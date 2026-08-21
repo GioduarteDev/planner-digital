@@ -1,0 +1,31 @@
+.library-page {
+  min-height: 100vh;
+}
+.library-content {
+  padding: 0 32px 32px;
+}
+
+.library-content-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.library-content-header h2 {
+  margin: 0;
+}
+
+.new-agenda-button {
+  padding: 10px 16px;
+
+  border: none;
+  border-radius: 10px;
+
+  cursor: pointer;
+}
+.agenda-grid {
+  display: flex;
+  gap: 24px;
+
+  margin-top: 24px;
+}

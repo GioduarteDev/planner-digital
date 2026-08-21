@@ -1,0 +1,15 @@
+.agenda-card {
+  width: 180px;
+}
+
+.agenda-cover {
+  width: 180px;
+  height: 240px;
+
+  background: #f3e8ee;
+  border-radius: 14px;
+}
+
+.agenda-card h3 {
+  margin: 10px 0 0;
+}
