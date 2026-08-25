@@ -29,3 +29,24 @@
 
   margin-top: 24px;
 }
+.library-content-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.agenda-count {
+  font-size: 14px;
+  color: #666666;
+}
+
+.new-agenda-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.agenda-form {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+}
