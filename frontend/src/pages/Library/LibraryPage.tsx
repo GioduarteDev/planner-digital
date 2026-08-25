@@ -34,6 +34,11 @@ function LibraryPage() {
   const [isCreatingAgenda, setIsCreatingAgenda] = useState(false)
   const [newAgendaTitle, setNewAgendaTitle] = useState('')
   const [newAgendaColor, setNewAgendaColor] = useState('#f0ece8')
+  const [searchTerm, setSearchTerm] = useState('')
+
+  const filteredAgendas = agendas.filter((agenda) =>
+    agenda.title.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
 
   function handleCreateAgenda() {
     if (agendas.length >= MAX_AGENDAS) {
@@ -87,6 +92,8 @@ function LibraryPage() {
           type="search"
           placeholder="Pesquisar..."
           aria-label="Pesquisar na biblioteca"
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
         />
       </header>
 
@@ -146,7 +153,7 @@ function LibraryPage() {
         )}
 
         <div className="agenda-grid">
-          {agendas.map((agenda) => (
+          {filteredAgendas.map((agenda) => (
             <AgendaCard
               key={agenda.id}
               title={agenda.title}
