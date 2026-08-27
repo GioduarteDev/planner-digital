@@ -50,3 +50,10 @@
   gap: 12px;
   margin-top: 24px;
 }
+.today-button {
+  padding: 8px 14px;
+  border: 1px solid #dddddd;
+  border-radius: 9px;
+  background: white;
+  cursor: pointer;
+}

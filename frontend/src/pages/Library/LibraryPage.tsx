@@ -118,6 +118,15 @@ function LibraryPage() {
           </button>
 
           <h1>Biblioteca</h1>
+          <button
+          className="today-button"
+          type="button"
+          onClick={() =>
+          navigate('/today')
+  }
+>
+  Hoje
+</button>
         </div>
 
         <input

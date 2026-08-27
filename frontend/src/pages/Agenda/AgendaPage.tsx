@@ -19,10 +19,14 @@ type StoredAgenda = {
   coverColor: string
 }
 
+type TaskPriority = 'low' | 'medium' | 'high'
+
 type PlannerTask = {
   id: number
   text: string
   done: boolean
+  dueDate: string
+  priority: TaskPriority
 }
 
 type PlannerPage = {
@@ -103,7 +107,12 @@ function AgendaPage() {
         title: page.title,
         content: page.content,
         favorite: page.favorite ?? false,
-        tasks: page.tasks ?? [],
+
+        tasks: (page.tasks ?? []).map((task) => ({
+          ...task,
+          dueDate: task.dueDate ?? '',
+          priority: task.priority ?? 'medium',
+        })),
       }))
     }
 
@@ -117,6 +126,14 @@ function AgendaPage() {
 
   const [newTaskText, setNewTaskText] =
     useState('')
+
+  const [newTaskDate, setNewTaskDate] =
+    useState('')
+
+  const [
+    newTaskPriority,
+    setNewTaskPriority,
+  ] = useState<TaskPriority>('medium')
 
   useEffect(() => {
     localStorage.setItem(
@@ -205,6 +222,8 @@ function AgendaPage() {
       id: Date.now(),
       text: newTaskText.trim(),
       done: false,
+      dueDate: newTaskDate,
+      priority: newTaskPriority,
     }
 
     setPages(
@@ -222,6 +241,8 @@ function AgendaPage() {
     )
 
     setNewTaskText('')
+    setNewTaskDate('')
+    setNewTaskPriority('medium')
   }
 
   function handleToggleTask(
@@ -398,6 +419,38 @@ function AgendaPage() {
                   }
                 />
 
+                <input
+                  type="date"
+                  value={newTaskDate}
+                  onChange={(event) =>
+                    setNewTaskDate(
+                      event.target.value,
+                    )
+                  }
+                />
+
+                <select
+                  value={newTaskPriority}
+                  onChange={(event) =>
+                    setNewTaskPriority(
+                      event.target
+                        .value as TaskPriority,
+                    )
+                  }
+                >
+                  <option value="low">
+                    Baixa
+                  </option>
+
+                  <option value="medium">
+                    Média
+                  </option>
+
+                  <option value="high">
+                    Alta
+                  </option>
+                </select>
+
                 <button type="submit">
                   Adicionar
                 </button>
@@ -410,30 +463,55 @@ function AgendaPage() {
                       className="task-item"
                       key={task.id}
                     >
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={task.done}
-                          onChange={() =>
-                            handleToggleTask(
-                              task.id,
-                            )
-                          }
-                        />
+                      <div className="task-main">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={task.done}
+                            onChange={() =>
+                              handleToggleTask(
+                                task.id,
+                              )
+                            }
+                          />
 
-                        <span
-                          className={
-                            task.done
-                              ? 'task-text done'
-                              : 'task-text'
-                          }
-                        >
-                          {task.text}
-                        </span>
-                      </label>
+                          <span
+                            className={
+                              task.done
+                                ? 'task-text done'
+                                : 'task-text'
+                            }
+                          >
+                            {task.text}
+                          </span>
+                        </label>
+
+                        <div className="task-details">
+                          {task.dueDate && (
+                            <span>
+                              📅 {task.dueDate}
+                            </span>
+                          )}
+
+                          <span>
+                            {task.priority ===
+                              'high' &&
+                              '🔴 Alta'}
+
+                            {task.priority ===
+                              'medium' &&
+                              '🟡 Média'}
+
+                            {task.priority ===
+                              'low' &&
+                              '🟢 Baixa'}
+                          </span>
+                        </div>
+                      </div>
 
                       <button
                         type="button"
+                        aria-label="Excluir tarefa"
                         onClick={() =>
                           handleDeleteTask(
                             task.id,

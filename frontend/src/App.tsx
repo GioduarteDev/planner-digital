@@ -6,6 +6,7 @@ import {
 
 import AgendaPage from './pages/Agenda/AgendaPage'
 import LibraryPage from './pages/Library/LibraryPage'
+import TodayPage from './pages/Today/TodayPage'
 
 function App() {
   return (
@@ -14,6 +15,11 @@ function App() {
         <Route
           path="/"
           element={<LibraryPage />}
+        />
+
+        <Route
+          path="/today"
+          element={<TodayPage />}
         />
 
         <Route
