@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import './LibraryPage.css'
 
 import AgendaCard from '../../components/AgendaCard/AgendaCard'
 
 const MAX_AGENDAS = 6
+const STORAGE_KEY = 'planner-agendas'
 
 const initialAgendas = [
   {
@@ -30,19 +32,46 @@ const initialAgendas = [
 ]
 
 function LibraryPage() {
-  const [agendas, setAgendas] = useState(initialAgendas)
+  const navigate = useNavigate()
+
+  const [agendas, setAgendas] = useState(() => {
+    const savedAgendas = localStorage.getItem(STORAGE_KEY)
+
+    if (savedAgendas) {
+      return JSON.parse(savedAgendas)
+    }
+
+    return initialAgendas
+  })
+
   const [isCreatingAgenda, setIsCreatingAgenda] = useState(false)
   const [newAgendaTitle, setNewAgendaTitle] = useState('')
   const [newAgendaColor, setNewAgendaColor] = useState('#f0ece8')
   const [searchTerm, setSearchTerm] = useState('')
 
-  const filteredAgendas = agendas.filter((agenda) =>
-    agenda.title.toLowerCase().includes(searchTerm.toLowerCase()),
+  useEffect(() => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(agendas),
+    )
+  }, [agendas])
+
+  const filteredAgendas = agendas.filter((agenda: {
+    id: number
+    title: string
+    coverColor: string
+  }) =>
+    agenda.title
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase()),
   )
 
   function handleCreateAgenda() {
     if (agendas.length >= MAX_AGENDAS) {
-      alert(`Você pode ter no máximo ${MAX_AGENDAS} agendas ativas.`)
+      alert(
+        `Você pode ter no máximo ${MAX_AGENDAS} agendas ativas.`,
+      )
+
       return
     }
 
@@ -66,10 +95,14 @@ function LibraryPage() {
 
   function handleDeleteAgenda(id: number) {
     const updatedAgendas = agendas.filter(
-      (agenda) => agenda.id !== id,
+      (agenda: { id: number }) => agenda.id !== id,
     )
 
     setAgendas(updatedAgendas)
+  }
+
+  function handleOpenAgenda(id: number) {
+    navigate(`/agenda/${id}`)
   }
 
   return (
@@ -93,7 +126,9 @@ function LibraryPage() {
           placeholder="Pesquisar..."
           aria-label="Pesquisar na biblioteca"
           value={searchTerm}
-          onChange={(event) => setSearchTerm(event.target.value)}
+          onChange={(event) =>
+            setSearchTerm(event.target.value)
+          }
         />
       </header>
 
@@ -109,7 +144,9 @@ function LibraryPage() {
             <button
               className="new-agenda-button"
               type="button"
-              onClick={() => setIsCreatingAgenda(true)}
+              onClick={() =>
+                setIsCreatingAgenda(true)
+              }
               disabled={agendas.length >= MAX_AGENDAS}
             >
               + Nova agenda
@@ -145,7 +182,9 @@ function LibraryPage() {
 
             <button
               type="button"
-              onClick={() => setIsCreatingAgenda(false)}
+              onClick={() =>
+                setIsCreatingAgenda(false)
+              }
             >
               Cancelar
             </button>
@@ -153,14 +192,25 @@ function LibraryPage() {
         )}
 
         <div className="agenda-grid">
-          {filteredAgendas.map((agenda) => (
-            <AgendaCard
-              key={agenda.id}
-              title={agenda.title}
-              coverColor={agenda.coverColor}
-              onDelete={() => handleDeleteAgenda(agenda.id)}
-            />
-          ))}
+          {filteredAgendas.map(
+            (agenda: {
+              id: number
+              title: string
+              coverColor: string
+            }) => (
+              <AgendaCard
+                key={agenda.id}
+                title={agenda.title}
+                coverColor={agenda.coverColor}
+                onOpen={() =>
+                  handleOpenAgenda(agenda.id)
+                }
+                onDelete={() =>
+                  handleDeleteAgenda(agenda.id)
+                }
+              />
+            ),
+          )}
         </div>
       </section>
     </main>

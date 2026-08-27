@@ -1,0 +1,209 @@
+.agenda-page {
+  min-height: 100vh;
+  display: flex;
+  background: #faf9f7;
+}
+
+.agenda-sidebar {
+  width: 260px;
+  min-height: 100vh;
+  padding: 24px;
+  border-right: 1px solid #e4e1dc;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 24px;
+  color: #555555;
+  text-decoration: none;
+}
+
+.agenda-sidebar h2 {
+  margin: 0 0 24px;
+}
+
+.pages-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.pages-header span {
+  font-size: 13px;
+  color: #777777;
+}
+
+.pages-header button {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.pages-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.page-button {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.page-button:hover {
+  background: #f4f2ef;
+}
+
+.page-button.active {
+  background: #ece8e3;
+}
+
+.agenda-editor {
+  flex: 1;
+  padding: 48px;
+  box-sizing: border-box;
+}
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.page-title-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 30px;
+  font-weight: 600;
+  outline: none;
+}
+
+.delete-page-button {
+  padding: 8px 12px;
+  border: 1px solid #dddddd;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+}
+
+.page-content {
+  width: 100%;
+  min-height: 65vh;
+  padding: 24px;
+  border: 1px solid #e4e1dc;
+  border-radius: 14px;
+  background: white;
+  resize: vertical;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.7;
+  outline: none;
+}
+
+.autosave-message {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #888888;
+}
+
+@media (max-width: 800px) {
+  .agenda-page {
+    flex-direction: column;
+  }
+
+  .agenda-sidebar {
+    width: 100%;
+    min-height: auto;
+    border-right: none;
+    border-bottom: 1px solid #e4e1dc;
+  }
+
+  .agenda-editor {
+    padding: 24px;
+  }
+}
+.favorite-button {
+  padding: 8px 12px;
+  border: 1px solid #dddddd;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+}
+
+.tasks-section {
+  margin-bottom: 24px;
+  padding: 20px;
+  border: 1px solid #e4e1dc;
+  border-radius: 14px;
+  background: white;
+}
+
+.tasks-section h3 {
+  margin: 0 0 16px;
+}
+
+.task-form {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.task-form input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #dddddd;
+  border-radius: 8px;
+}
+
+.task-form button {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.task-item label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.task-item button {
+  border: none;
+  background: transparent;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.task-text.done {
+  text-decoration: line-through;
+  color: #999999;
+}
