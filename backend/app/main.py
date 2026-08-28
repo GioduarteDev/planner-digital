@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app import models
-from app.database import Base, engine
+from app.database import engine
 
 from app.routes.agendas import (
     router as agendas_router,
@@ -22,10 +22,6 @@ from app.routes.tasks import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(
-        bind=engine
-    )
-
     yield
 
 
