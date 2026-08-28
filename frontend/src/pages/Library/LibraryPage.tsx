@@ -68,33 +68,46 @@ function LibraryPage() {
 
 
   useEffect(() => {
-    loadAgendas()
-  }, [])
+  let cancelled = false
 
-
-  async function loadAgendas() {
+  async function loadAgendasFromApi() {
     try {
-      setIsLoading(true)
-
       const data =
         await apiRequest<AgendaFromApi[]>(
           '/agendas',
         )
+
+      if (cancelled) {
+        return
+      }
 
       const convertedAgendas =
         data.map(convertAgendaFromApi)
 
       setAgendas(convertedAgendas)
     } catch (error) {
+      if (cancelled) {
+        return
+      }
+
       console.error(error)
 
       alert(
         'Não foi possível carregar as agendas.',
       )
     } finally {
-      setIsLoading(false)
+      if (!cancelled) {
+        setIsLoading(false)
+      }
     }
   }
+
+  void loadAgendasFromApi()
+
+  return () => {
+    cancelled = true
+  }
+}, [])
 
 
   const filteredAgendas = agendas.filter(
