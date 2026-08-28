@@ -1,72 +1,113 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import AgendaCard from '../../components/AgendaCard/AgendaCard'
+import { apiRequest } from '../../services/api'
+
 import './LibraryPage.css'
 
-import AgendaCard from '../../components/AgendaCard/AgendaCard'
 
 const MAX_AGENDAS = 6
-const STORAGE_KEY = 'planner-agendas'
 
-const initialAgendas = [
-  {
-    id: 1,
-    title: 'Planner 2026',
-    coverColor: '#f3e8ee',
-  },
-  {
-    id: 2,
-    title: 'Diário',
-    coverColor: '#e8e5f3',
-  },
-  {
-    id: 3,
-    title: 'Faculdade',
-    coverColor: '#e5edf3',
-  },
-  {
-    id: 4,
-    title: 'Projetos',
-    coverColor: '#eee7dc',
-  },
-]
+
+type Agenda = {
+  id: number
+  title: string
+  coverColor: string
+}
+
+
+type AgendaFromApi = {
+  id: number
+  title: string
+  cover_color: string
+  created_at: string
+}
+
+
+function convertAgendaFromApi(
+  agenda: AgendaFromApi,
+): Agenda {
+  return {
+    id: agenda.id,
+    title: agenda.title,
+    coverColor: agenda.cover_color,
+  }
+}
+
 
 function LibraryPage() {
   const navigate = useNavigate()
 
-  const [agendas, setAgendas] = useState(() => {
-    const savedAgendas = localStorage.getItem(STORAGE_KEY)
+  const [agendas, setAgendas] = useState<Agenda[]>([])
 
-    if (savedAgendas) {
-      return JSON.parse(savedAgendas)
-    }
+  const [
+    isCreatingAgenda,
+    setIsCreatingAgenda,
+  ] = useState(false)
 
-    return initialAgendas
-  })
+  const [
+    newAgendaTitle,
+    setNewAgendaTitle,
+  ] = useState('')
 
-  const [isCreatingAgenda, setIsCreatingAgenda] = useState(false)
-  const [newAgendaTitle, setNewAgendaTitle] = useState('')
-  const [newAgendaColor, setNewAgendaColor] = useState('#f0ece8')
-  const [searchTerm, setSearchTerm] = useState('')
+  const [
+    newAgendaColor,
+    setNewAgendaColor,
+  ] = useState('#f0ece8')
+
+  const [
+    searchTerm,
+    setSearchTerm,
+  ] = useState('')
+
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(true)
+
 
   useEffect(() => {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(agendas),
-    )
-  }, [agendas])
+    loadAgendas()
+  }, [])
 
-  const filteredAgendas = agendas.filter((agenda: {
-    id: number
-    title: string
-    coverColor: string
-  }) =>
-    agenda.title
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase()),
+
+  async function loadAgendas() {
+    try {
+      setIsLoading(true)
+
+      const data =
+        await apiRequest<AgendaFromApi[]>(
+          '/agendas',
+        )
+
+      const convertedAgendas =
+        data.map(convertAgendaFromApi)
+
+      setAgendas(convertedAgendas)
+    } catch (error) {
+      console.error(error)
+
+      alert(
+        'Não foi possível carregar as agendas.',
+      )
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+
+  const filteredAgendas = agendas.filter(
+    (agenda) =>
+      agenda.title
+        .toLowerCase()
+        .includes(
+          searchTerm.toLowerCase(),
+        ),
   )
 
-  function handleCreateAgenda() {
+
+  async function handleCreateAgenda() {
     if (agendas.length >= MAX_AGENDAS) {
       alert(
         `Você pode ter no máximo ${MAX_AGENDAS} agendas ativas.`,
@@ -76,34 +117,95 @@ function LibraryPage() {
     }
 
     if (newAgendaTitle.trim() === '') {
-      alert('Digite um nome para a agenda.')
+      alert(
+        'Digite um nome para a agenda.',
+      )
+
       return
     }
 
-    const newAgenda = {
-      id: Date.now(),
-      title: newAgendaTitle,
-      coverColor: newAgendaColor,
+    try {
+      const createdAgenda =
+        await apiRequest<AgendaFromApi>(
+          '/agendas',
+          {
+            method: 'POST',
+
+            body: JSON.stringify({
+              title: newAgendaTitle,
+              cover_color:
+                newAgendaColor,
+            }),
+          },
+        )
+
+      const convertedAgenda =
+        convertAgendaFromApi(
+          createdAgenda,
+        )
+
+      setAgendas((currentAgendas) => [
+        ...currentAgendas,
+        convertedAgenda,
+      ])
+
+      setNewAgendaTitle('')
+      setNewAgendaColor('#f0ece8')
+      setIsCreatingAgenda(false)
+    } catch (error) {
+      console.error(error)
+
+      if (error instanceof Error) {
+        alert(error.message)
+      }
     }
-
-    setAgendas([...agendas, newAgenda])
-
-    setNewAgendaTitle('')
-    setNewAgendaColor('#f0ece8')
-    setIsCreatingAgenda(false)
   }
 
-  function handleDeleteAgenda(id: number) {
-    const updatedAgendas = agendas.filter(
-      (agenda: { id: number }) => agenda.id !== id,
+
+  async function handleDeleteAgenda(
+    id: number,
+  ) {
+    const confirmed = window.confirm(
+      'Deseja realmente excluir esta agenda?',
     )
 
-    setAgendas(updatedAgendas)
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      await apiRequest<void>(
+        `/agendas/${id}`,
+        {
+          method: 'DELETE',
+        },
+      )
+
+      setAgendas(
+        (currentAgendas) =>
+          currentAgendas.filter(
+            (agenda) =>
+              agenda.id !== id,
+          ),
+      )
+    } catch (error) {
+      console.error(error)
+
+      if (error instanceof Error) {
+        alert(error.message)
+      }
+    }
   }
 
-  function handleOpenAgenda(id: number) {
-    navigate(`/agenda/${id}`)
+
+  function handleOpenAgenda(
+    id: number,
+  ) {
+    navigate(
+      `/agenda/${id}`,
+    )
   }
+
 
   return (
     <main className="library-page">
@@ -118,15 +220,16 @@ function LibraryPage() {
           </button>
 
           <h1>Biblioteca</h1>
+
           <button
-          className="today-button"
-          type="button"
-          onClick={() =>
-          navigate('/today')
-  }
->
-  Hoje
-</button>
+            className="today-button"
+            type="button"
+            onClick={() =>
+              navigate('/today')
+            }
+          >
+            Hoje
+          </button>
         </div>
 
         <input
@@ -136,7 +239,9 @@ function LibraryPage() {
           aria-label="Pesquisar na biblioteca"
           value={searchTerm}
           onChange={(event) =>
-            setSearchTerm(event.target.value)
+            setSearchTerm(
+              event.target.value,
+            )
           }
         />
       </header>
@@ -147,7 +252,8 @@ function LibraryPage() {
 
           <div className="library-content-actions">
             <span className="agenda-count">
-              {agendas.length}/{MAX_AGENDAS} agendas
+              {agendas.length}/
+              {MAX_AGENDAS} agendas
             </span>
 
             <button
@@ -156,7 +262,10 @@ function LibraryPage() {
               onClick={() =>
                 setIsCreatingAgenda(true)
               }
-              disabled={agendas.length >= MAX_AGENDAS}
+              disabled={
+                agendas.length >=
+                MAX_AGENDAS
+              }
             >
               + Nova agenda
             </button>
@@ -170,7 +279,9 @@ function LibraryPage() {
               placeholder="Nome da agenda"
               value={newAgendaTitle}
               onChange={(event) =>
-                setNewAgendaTitle(event.target.value)
+                setNewAgendaTitle(
+                  event.target.value,
+                )
               }
             />
 
@@ -178,13 +289,17 @@ function LibraryPage() {
               type="color"
               value={newAgendaColor}
               onChange={(event) =>
-                setNewAgendaColor(event.target.value)
+                setNewAgendaColor(
+                  event.target.value,
+                )
               }
             />
 
             <button
               type="button"
-              onClick={handleCreateAgenda}
+              onClick={
+                handleCreateAgenda
+              }
             >
               Criar agenda
             </button>
@@ -192,7 +307,9 @@ function LibraryPage() {
             <button
               type="button"
               onClick={() =>
-                setIsCreatingAgenda(false)
+                setIsCreatingAgenda(
+                  false,
+                )
               }
             >
               Cancelar
@@ -200,30 +317,37 @@ function LibraryPage() {
           </div>
         )}
 
-        <div className="agenda-grid">
-          {filteredAgendas.map(
-            (agenda: {
-              id: number
-              title: string
-              coverColor: string
-            }) => (
-              <AgendaCard
-                key={agenda.id}
-                title={agenda.title}
-                coverColor={agenda.coverColor}
-                onOpen={() =>
-                  handleOpenAgenda(agenda.id)
-                }
-                onDelete={() =>
-                  handleDeleteAgenda(agenda.id)
-                }
-              />
-            ),
-          )}
-        </div>
+        {isLoading ? (
+          <p>Carregando agendas...</p>
+        ) : (
+          <div className="agenda-grid">
+            {filteredAgendas.map(
+              (agenda) => (
+                <AgendaCard
+                  key={agenda.id}
+                  title={agenda.title}
+                  coverColor={
+                    agenda.coverColor
+                  }
+                  onOpen={() =>
+                    handleOpenAgenda(
+                      agenda.id,
+                    )
+                  }
+                  onDelete={() =>
+                    handleDeleteAgenda(
+                      agenda.id,
+                    )
+                  }
+                />
+              ),
+            )}
+          </div>
+        )}
       </section>
     </main>
   )
 }
+
 
 export default LibraryPage
