@@ -13,7 +13,16 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Agenda, Page
+from app.dependencies import (
+    get_current_user,
+)
+
+from app.models import (
+    Agenda,
+    Page,
+    User,
+)
+
 from app.schemas import (
     AgendaCreate,
     AgendaResponse,
@@ -35,14 +44,28 @@ router = APIRouter(
     response_model=list[AgendaResponse],
 )
 def list_agendas(
-    db: Session = Depends(get_db),
+    db: Session = Depends(
+        get_db
+    ),
+
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
     statement = (
         select(Agenda)
-        .order_by(Agenda.created_at)
+        .where(
+            Agenda.user_id
+            == current_user.id
+        )
+        .order_by(
+            Agenda.created_at
+        )
     )
 
-    return db.scalars(statement).all()
+    return db.scalars(
+        statement
+    ).all()
 
 
 @router.get(
@@ -51,17 +74,30 @@ def list_agendas(
 )
 def get_agenda(
     agenda_id: int,
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db
+    ),
+
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
-    agenda = db.get(
-        Agenda,
-        agenda_id,
+    agenda = db.scalar(
+        select(Agenda)
+        .where(
+            Agenda.id == agenda_id,
+            Agenda.user_id
+            == current_user.id,
+        )
     )
 
     if agenda is None:
         raise HTTPException(
             status_code=404,
-            detail="Agenda não encontrada.",
+            detail=(
+                "Agenda não encontrada."
+            ),
         )
 
     return agenda
@@ -70,18 +106,40 @@ def get_agenda(
 @router.post(
     "",
     response_model=AgendaResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=(
+        status.HTTP_201_CREATED
+    ),
 )
 def create_agenda(
     data: AgendaCreate,
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db
+    ),
+
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
     agenda_count = db.scalar(
-        select(func.count())
+        select(
+            func.count()
+        )
         .select_from(Agenda)
+        .where(
+            Agenda.user_id
+            == current_user.id
+        )
     )
 
-    if agenda_count >= MAX_AGENDAS:
+    agenda_count = (
+        agenda_count or 0
+    )
+
+    if (
+        agenda_count >=
+        MAX_AGENDAS
+    ):
         raise HTTPException(
             status_code=400,
             detail=(
@@ -91,14 +149,23 @@ def create_agenda(
         )
 
     agenda = Agenda(
+        user_id=current_user.id,
         title=data.title,
-        cover_color=data.cover_color,
+        cover_color=(
+            data.cover_color
+        ),
     )
 
-    for page_number in range(1, 6):
+    for page_number in range(
+        1,
+        6,
+    ):
         agenda.pages.append(
             Page(
-                title=f"Página {page_number}",
+                title=(
+                    f"Página "
+                    f"{page_number}"
+                ),
                 content="",
                 favorite=False,
             )
@@ -118,24 +185,42 @@ def create_agenda(
 def update_agenda(
     agenda_id: int,
     data: AgendaUpdate,
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db
+    ),
+
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
-    agenda = db.get(
-        Agenda,
-        agenda_id,
+    agenda = db.scalar(
+        select(Agenda)
+        .where(
+            Agenda.id == agenda_id,
+            Agenda.user_id
+            == current_user.id,
+        )
     )
 
     if agenda is None:
         raise HTTPException(
             status_code=404,
-            detail="Agenda não encontrada.",
+            detail=(
+                "Agenda não encontrada."
+            ),
         )
 
-    update_data = data.model_dump(
-        exclude_unset=True
+    update_data = (
+        data.model_dump(
+            exclude_unset=True
+        )
     )
 
-    for field, value in update_data.items():
+    for (
+        field,
+        value,
+    ) in update_data.items():
         setattr(
             agenda,
             field,
@@ -150,21 +235,36 @@ def update_agenda(
 
 @router.delete(
     "/{agenda_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
+    status_code=(
+        status.HTTP_204_NO_CONTENT
+    ),
 )
 def delete_agenda(
     agenda_id: int,
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db
+    ),
+
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
-    agenda = db.get(
-        Agenda,
-        agenda_id,
+    agenda = db.scalar(
+        select(Agenda)
+        .where(
+            Agenda.id == agenda_id,
+            Agenda.user_id
+            == current_user.id,
+        )
     )
 
     if agenda is None:
         raise HTTPException(
             status_code=404,
-            detail="Agenda não encontrada.",
+            detail=(
+                "Agenda não encontrada."
+            ),
         )
 
     db.delete(agenda)

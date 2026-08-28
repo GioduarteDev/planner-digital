@@ -13,7 +13,16 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Agenda, Page
+from app.dependencies import (
+    get_current_user,
+)
+
+from app.models import (
+    Agenda,
+    Page,
+    User,
+)
+
 from app.schemas import (
     PageCreate,
     PageResponse,
@@ -29,23 +38,54 @@ router = APIRouter(
 )
 
 
+def get_user_page(
+    page_id: int,
+    user_id: int,
+    db: Session,
+) -> Page | None:
+    return db.scalar(
+        select(Page)
+        .join(
+            Agenda,
+            Page.agenda_id == Agenda.id,
+        )
+        .where(
+            Page.id == page_id,
+            Agenda.user_id == user_id,
+        )
+    )
+
+
 @router.get(
     "/agendas/{agenda_id}/pages",
     response_model=list[PageResponse],
 )
 def list_pages(
     agenda_id: int,
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db
+    ),
+
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
-    agenda = db.get(
-        Agenda,
-        agenda_id,
+    agenda = db.scalar(
+        select(Agenda)
+        .where(
+            Agenda.id == agenda_id,
+            Agenda.user_id
+            == current_user.id,
+        )
     )
 
     if agenda is None:
         raise HTTPException(
             status_code=404,
-            detail="Agenda não encontrada.",
+            detail=(
+                "Agenda não encontrada."
+            ),
         )
 
     statement = (
@@ -59,7 +99,9 @@ def list_pages(
         )
     )
 
-    return db.scalars(statement).all()
+    return db.scalars(
+        statement
+    ).all()
 
 
 @router.get(
@@ -68,17 +110,27 @@ def list_pages(
 )
 def get_page(
     page_id: int,
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db
+    ),
+
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
-    page = db.get(
-        Page,
+    page = get_user_page(
         page_id,
+        current_user.id,
+        db,
     )
 
     if page is None:
         raise HTTPException(
             status_code=404,
-            detail="Página não encontrada.",
+            detail=(
+                "Página não encontrada."
+            ),
         )
 
     return page
@@ -87,35 +139,58 @@ def get_page(
 @router.post(
     "/agendas/{agenda_id}/pages",
     response_model=PageResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=(
+        status.HTTP_201_CREATED
+    ),
 )
 def create_page(
     agenda_id: int,
     data: PageCreate,
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db
+    ),
+
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
-    agenda = db.get(
-        Agenda,
-        agenda_id,
+    agenda = db.scalar(
+        select(Agenda)
+        .where(
+            Agenda.id == agenda_id,
+            Agenda.user_id
+            == current_user.id,
+        )
     )
 
     if agenda is None:
         raise HTTPException(
             status_code=404,
-            detail="Agenda não encontrada.",
+            detail=(
+                "Agenda não encontrada."
+            ),
         )
 
     page_count = db.scalar(
-        select(func.count())
+        select(
+            func.count()
+        )
         .select_from(Page)
         .where(
-            Page.agenda_id == agenda_id
+            Page.agenda_id
+            == agenda_id
         )
     )
 
-    page_count = page_count or 0
+    page_count = (
+        page_count or 0
+    )
 
-    if page_count >= MAX_PAGES:
+    if (
+        page_count >=
+        MAX_PAGES
+    ):
         raise HTTPException(
             status_code=400,
             detail=(
@@ -151,24 +226,39 @@ def create_page(
 def update_page(
     page_id: int,
     data: PageUpdate,
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db
+    ),
+
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
-    page = db.get(
-        Page,
+    page = get_user_page(
         page_id,
+        current_user.id,
+        db,
     )
 
     if page is None:
         raise HTTPException(
             status_code=404,
-            detail="Página não encontrada.",
+            detail=(
+                "Página não encontrada."
+            ),
         )
 
-    update_data = data.model_dump(
-        exclude_unset=True
+    update_data = (
+        data.model_dump(
+            exclude_unset=True
+        )
     )
 
-    for field, value in update_data.items():
+    for (
+        field,
+        value,
+    ) in update_data.items():
         setattr(
             page,
             field,
@@ -183,29 +273,48 @@ def update_page(
 
 @router.delete(
     "/pages/{page_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
+    status_code=(
+        status.HTTP_204_NO_CONTENT
+    ),
 )
 def delete_page(
     page_id: int,
-    db: Session = Depends(get_db),
+
+    db: Session = Depends(
+        get_db
+    ),
+
+    current_user: User = Depends(
+        get_current_user
+    ),
 ):
-    page = db.get(
-        Page,
+    page = get_user_page(
         page_id,
+        current_user.id,
+        db,
     )
 
     if page is None:
         raise HTTPException(
             status_code=404,
-            detail="Página não encontrada.",
+            detail=(
+                "Página não encontrada."
+            ),
         )
 
     page_count = db.scalar(
-        select(func.count())
+        select(
+            func.count()
+        )
         .select_from(Page)
         .where(
-            Page.agenda_id == page.agenda_id
+            Page.agenda_id
+            == page.agenda_id
         )
+    )
+
+    page_count = (
+        page_count or 0
     )
 
     if page_count <= 1:
