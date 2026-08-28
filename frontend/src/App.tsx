@@ -1,34 +1,98 @@
+import type {
+  ReactNode,
+} from 'react'
+
 import {
   BrowserRouter,
+  Navigate,
   Route,
   Routes,
 } from 'react-router-dom'
 
-import AgendaPage from './pages/Agenda/AgendaPage'
-import LibraryPage from './pages/Library/LibraryPage'
-import TodayPage from './pages/Today/TodayPage'
+import AgendaPage
+  from './pages/Agenda/AgendaPage'
+
+import AuthPage
+  from './pages/Auth/AuthPage'
+
+import LibraryPage
+  from './pages/Library/LibraryPage'
+
+import TodayPage
+  from './pages/Today/TodayPage'
+
+import {
+  getAccessToken,
+} from './services/api'
+
+
+function ProtectedRoute({
+  children,
+}: {
+  children: ReactNode
+}) {
+  const token =
+    getAccessToken()
+
+
+  if (!token) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+      />
+    )
+  }
+
+
+  return children
+}
+
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route
-          path="/"
-          element={<LibraryPage />}
+          path="/login"
+          element={
+            <AuthPage />
+          }
         />
+
+
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <LibraryPage />
+            </ProtectedRoute>
+          }
+        />
+
 
         <Route
           path="/today"
-          element={<TodayPage />}
+          element={
+            <ProtectedRoute>
+              <TodayPage />
+            </ProtectedRoute>
+          }
         />
+
 
         <Route
           path="/agenda/:id"
-          element={<AgendaPage />}
+          element={
+            <ProtectedRoute>
+              <AgendaPage />
+            </ProtectedRoute>
+          }
         />
       </Routes>
     </BrowserRouter>
   )
 }
+
 
 export default App

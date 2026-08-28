@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import date, datetime
 
 from sqlalchemy import (
@@ -9,6 +11,7 @@ from sqlalchemy import (
     Text,
     func,
 )
+
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -18,11 +21,46 @@ from sqlalchemy.orm import (
 from app.database import Base
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(
+        primary_key=True
+    )
+
+    email: Mapped[str] = mapped_column(
+        String(255),
+        unique=True,
+        index=True,
+    )
+
+    password_hash: Mapped[str] = mapped_column(
+        String(255)
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+    )
+
+    agendas: Mapped[list[Agenda]] = relationship(
+        back_populates="user"
+    )
+
+
 class Agenda(Base):
     __tablename__ = "agendas"
 
     id: Mapped[int] = mapped_column(
         primary_key=True
+    )
+
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE",
+        ),
+        nullable=True,
     )
 
     title: Mapped[str] = mapped_column(
@@ -39,7 +77,11 @@ class Agenda(Base):
         server_default=func.now(),
     )
 
-    pages: Mapped[list["Page"]] = relationship(
+    user: Mapped[User | None] = relationship(
+        back_populates="agendas"
+    )
+
+    pages: Mapped[list[Page]] = relationship(
         back_populates="agenda",
         cascade="all, delete-orphan",
     )
@@ -78,11 +120,11 @@ class Page(Base):
         server_default=func.now(),
     )
 
-    agenda: Mapped["Agenda"] = relationship(
+    agenda: Mapped[Agenda] = relationship(
         back_populates="pages"
     )
 
-    tasks: Mapped[list["Task"]] = relationship(
+    tasks: Mapped[list[Task]] = relationship(
         back_populates="page",
         cascade="all, delete-orphan",
     )
@@ -126,6 +168,6 @@ class Task(Base):
         server_default=func.now(),
     )
 
-    page: Mapped["Page"] = relationship(
+    page: Mapped[Page] = relationship(
         back_populates="tasks"
     )

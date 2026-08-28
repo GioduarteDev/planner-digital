@@ -1,11 +1,21 @@
 from pathlib import Path
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    SettingsConfigDict,
+)
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = (
+    Path(__file__)
+    .resolve()
+    .parent
+    .parent
+)
 
-ENV_FILE = BASE_DIR / ".env"
+ENV_FILE = (
+    BASE_DIR / ".env"
+)
 
 
 class Settings(BaseSettings):
@@ -14,6 +24,10 @@ class Settings(BaseSettings):
     db_name: str
     db_user: str
     db_password: str
+
+    jwt_secret: str
+    jwt_algorithm: str = "HS256"
+    jwt_expiration_minutes: int = 1440
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
