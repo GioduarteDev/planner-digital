@@ -28,6 +28,17 @@ type EventFromApi = {
 }
 
 
+type TaskFromApi = {
+  id: number
+  page_id: number
+  text: string
+  done: boolean
+  due_date: string | null
+  priority: string
+  created_at: string
+}
+
+
 type CalendarEvent = {
   id: number
   title: string
@@ -36,6 +47,15 @@ type CalendarEvent = {
   endsAt: string | null
   allDay: boolean
   reminderMinutes: number | null
+}
+
+
+type CalendarTask = {
+  id: number
+  text: string
+  done: boolean
+  dueDate: string | null
+  priority: string
 }
 
 
@@ -125,6 +145,13 @@ function CalendarPage() {
 
 
   const [
+    tasks,
+    setTasks,
+  ] =
+    useState<CalendarTask[]>([])
+
+
+  const [
     selectedDate,
     setSelectedDate,
   ] =
@@ -132,6 +159,15 @@ function CalendarPage() {
       formatDateKey(
         today,
       ),
+    )
+
+
+  const [
+    editingEventId,
+    setEditingEventId,
+  ] =
+    useState<number | null>(
+      null,
     )
 
 
@@ -188,12 +224,21 @@ function CalendarPage() {
     let cancelled = false
 
 
-    async function loadEvents() {
+    async function loadCalendar() {
       try {
-        const data =
-          await apiRequest<EventFromApi[]>(
-            '/events',
-          )
+        const [
+          eventsData,
+          tasksData,
+        ] =
+          await Promise.all([
+            apiRequest<EventFromApi[]>(
+              '/events',
+            ),
+
+            apiRequest<TaskFromApi[]>(
+              '/tasks',
+            ),
+          ])
 
 
         if (cancelled) {
@@ -202,7 +247,7 @@ function CalendarPage() {
 
 
         setEvents(
-          data.map(
+          eventsData.map(
             (event) => ({
               id: event.id,
               title: event.title,
@@ -219,6 +264,21 @@ function CalendarPage() {
             }),
           ),
         )
+
+
+        setTasks(
+          tasksData.map(
+            (task) => ({
+              id: task.id,
+              text: task.text,
+              done: task.done,
+              dueDate:
+                task.due_date,
+              priority:
+                task.priority,
+            }),
+          ),
+        )
       } catch (error) {
         if (cancelled) {
           return
@@ -229,17 +289,19 @@ function CalendarPage() {
         )
 
         alert(
-          'Não foi possível carregar os eventos.',
+          'Não foi possível carregar o calendário.',
         )
       } finally {
         if (!cancelled) {
-          setIsLoading(false)
+          setIsLoading(
+            false,
+          )
         }
       }
     }
 
 
-    void loadEvents()
+    void loadCalendar()
 
 
     return () => {
@@ -278,6 +340,7 @@ function CalendarPage() {
           firstDay
           + daysInMonth,
       },
+
       (
         _,
         index,
@@ -297,6 +360,19 @@ function CalendarPage() {
     )
 
 
+  function resetEventForm() {
+    setEditingEventId(
+      null,
+    )
+
+    setTitle('')
+    setDescription('')
+    setTime('09:00')
+    setAllDay(false)
+    setReminderMinutes('')
+  }
+
+
   function previousMonth() {
     setCurrentDate(
       new Date(
@@ -305,6 +381,8 @@ function CalendarPage() {
         1,
       ),
     )
+
+    resetEventForm()
   }
 
 
@@ -316,6 +394,8 @@ function CalendarPage() {
         1,
       ),
     )
+
+    resetEventForm()
   }
 
 
@@ -333,6 +413,8 @@ function CalendarPage() {
         today,
       ),
     )
+
+    resetEventForm()
   }
 
 
@@ -351,6 +433,8 @@ function CalendarPage() {
         date,
       ),
     )
+
+    resetEventForm()
   }
 
 
@@ -388,7 +472,31 @@ function CalendarPage() {
   }
 
 
-  async function createEvent() {
+  function getTasksForDay(
+    day: number,
+  ) {
+    const date =
+      new Date(
+        year,
+        month,
+        day,
+      )
+
+    const dateKey =
+      formatDateKey(
+        date,
+      )
+
+
+    return tasks.filter(
+      (task) =>
+        task.dueDate
+        === dateKey,
+    )
+  }
+
+
+  async function saveEvent() {
     if (
       title.trim() === ''
     ) {
@@ -418,67 +526,113 @@ function CalendarPage() {
         ).toISOString()
 
 
-      const created =
-        await apiRequest<EventFromApi>(
-          '/events',
-          {
-            method: 'POST',
+      const body =
+        JSON.stringify({
+          title:
+            title.trim(),
 
-            body: JSON.stringify({
-              title:
-                title.trim(),
+          description:
+            description.trim(),
 
-              description:
-                description.trim(),
+          starts_at:
+            startsAt,
 
-              starts_at:
-                startsAt,
+          ends_at:
+            null,
 
-              ends_at:
-                null,
+          all_day:
+            allDay,
 
-              all_day:
-                allDay,
+          reminder_minutes:
+            reminderMinutes === ''
+              ? null
+              : Number(
+                  reminderMinutes,
+                ),
+        })
 
-              reminder_minutes:
-                reminderMinutes === ''
-                  ? null
-                  : Number(
-                      reminderMinutes,
-                    ),
-            }),
-          },
+
+      if (
+        editingEventId
+        !== null
+      ) {
+        const updated =
+          await apiRequest<EventFromApi>(
+            `/events/${editingEventId}`,
+            {
+              method: 'PATCH',
+              body,
+            },
+          )
+
+
+        setEvents(
+          (currentEvents) =>
+            currentEvents.map(
+              (event) =>
+                event.id
+                === updated.id
+                  ? {
+                      id:
+                        updated.id,
+
+                      title:
+                        updated.title,
+
+                      description:
+                        updated.description,
+
+                      startsAt:
+                        updated.starts_at,
+
+                      endsAt:
+                        updated.ends_at,
+
+                      allDay:
+                        updated.all_day,
+
+                      reminderMinutes:
+                        updated.reminder_minutes,
+                    }
+                  : event,
+            ),
         )
+      } else {
+        const created =
+          await apiRequest<EventFromApi>(
+            '/events',
+            {
+              method: 'POST',
+              body,
+            },
+          )
 
 
-      setEvents(
-        (currentEvents) => [
-          ...currentEvents,
+        setEvents(
+          (currentEvents) => [
+            ...currentEvents,
 
-          {
-            id: created.id,
-            title:
-              created.title,
-            description:
-              created.description,
-            startsAt:
-              created.starts_at,
-            endsAt:
-              created.ends_at,
-            allDay:
-              created.all_day,
-            reminderMinutes:
-              created.reminder_minutes,
-          },
-        ],
-      )
+            {
+              id: created.id,
+              title:
+                created.title,
+              description:
+                created.description,
+              startsAt:
+                created.starts_at,
+              endsAt:
+                created.ends_at,
+              allDay:
+                created.all_day,
+              reminderMinutes:
+                created.reminder_minutes,
+            },
+          ],
+        )
+      }
 
 
-      setTitle('')
-      setDescription('')
-      setTime('09:00')
-      setAllDay(false)
-      setReminderMinutes('')
+      resetEventForm()
     } catch (error) {
       console.error(
         error,
@@ -496,6 +650,78 @@ function CalendarPage() {
         false,
       )
     }
+  }
+
+
+  function startEditingEvent(
+    event: CalendarEvent,
+  ) {
+    const eventDate =
+      new Date(
+        event.startsAt,
+      )
+
+
+    setEditingEventId(
+      event.id,
+    )
+
+    setSelectedDate(
+      formatDateKey(
+        eventDate,
+      ),
+    )
+
+    setCurrentDate(
+      new Date(
+        eventDate.getFullYear(),
+        eventDate.getMonth(),
+        1,
+      ),
+    )
+
+    setTitle(
+      event.title,
+    )
+
+    setDescription(
+      event.description,
+    )
+
+    setAllDay(
+      event.allDay,
+    )
+
+    setReminderMinutes(
+      event.reminderMinutes
+        === null
+        ? ''
+        : String(
+            event.reminderMinutes,
+          ),
+    )
+
+
+    const hours =
+      String(
+        eventDate.getHours(),
+      ).padStart(
+        2,
+        '0',
+      )
+
+    const minutes =
+      String(
+        eventDate.getMinutes(),
+      ).padStart(
+        2,
+        '0',
+      )
+
+
+    setTime(
+      `${hours}:${minutes}`,
+    )
   }
 
 
@@ -530,6 +756,14 @@ function CalendarPage() {
               !== eventId,
           ),
       )
+
+
+      if (
+        editingEventId
+        === eventId
+      ) {
+        resetEventForm()
+      }
     } catch (error) {
       console.error(
         error,
@@ -537,6 +771,50 @@ function CalendarPage() {
 
       alert(
         'Não foi possível excluir o evento.',
+      )
+    }
+  }
+
+
+  async function toggleTask(
+    task: CalendarTask,
+  ) {
+    try {
+      const updated =
+        await apiRequest<TaskFromApi>(
+          `/tasks/${task.id}`,
+          {
+            method: 'PATCH',
+
+            body: JSON.stringify({
+              done:
+                !task.done,
+            }),
+          },
+        )
+
+
+      setTasks(
+        (currentTasks) =>
+          currentTasks.map(
+            (currentTask) =>
+              currentTask.id
+              === updated.id
+                ? {
+                    ...currentTask,
+                    done:
+                      updated.done,
+                  }
+                : currentTask,
+          ),
+      )
+    } catch (error) {
+      console.error(
+        error,
+      )
+
+      alert(
+        'Não foi possível atualizar a tarefa.',
       )
     }
   }
@@ -560,19 +838,25 @@ function CalendarPage() {
     )
 
 
+  const selectedTasks =
+    tasks.filter(
+      (task) =>
+        task.dueDate
+        === selectedDate,
+    )
+
+
   return (
     <main className="calendar-page">
       <header className="calendar-topbar">
-        <div>
-          <button
-            type="button"
-            onClick={() =>
-              navigate('/')
-            }
-          >
-            ← Biblioteca
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() =>
+            navigate('/')
+          }
+        >
+          ← Biblioteca
+        </button>
 
 
         <h1>
@@ -679,6 +963,12 @@ function CalendarPage() {
                   )
 
 
+                const dayTasks =
+                  getTasksForDay(
+                    day,
+                  )
+
+
                 const isToday =
                   dateKey
                   === formatDateKey(
@@ -729,13 +1019,13 @@ function CalendarPage() {
                       {dayEvents
                         .slice(
                           0,
-                          3,
+                          2,
                         )
                         .map(
                           (event) => (
                             <span
                               key={
-                                event.id
+                                `event-${event.id}`
                               }
                               className="day-event"
                             >
@@ -761,14 +1051,44 @@ function CalendarPage() {
                         )}
 
 
-                      {dayEvents.length
-                        > 3 && (
+                      {dayTasks
+                        .slice(
+                          0,
+                          Math.max(
+                            0,
+                            3
+                            - dayEvents.length,
+                          ),
+                        )
+                        .map(
+                          (task) => (
+                            <span
+                              key={
+                                `task-${task.id}`
+                              }
+                              className={
+                                task.done
+                                  ? 'day-event task-event done'
+                                  : 'day-event task-event'
+                              }
+                            >
+                              ✓ {task.text}
+                            </span>
+                          ),
+                        )}
+
+
+                      {(
+                        dayEvents.length
+                        + dayTasks.length
+                      ) > 3 && (
                         <small>
                           +
                           {
                             dayEvents.length
+                            + dayTasks.length
                             - 3
-                          } eventos
+                          } itens
                         </small>
                       )}
                     </div>
@@ -787,9 +1107,12 @@ function CalendarPage() {
             ).toLocaleDateString(
               'pt-BR',
               {
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric',
+                day:
+                  '2-digit',
+                month:
+                  'long',
+                year:
+                  'numeric',
               },
             )}
           </h2>
@@ -797,8 +1120,20 @@ function CalendarPage() {
 
           <div className="event-form">
             <h3>
-              Novo evento
+              {editingEventId
+                !== null
+                ? 'Editar evento'
+                : 'Novo evento'}
             </h3>
+
+
+            {editingEventId
+              !== null && (
+              <p className="editing-banner">
+                Você está editando
+                um evento.
+              </p>
+            )}
 
 
             <label>
@@ -923,13 +1258,29 @@ function CalendarPage() {
                 isSaving
               }
               onClick={
-                createEvent
+                saveEvent
               }
             >
               {isSaving
                 ? 'Salvando...'
-                : 'Criar evento'}
+                : editingEventId
+                    !== null
+                  ? 'Salvar alterações'
+                  : 'Criar evento'}
             </button>
+
+
+            {editingEventId
+              !== null && (
+              <button
+                type="button"
+                onClick={
+                  resetEventForm
+                }
+              >
+                Cancelar edição
+              </button>
+            )}
           </div>
 
 
@@ -996,16 +1347,87 @@ function CalendarPage() {
                   </div>
 
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      deleteEvent(
-                        event.id,
-                      )
+                  <div className="event-actions">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        startEditingEvent(
+                          event,
+                        )
+                      }
+                    >
+                      Editar
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        deleteEvent(
+                          event.id,
+                        )
+                      }
+                    >
+                      Excluir
+                    </button>
+                  </div>
+                </article>
+              ),
+            )}
+          </div>
+
+
+          <div className="selected-events">
+            <h3>
+              Tarefas do dia
+            </h3>
+
+
+            {selectedTasks.length
+              === 0 && (
+              <p className="no-events">
+                Nenhuma tarefa.
+              </p>
+            )}
+
+
+            {selectedTasks.map(
+              (task) => (
+                <article
+                  key={
+                    task.id
+                  }
+                  className={
+                    task.done
+                      ? 'task-card done'
+                      : 'task-card'
+                  }
+                >
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={
+                        task.done
+                      }
+                      onChange={() =>
+                        toggleTask(
+                          task,
+                        )
+                      }
+                    />
+
+                    <span>
+                      {
+                        task.text
+                      }
+                    </span>
+                  </label>
+
+                  <small>
+                    Prioridade:{' '}
+                    {
+                      task.priority
                     }
-                  >
-                    Excluir
-                  </button>
+                  </small>
                 </article>
               ),
             )}
