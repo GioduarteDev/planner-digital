@@ -28,6 +28,9 @@ import {
 import CalendarPage
   from './pages/Calendar/CalendarPage'
 
+  import ReminderWatcher
+  from './components/ReminderWatcher'
+
 
 function ProtectedRoute({
   children,
@@ -48,7 +51,13 @@ function ProtectedRoute({
   }
 
 
-  return children
+  return (
+  <>
+    <ReminderWatcher />
+
+    {children}
+  </>
+)
 }
 
 

@@ -288,3 +288,8 @@
 .task-card.done span {
   text-decoration: line-through;
 }
+
+.calendar-topbar-actions {
+  display: flex;
+  gap: 8px;
+}

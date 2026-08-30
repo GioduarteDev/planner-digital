@@ -220,6 +220,43 @@ function CalendarPage() {
     useState(false)
 
 
+  async function enableNotifications() {
+  if (
+    !('Notification' in window)
+  ) {
+    alert(
+      'Este navegador não suporta notificações.',
+    )
+
+    return
+  }
+
+  const permission =
+    await Notification.requestPermission()
+
+  if (
+    permission !== 'granted'
+  ) {
+    alert(
+      'As notificações não foram autorizadas.',
+    )
+
+    return
+  }
+
+  new Notification(
+    'Planner Digital 🔔',
+    {
+      body:
+        'Notificações funcionando!',
+    },
+  )
+
+  alert(
+    'Lembretes ativados! Fiz um teste de notificação. 🔔',
+  )
+}
+
   useEffect(() => {
     let cancelled = false
 
@@ -250,15 +287,22 @@ function CalendarPage() {
           eventsData.map(
             (event) => ({
               id: event.id,
-              title: event.title,
+
+              title:
+                event.title,
+
               description:
                 event.description,
+
               startsAt:
                 event.starts_at,
+
               endsAt:
                 event.ends_at,
+
               allDay:
                 event.all_day,
+
               reminderMinutes:
                 event.reminder_minutes,
             }),
@@ -270,10 +314,16 @@ function CalendarPage() {
           tasksData.map(
             (task) => ({
               id: task.id,
-              text: task.text,
-              done: task.done,
+
+              text:
+                task.text,
+
+              done:
+                task.done,
+
               dueDate:
                 task.due_date,
+
               priority:
                 task.priority,
             }),
@@ -284,9 +334,11 @@ function CalendarPage() {
           return
         }
 
+
         console.error(
           error,
         )
+
 
         alert(
           'Não foi possível carregar o calendário.',
@@ -312,6 +364,7 @@ function CalendarPage() {
 
   const year =
     currentDate.getFullYear()
+
 
   const month =
     currentDate.getMonth()
@@ -351,6 +404,7 @@ function CalendarPage() {
           return null
         }
 
+
         return (
           index
           - firstDay
@@ -366,10 +420,20 @@ function CalendarPage() {
     )
 
     setTitle('')
+
     setDescription('')
-    setTime('09:00')
-    setAllDay(false)
-    setReminderMinutes('')
+
+    setTime(
+      '09:00',
+    )
+
+    setAllDay(
+      false,
+    )
+
+    setReminderMinutes(
+      '',
+    )
   }
 
 
@@ -381,6 +445,7 @@ function CalendarPage() {
         1,
       ),
     )
+
 
     resetEventForm()
   }
@@ -395,6 +460,7 @@ function CalendarPage() {
       ),
     )
 
+
     resetEventForm()
   }
 
@@ -408,11 +474,13 @@ function CalendarPage() {
       ),
     )
 
+
     setSelectedDate(
       formatDateKey(
         today,
       ),
     )
+
 
     resetEventForm()
   }
@@ -428,11 +496,13 @@ function CalendarPage() {
         day,
       )
 
+
     setSelectedDate(
       formatDateKey(
         date,
       ),
     )
+
 
     resetEventForm()
   }
@@ -448,6 +518,7 @@ function CalendarPage() {
         day,
       )
 
+
     const dateKey =
       formatDateKey(
         date,
@@ -460,6 +531,7 @@ function CalendarPage() {
           new Date(
             event.startsAt,
           )
+
 
         return (
           formatDateKey(
@@ -481,6 +553,7 @@ function CalendarPage() {
         month,
         day,
       )
+
 
     const dateKey =
       formatDateKey(
@@ -561,13 +634,16 @@ function CalendarPage() {
             `/events/${editingEventId}`,
             {
               method: 'PATCH',
+
               body,
             },
           )
 
 
         setEvents(
-          (currentEvents) =>
+          (
+            currentEvents,
+          ) =>
             currentEvents.map(
               (event) =>
                 event.id
@@ -603,27 +679,37 @@ function CalendarPage() {
             '/events',
             {
               method: 'POST',
+
               body,
             },
           )
 
 
         setEvents(
-          (currentEvents) => [
+          (
+            currentEvents,
+          ) => [
             ...currentEvents,
 
             {
-              id: created.id,
+              id:
+                created.id,
+
               title:
                 created.title,
+
               description:
                 created.description,
+
               startsAt:
                 created.starts_at,
+
               endsAt:
                 created.ends_at,
+
               allDay:
                 created.all_day,
+
               reminderMinutes:
                 created.reminder_minutes,
             },
@@ -637,6 +723,7 @@ function CalendarPage() {
       console.error(
         error,
       )
+
 
       if (
         error instanceof Error
@@ -666,11 +753,13 @@ function CalendarPage() {
       event.id,
     )
 
+
     setSelectedDate(
       formatDateKey(
         eventDate,
       ),
     )
+
 
     setCurrentDate(
       new Date(
@@ -680,17 +769,21 @@ function CalendarPage() {
       ),
     )
 
+
     setTitle(
       event.title,
     )
+
 
     setDescription(
       event.description,
     )
 
+
     setAllDay(
       event.allDay,
     )
+
 
     setReminderMinutes(
       event.reminderMinutes
@@ -709,6 +802,7 @@ function CalendarPage() {
         2,
         '0',
       )
+
 
     const minutes =
       String(
@@ -743,13 +837,16 @@ function CalendarPage() {
       await apiRequest<void>(
         `/events/${eventId}`,
         {
-          method: 'DELETE',
+          method:
+            'DELETE',
         },
       )
 
 
       setEvents(
-        (currentEvents) =>
+        (
+          currentEvents,
+        ) =>
           currentEvents.filter(
             (event) =>
               event.id
@@ -769,6 +866,7 @@ function CalendarPage() {
         error,
       )
 
+
       alert(
         'Não foi possível excluir o evento.',
       )
@@ -786,22 +884,28 @@ function CalendarPage() {
           {
             method: 'PATCH',
 
-            body: JSON.stringify({
-              done:
-                !task.done,
-            }),
+            body:
+              JSON.stringify({
+                done:
+                  !task.done,
+              }),
           },
         )
 
 
       setTasks(
-        (currentTasks) =>
+        (
+          currentTasks,
+        ) =>
           currentTasks.map(
-            (currentTask) =>
+            (
+              currentTask,
+            ) =>
               currentTask.id
               === updated.id
                 ? {
                     ...currentTask,
+
                     done:
                       updated.done,
                   }
@@ -812,6 +916,7 @@ function CalendarPage() {
       console.error(
         error,
       )
+
 
       alert(
         'Não foi possível atualizar a tarefa.',
@@ -827,6 +932,7 @@ function CalendarPage() {
           new Date(
             event.startsAt,
           )
+
 
         return (
           formatDateKey(
@@ -851,6 +957,7 @@ function CalendarPage() {
       <header className="calendar-topbar">
         <button
           type="button"
+
           onClick={() =>
             navigate('/')
           }
@@ -864,14 +971,28 @@ function CalendarPage() {
         </h1>
 
 
-        <button
-          type="button"
-          onClick={
-            goToToday
-          }
-        >
-          Hoje
-        </button>
+        <div className="calendar-topbar-actions">
+          <button
+            type="button"
+
+            onClick={
+              enableNotifications
+            }
+          >
+            🔔 Ativar lembretes
+          </button>
+
+
+          <button
+            type="button"
+
+            onClick={
+              goToToday
+            }
+          >
+            Hoje
+          </button>
+        </div>
       </header>
 
 
@@ -880,6 +1001,7 @@ function CalendarPage() {
           <div className="calendar-month-header">
             <button
               type="button"
+
               onClick={
                 previousMonth
               }
@@ -894,12 +1016,14 @@ function CalendarPage() {
                   month
                 ]
               }{' '}
+
               {year}
             </h2>
 
 
             <button
               type="button"
+
               onClick={
                 nextMonth
               }
@@ -914,6 +1038,7 @@ function CalendarPage() {
               (day) => (
                 <div
                   key={day}
+
                   className="calendar-weekday"
                 >
                   {day}
@@ -937,6 +1062,7 @@ function CalendarPage() {
                       key={
                         `empty-${index}`
                       }
+
                       className="calendar-day empty"
                     />
                   )
@@ -986,7 +1112,9 @@ function CalendarPage() {
                     key={
                       dateKey
                     }
+
                     type="button"
+
                     className={
                       [
                         'calendar-day',
@@ -1004,6 +1132,7 @@ function CalendarPage() {
                         )
                         .join(' ')
                     }
+
                     onClick={() =>
                       selectDay(
                         day,
@@ -1022,11 +1151,14 @@ function CalendarPage() {
                           2,
                         )
                         .map(
-                          (event) => (
+                          (
+                            event,
+                          ) => (
                             <span
                               key={
                                 `event-${event.id}`
                               }
+
                               className="day-event"
                             >
                               {event.allDay
@@ -1038,6 +1170,7 @@ function CalendarPage() {
                                     {
                                       hour:
                                         '2-digit',
+
                                       minute:
                                         '2-digit',
                                     },
@@ -1054,18 +1187,23 @@ function CalendarPage() {
                       {dayTasks
                         .slice(
                           0,
+
                           Math.max(
                             0,
+
                             3
                             - dayEvents.length,
                           ),
                         )
                         .map(
-                          (task) => (
+                          (
+                            task,
+                          ) => (
                             <span
                               key={
                                 `task-${task.id}`
                               }
+
                               className={
                                 task.done
                                   ? 'day-event task-event done'
@@ -1109,8 +1247,10 @@ function CalendarPage() {
               {
                 day:
                   '2-digit',
+
                 month:
                   'long',
+
                 year:
                   'numeric',
               },
@@ -1141,13 +1281,18 @@ function CalendarPage() {
 
               <input
                 type="text"
+
                 value={
                   title
                 }
+
                 maxLength={
                   200
                 }
-                onChange={(event) =>
+
+                onChange={(
+                  event,
+                ) =>
                   setTitle(
                     event.target.value,
                   )
@@ -1163,10 +1308,14 @@ function CalendarPage() {
                 value={
                   description
                 }
+
                 maxLength={
                   2000
                 }
-                onChange={(event) =>
+
+                onChange={(
+                  event,
+                ) =>
                   setDescription(
                     event.target.value,
                   )
@@ -1178,10 +1327,14 @@ function CalendarPage() {
             <label className="event-checkbox">
               <input
                 type="checkbox"
+
                 checked={
                   allDay
                 }
-                onChange={(event) =>
+
+                onChange={(
+                  event,
+                ) =>
                   setAllDay(
                     event.target.checked,
                   )
@@ -1198,10 +1351,14 @@ function CalendarPage() {
 
                 <input
                   type="time"
+
                   value={
                     time
                   }
-                  onChange={(event) =>
+
+                  onChange={(
+                    event,
+                  ) =>
                     setTime(
                       event.target.value,
                     )
@@ -1218,7 +1375,10 @@ function CalendarPage() {
                 value={
                   reminderMinutes
                 }
-                onChange={(event) =>
+
+                onChange={(
+                  event,
+                ) =>
                   setReminderMinutes(
                     event.target.value,
                   )
@@ -1253,10 +1413,13 @@ function CalendarPage() {
 
             <button
               type="button"
+
               className="create-event-button"
+
               disabled={
                 isSaving
               }
+
               onClick={
                 saveEvent
               }
@@ -1274,6 +1437,7 @@ function CalendarPage() {
               !== null && (
               <button
                 type="button"
+
                 onClick={
                   resetEventForm
                 }
@@ -1307,11 +1471,14 @@ function CalendarPage() {
 
 
             {selectedEvents.map(
-              (event) => (
+              (
+                event,
+              ) => (
                 <article
                   key={
                     event.id
                   }
+
                   className="event-card"
                 >
                   <div>
@@ -1320,6 +1487,7 @@ function CalendarPage() {
                         event.title
                       }
                     </strong>
+
 
                     <span>
                       {event.allDay
@@ -1331,11 +1499,13 @@ function CalendarPage() {
                             {
                               hour:
                                 '2-digit',
+
                               minute:
                                 '2-digit',
                             },
                           )}
                     </span>
+
 
                     {event.description && (
                       <p>
@@ -1350,6 +1520,7 @@ function CalendarPage() {
                   <div className="event-actions">
                     <button
                       type="button"
+
                       onClick={() =>
                         startEditingEvent(
                           event,
@@ -1359,8 +1530,10 @@ function CalendarPage() {
                       Editar
                     </button>
 
+
                     <button
                       type="button"
+
                       onClick={() =>
                         deleteEvent(
                           event.id,
@@ -1391,11 +1564,14 @@ function CalendarPage() {
 
 
             {selectedTasks.map(
-              (task) => (
+              (
+                task,
+              ) => (
                 <article
                   key={
                     task.id
                   }
+
                   className={
                     task.done
                       ? 'task-card done'
@@ -1405,15 +1581,18 @@ function CalendarPage() {
                   <label>
                     <input
                       type="checkbox"
+
                       checked={
                         task.done
                       }
+
                       onChange={() =>
                         toggleTask(
                           task,
                         )
                       }
                     />
+
 
                     <span>
                       {
@@ -1422,8 +1601,10 @@ function CalendarPage() {
                     </span>
                   </label>
 
+
                   <small>
                     Prioridade:{' '}
+
                     {
                       task.priority
                     }
