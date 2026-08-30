@@ -113,7 +113,6 @@ class TaskCreate(BaseModel):
     )
 
     due_date: date | None = None
-
     priority: TaskPriority = "medium"
 
     model_config = ConfigDict(
@@ -149,8 +148,11 @@ class TaskResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True
     )
-    from pydantic import field_validator
 
+
+# =========================
+# USUÁRIOS / AUTENTICAÇÃO
+# =========================
 
 class UserCreate(BaseModel):
     email: str = Field(
@@ -217,3 +219,72 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+# =========================
+# EVENTOS / CALENDÁRIO
+# =========================
+
+class EventCreate(BaseModel):
+    title: str = Field(
+        min_length=1,
+        max_length=200,
+    )
+
+    description: str = Field(
+        default="",
+        max_length=2000,
+    )
+
+    starts_at: datetime
+
+    ends_at: datetime | None = None
+
+    all_day: bool = False
+
+    reminder_minutes: int | None = Field(
+        default=None,
+        ge=0,
+        le=10080,
+    )
+
+
+class EventUpdate(BaseModel):
+    title: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+    )
+
+    description: str | None = Field(
+        default=None,
+        max_length=2000,
+    )
+
+    starts_at: datetime | None = None
+
+    ends_at: datetime | None = None
+
+    all_day: bool | None = None
+
+    reminder_minutes: int | None = Field(
+        default=None,
+        ge=0,
+        le=10080,
+    )
+
+
+class EventResponse(BaseModel):
+    id: int
+    user_id: int
+    title: str
+    description: str
+    starts_at: datetime
+    ends_at: datetime | None
+    all_day: bool
+    reminder_minutes: int | None
+    created_at: datetime
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )

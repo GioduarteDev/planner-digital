@@ -25,6 +25,9 @@ import {
   getAccessToken,
 } from './services/api'
 
+import CalendarPage
+  from './pages/Calendar/CalendarPage'
+
 
 function ProtectedRoute({
   children,
@@ -79,6 +82,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+        path="/calendar"
+        element={
+        <ProtectedRoute>
+        <CalendarPage />
+    </ProtectedRoute>
+  }
+/>
 
 
         <Route

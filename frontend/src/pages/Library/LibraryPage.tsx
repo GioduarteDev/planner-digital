@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import AgendaCard from '../../components/AgendaCard/AgendaCard'
-import { apiRequest } from '../../services/api'
+import {
+  apiRequest,
+  clearAuth,
+} from '../../services/api'
 
 import './LibraryPage.css'
 
@@ -65,6 +68,28 @@ function LibraryPage() {
     isLoading,
     setIsLoading,
   ] = useState(true)
+  function handleLogout() {
+  const confirmed =
+    window.confirm(
+      'Deseja sair da sua conta?',
+    )
+
+
+  if (!confirmed) {
+    return
+  }
+
+
+  clearAuth()
+
+
+  navigate(
+    '/login',
+    {
+      replace: true,
+    },
+  )
+}
 
 
   useEffect(() => {
@@ -244,6 +269,22 @@ function LibraryPage() {
             Hoje
           </button>
         </div>
+
+        <button
+  type="button"
+  onClick={handleLogout}
+>
+  Sair
+</button>
+<button
+  type="button"
+  onClick={() =>
+    navigate('/calendar')
+  }
+>
+  Calendário
+</button>
+
 
         <input
           className="library-search"

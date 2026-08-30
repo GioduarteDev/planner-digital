@@ -98,6 +98,28 @@ export async function apiRequest<T>(
     }
 
 
+    const isAuthRequest =
+      endpoint === '/auth/login'
+      || endpoint === '/auth/register'
+
+
+    if (
+      response.status === 401
+      && token
+      && !isAuthRequest
+    ) {
+      clearAuth()
+
+      window.location.replace(
+        '/login',
+      )
+
+      throw new Error(
+        'Sua sessão expirou.',
+      )
+    }
+
+
     throw new Error(
       errorMessage,
     )

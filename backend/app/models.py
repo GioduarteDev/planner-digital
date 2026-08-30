@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import (
+    date,
+    datetime,
+)
 
 from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
     ForeignKey,
+    Integer,
     String,
     Text,
     func,
@@ -45,6 +49,11 @@ class User(Base):
 
     agendas: Mapped[list[Agenda]] = relationship(
         back_populates="user"
+    )
+
+    events: Mapped[list[Event]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
     )
 
 
@@ -170,4 +179,57 @@ class Task(Base):
 
     page: Mapped[Page] = relationship(
         back_populates="tasks"
+    )
+
+
+class Event(Base):
+    __tablename__ = "events"
+
+    id: Mapped[int] = mapped_column(
+        primary_key=True
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE",
+        ),
+        index=True,
+    )
+
+    title: Mapped[str] = mapped_column(
+        String(200)
+    )
+
+    description: Mapped[str] = mapped_column(
+        Text,
+        default="",
+    )
+
+    starts_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True)
+    )
+
+    ends_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    all_day: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+    )
+
+    reminder_minutes: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+    user: Mapped[User] = relationship(
+        back_populates="events"
     )
