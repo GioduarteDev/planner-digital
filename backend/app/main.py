@@ -25,6 +25,10 @@ from app.routes.events import (
     router as events_router,
 )
 
+from app.routes.studies import (
+    router as studies_router,
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -66,6 +70,10 @@ app.include_router(
 )
 app.include_router(
     events_router
+)
+
+app.include_router(
+    studies_router
 )
 
 

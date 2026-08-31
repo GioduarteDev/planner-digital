@@ -56,6 +56,13 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
+    study_sessions: Mapped[
+        list[StudySession]
+    ] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
 
 class Agenda(Base):
     __tablename__ = "agendas"
@@ -232,4 +239,51 @@ class Event(Base):
 
     user: Mapped[User] = relationship(
         back_populates="events"
+    )
+
+
+class StudySession(Base):
+    __tablename__ = "study_sessions"
+
+    id: Mapped[int] = mapped_column(
+        primary_key=True
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE",
+        ),
+        index=True,
+    )
+
+    subject: Mapped[str] = mapped_column(
+        String(100)
+    )
+
+    topic: Mapped[str] = mapped_column(
+        String(200),
+        default="",
+    )
+
+    study_date: Mapped[date] = mapped_column(
+        Date
+    )
+
+    duration_minutes: Mapped[int] = mapped_column(
+        Integer
+    )
+
+    notes: Mapped[str] = mapped_column(
+        Text,
+        default="",
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+    )
+
+    user: Mapped[User] = relationship(
+        back_populates="study_sessions"
     )

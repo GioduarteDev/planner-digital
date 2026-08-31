@@ -288,3 +288,79 @@ class EventResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True
     )
+
+    # =========================
+# ESTUDOS
+# =========================
+
+class StudySessionCreate(BaseModel):
+    subject: str = Field(
+        min_length=1,
+        max_length=100,
+    )
+
+    topic: str = Field(
+        default="",
+        max_length=200,
+    )
+
+    study_date: date
+
+    duration_minutes: int = Field(
+        ge=1,
+        le=1440,
+    )
+
+    notes: str = Field(
+        default="",
+        max_length=2000,
+    )
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True
+    )
+
+
+class StudySessionUpdate(BaseModel):
+    subject: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+    )
+
+    topic: str | None = Field(
+        default=None,
+        max_length=200,
+    )
+
+    study_date: date | None = None
+
+    duration_minutes: int | None = Field(
+        default=None,
+        ge=1,
+        le=1440,
+    )
+
+    notes: str | None = Field(
+        default=None,
+        max_length=2000,
+    )
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True
+    )
+
+
+class StudySessionResponse(BaseModel):
+    id: int
+    user_id: int
+    subject: str
+    topic: str
+    study_date: date
+    duration_minutes: int
+    notes: str
+    created_at: datetime
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
