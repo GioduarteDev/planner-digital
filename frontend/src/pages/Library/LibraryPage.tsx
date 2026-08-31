@@ -268,7 +268,16 @@ function LibraryPage() {
           >
             Hoje
           </button>
-        </div>
+        </div>         
+
+        <button
+  type="button"
+  onClick={() =>
+    navigate('/studies')
+  }
+>
+  Estudos
+</button>
 
         <button
   type="button"

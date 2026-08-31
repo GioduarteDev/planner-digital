@@ -31,6 +31,9 @@ import CalendarPage
   import ReminderWatcher
   from './components/ReminderWatcher'
 
+import StudiesPage
+  from './pages/Studies/StudiesPage'  
+
 
 function ProtectedRoute({
   children,
@@ -96,6 +99,15 @@ function App() {
         element={
         <ProtectedRoute>
         <CalendarPage />
+    </ProtectedRoute>
+  }
+/>
+
+      <Route
+  path="/studies"
+  element={
+    <ProtectedRoute>
+      <StudiesPage />
     </ProtectedRoute>
   }
 />
