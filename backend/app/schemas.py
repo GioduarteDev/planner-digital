@@ -364,3 +364,15 @@ class StudySessionResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True
     )
+
+    # =========================
+# BUSCA
+# =========================
+
+class SearchResult(BaseModel):
+    type: str
+    id: int
+    title: str
+    subtitle: str = ""
+    agenda_id: int | None = None
+    page_id: int | None = None

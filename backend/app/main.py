@@ -29,6 +29,10 @@ from app.routes.studies import (
     router as studies_router,
 )
 
+from app.routes.search import (
+    router as search_router,
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -51,6 +55,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+
+app.include_router(
+    search_router
 )
 
 

@@ -34,6 +34,9 @@ import CalendarPage
 import StudiesPage
   from './pages/Studies/StudiesPage'  
 
+import SearchPage
+  from './pages/Search/SearchPage'
+
 
 function ProtectedRoute({
   children,
@@ -108,6 +111,14 @@ function App() {
   element={
     <ProtectedRoute>
       <StudiesPage />
+    </ProtectedRoute>
+  }
+/>  
+  <Route
+  path="/search"
+  element={
+    <ProtectedRoute>
+      <SearchPage />
     </ProtectedRoute>
   }
 />

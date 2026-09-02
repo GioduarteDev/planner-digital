@@ -279,6 +279,16 @@ function LibraryPage() {
   Estudos
 </button>
 
+
+<button
+  type="button"
+  onClick={() =>
+    navigate('/search')
+  }
+>
+  🔎 Buscar
+</button>
+
         <button
   type="button"
   onClick={handleLogout}
