@@ -428,3 +428,15 @@ class FolderResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True
     )
+
+# =========================
+# REORDENAÇÃO
+# =========================
+
+class FolderReorderRequest(BaseModel):
+    folder_ids: list[int]
+
+
+class PageReorderRequest(BaseModel):
+    folder_id: int | None = None
+    page_ids: list[int]

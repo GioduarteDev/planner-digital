@@ -317,5 +317,40 @@
   }
 }
 
+/* ===== REORDENAÇÃO DE PASTAS E PÁGINAS ===== */
+
+.page-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.page-row .page-button {
+  flex: 1;
+  min-width: 0;
+}
+
+.page-order-actions {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.page-order-actions button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.page-order-actions button:disabled,
+.folder-group-actions button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+
 }
 

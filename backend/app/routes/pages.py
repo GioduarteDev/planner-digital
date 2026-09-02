@@ -28,6 +28,7 @@ from app.models import (
 from app.schemas import (
     PageCreate,
     PageMoveFolder,
+    PageReorderRequest,
     PageResponse,
     PageUpdate,
 )
@@ -40,6 +41,10 @@ router = APIRouter(
     tags=["Páginas"],
 )
 
+
+# =========================
+# BUSCAR PÁGINA DO USUÁRIO
+# =========================
 
 def get_user_page(
     page_id: int,
@@ -60,6 +65,10 @@ def get_user_page(
         )
     )
 
+
+# =========================
+# LISTAR PÁGINAS
+# =========================
 
 @router.get(
     "/agendas/{agenda_id}/pages",
@@ -109,6 +118,10 @@ def list_pages(
     ).all()
 
 
+# =========================
+# BUSCAR UMA PÁGINA
+# =========================
+
 @router.get(
     "/pages/{page_id}",
     response_model=PageResponse,
@@ -138,6 +151,10 @@ def get_page(
 
     return page
 
+
+# =========================
+# CRIAR PÁGINA
+# =========================
 
 @router.post(
     "/agendas/{agenda_id}/pages",
@@ -206,10 +223,32 @@ def create_page(
         else f"Página {page_count + 1}"
     )
 
+    last_position = db.scalar(
+        select(
+            func.max(
+                Page.position
+            )
+        )
+        .where(
+            Page.agenda_id
+            == agenda_id,
+            Page.folder_id.is_(
+                None
+            ),
+        )
+    )
+
+    new_position = (
+        last_position + 1
+        if last_position
+        is not None
+        else 0
+    )
+
     page = Page(
         agenda_id=agenda_id,
         folder_id=None,
-        position=page_count,
+        position=new_position,
         title=title,
         content="",
         favorite=False,
@@ -221,6 +260,10 @@ def create_page(
 
     return page
 
+
+# =========================
+# EDITAR PÁGINA
+# =========================
 
 @router.patch(
     "/pages/{page_id}",
@@ -272,6 +315,10 @@ def update_page(
     return page
 
 
+# =========================
+# MOVER PÁGINA PARA PASTA
+# =========================
+
 @router.patch(
     "/pages/{page_id}/folder",
     response_model=PageResponse,
@@ -300,12 +347,39 @@ def move_page_to_folder(
             ),
         )
 
+
     # =========================
     # VOLTAR PARA SEM PASTA
     # =========================
 
     if data.folder_id is None:
+        last_position = db.scalar(
+            select(
+                func.max(
+                    Page.position
+                )
+            )
+            .where(
+                Page.agenda_id
+                == page.agenda_id,
+
+                Page.folder_id.is_(
+                    None
+                ),
+
+                Page.id
+                != page.id,
+            )
+        )
+
         page.folder_id = None
+
+        page.position = (
+            last_position + 1
+            if last_position
+            is not None
+            else 0
+        )
 
         db.commit()
         db.refresh(page)
@@ -327,6 +401,7 @@ def move_page_to_folder(
         .where(
             Folder.id
             == data.folder_id,
+
             Agenda.user_id
             == current_user.id,
         )
@@ -358,13 +433,216 @@ def move_page_to_folder(
             ),
         )
 
+
+    # =========================
+    # COLOCAR NO FINAL
+    # DA NOVA PASTA
+    # =========================
+
+    last_position = db.scalar(
+        select(
+            func.max(
+                Page.position
+            )
+        )
+        .where(
+            Page.agenda_id
+            == page.agenda_id,
+
+            Page.folder_id
+            == folder.id,
+
+            Page.id
+            != page.id,
+        )
+    )
+
     page.folder_id = folder.id
+
+    page.position = (
+        last_position + 1
+        if last_position
+        is not None
+        else 0
+    )
 
     db.commit()
     db.refresh(page)
 
     return page
 
+
+# =========================
+# REORDENAR PÁGINAS
+# =========================
+
+@router.patch(
+    "/agendas/{agenda_id}/pages/reorder",
+    response_model=list[PageResponse],
+)
+def reorder_pages(
+    agenda_id: int,
+    data: PageReorderRequest,
+    db: Session = Depends(
+        get_db
+    ),
+    current_user: User = Depends(
+        get_current_user
+    ),
+):
+    agenda = db.scalar(
+        select(Agenda)
+        .where(
+            Agenda.id == agenda_id,
+            Agenda.user_id
+            == current_user.id,
+        )
+    )
+
+    if agenda is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Agenda não encontrada."
+            ),
+        )
+
+
+    # =========================
+    # VALIDAR PASTA
+    # =========================
+
+    if data.folder_id is not None:
+        folder = db.scalar(
+            select(Folder)
+            .where(
+                Folder.id
+                == data.folder_id,
+
+                Folder.agenda_id
+                == agenda_id,
+            )
+        )
+
+        if folder is None:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "Pasta não encontrada "
+                    "nesta agenda."
+                ),
+            )
+
+
+    # =========================
+    # PEGAR PÁGINAS DO GRUPO
+    # =========================
+
+    statement = (
+        select(Page)
+        .where(
+            Page.agenda_id
+            == agenda_id
+        )
+    )
+
+    if data.folder_id is None:
+        statement = (
+            statement.where(
+                Page.folder_id.is_(
+                    None
+                )
+            )
+        )
+    else:
+        statement = (
+            statement.where(
+                Page.folder_id
+                == data.folder_id
+            )
+        )
+
+    group_pages = db.scalars(
+        statement
+    ).all()
+
+
+    # =========================
+    # VALIDAR IDs
+    # =========================
+
+    existing_ids = {
+        page.id
+        for page in group_pages
+    }
+
+    received_ids = (
+        data.page_ids
+    )
+
+    if (
+        len(received_ids)
+        != len(set(received_ids))
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "A lista possui "
+                "páginas duplicadas."
+            ),
+        )
+
+    if (
+        set(received_ids)
+        != existing_ids
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Envie todas as páginas "
+                "desse grupo exatamente "
+                "uma vez."
+            ),
+        )
+
+
+    # =========================
+    # SALVAR NOVA ORDEM
+    # =========================
+
+    pages_by_id = {
+        page.id: page
+        for page in group_pages
+    }
+
+    for (
+        position,
+        page_id,
+    ) in enumerate(
+        received_ids
+    ):
+        pages_by_id[
+            page_id
+        ].position = position
+
+    db.commit()
+
+
+    # =========================
+    # DEVOLVER ORDENADO
+    # =========================
+
+    return db.scalars(
+        statement.order_by(
+            Page.position,
+            Page.id,
+        )
+    ).all()
+
+
+# =========================
+# EXCLUIR PÁGINA
+# =========================
 
 @router.delete(
     "/pages/{page_id}",

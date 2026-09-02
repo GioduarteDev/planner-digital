@@ -25,6 +25,7 @@ from app.models import (
 
 from app.schemas import (
     FolderCreate,
+    FolderReorderRequest,
     FolderResponse,
     FolderUpdate,
 )
@@ -222,3 +223,92 @@ def delete_folder(
 
     db.delete(folder)
     db.commit()
+
+@router.patch(
+    "/agendas/{agenda_id}/folders/reorder",
+    response_model=list[FolderResponse],
+)
+def reorder_folders(
+    agenda_id: int,
+    data: FolderReorderRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        get_current_user
+    ),
+):
+    get_user_agenda(
+        agenda_id,
+        db,
+        current_user,
+    )
+
+    folders = db.scalars(
+        select(Folder)
+        .where(
+            Folder.agenda_id
+            == agenda_id
+        )
+    ).all()
+
+    existing_ids = {
+        folder.id
+        for folder in folders
+    }
+
+    received_ids = (
+        data.folder_ids
+    )
+
+    if (
+        len(received_ids)
+        != len(set(received_ids))
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "A lista possui "
+                "pastas duplicadas."
+            ),
+        )
+
+    if (
+        set(received_ids)
+        != existing_ids
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Envie todas as pastas "
+                "da agenda exatamente "
+                "uma vez."
+            ),
+        )
+
+    folders_by_id = {
+        folder.id: folder
+        for folder in folders
+    }
+
+    for (
+        position,
+        folder_id,
+    ) in enumerate(
+        received_ids
+    ):
+        folders_by_id[
+            folder_id
+        ].position = position
+
+    db.commit()
+
+    return db.scalars(
+        select(Folder)
+        .where(
+            Folder.agenda_id
+            == agenda_id
+        )
+        .order_by(
+            Folder.position,
+            Folder.id,
+        )
+    ).all()   

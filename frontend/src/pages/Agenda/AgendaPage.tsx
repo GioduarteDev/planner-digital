@@ -680,53 +680,518 @@ function AgendaPage() {
 
 
 
+  async function handleMoveFolder(
+
+    folderId: number,
+
+    direction: 'up' | 'down',
+
+  ) {
+
+    const currentFolders =
+
+      [...sortedFolders]
+
+
+    const currentIndex =
+
+      currentFolders.findIndex(
+
+        (folder) =>
+
+          folder.id === folderId,
+
+      )
+
+
+    if (currentIndex === -1) {
+
+      return
+
+    }
+
+
+    const targetIndex =
+
+      direction === 'up'
+
+        ? currentIndex - 1
+
+        : currentIndex + 1
+
+
+    if (
+
+      targetIndex < 0
+
+      || targetIndex >=
+
+        currentFolders.length
+
+    ) {
+
+      return
+
+    }
+
+
+    const reordered =
+
+      [...currentFolders]
+
+
+    const currentFolder =
+
+      reordered[currentIndex]
+
+
+    const targetFolder =
+
+      reordered[targetIndex]
+
+
+    reordered[currentIndex] =
+
+      targetFolder
+
+
+    reordered[targetIndex] =
+
+      currentFolder
+
+
+    try {
+
+      const updatedFolders =
+
+        await apiRequest<
+
+          FolderFromApi[]
+
+        >(
+
+          `/agendas/${agendaId}/folders/reorder`,
+
+          {
+
+            method: 'PATCH',
+
+            body: JSON.stringify({
+
+              folder_ids:
+
+                reordered.map(
+
+                  (folder) =>
+
+                    folder.id,
+
+                ),
+
+            }),
+
+          },
+
+        )
+
+
+      setFolders(
+
+        updatedFolders.map(
+
+          (folder) => ({
+
+            id: folder.id,
+
+            title: folder.title,
+
+            position:
+
+              folder.position,
+
+          }),
+
+        ),
+
+      )
+
+    } catch (error) {
+
+      console.error(error)
+
+
+      alert(
+
+        'Não foi possível reordenar as pastas.',
+
+      )
+
+    }
+
+  }
+
+
+
+  async function handleMovePage(
+
+    pageId: number,
+
+    folderId: number | null,
+
+    direction: 'up' | 'down',
+
+  ) {
+
+    const groupPages =
+
+      getPagesForFolder(
+
+        folderId,
+
+      )
+
+
+    const currentIndex =
+
+      groupPages.findIndex(
+
+        (page) =>
+
+          page.id === pageId,
+
+      )
+
+
+    if (currentIndex === -1) {
+
+      return
+
+    }
+
+
+    const targetIndex =
+
+      direction === 'up'
+
+        ? currentIndex - 1
+
+        : currentIndex + 1
+
+
+    if (
+
+      targetIndex < 0
+
+      || targetIndex >=
+
+        groupPages.length
+
+    ) {
+
+      return
+
+    }
+
+
+    const reordered =
+
+      [...groupPages]
+
+
+    const currentPage =
+
+      reordered[currentIndex]
+
+
+    const targetPage =
+
+      reordered[targetIndex]
+
+
+    reordered[currentIndex] =
+
+      targetPage
+
+
+    reordered[targetIndex] =
+
+      currentPage
+
+
+    try {
+
+      const updatedPages =
+
+        await apiRequest<
+
+          PageFromApi[]
+
+        >(
+
+          `/agendas/${agendaId}/pages/reorder`,
+
+          {
+
+            method: 'PATCH',
+
+            body: JSON.stringify({
+
+              folder_id:
+
+                folderId,
+
+              page_ids:
+
+                reordered.map(
+
+                  (page) =>
+
+                    page.id,
+
+                ),
+
+            }),
+
+          },
+
+        )
+
+
+      const positionsById =
+
+        new Map(
+
+          updatedPages.map(
+
+            (page) => [
+
+              page.id,
+
+              page.position,
+
+            ],
+
+          ),
+
+        )
+
+
+      setPages(
+
+        (currentPages) =>
+
+          currentPages.map(
+
+            (page) => {
+
+              const newPosition =
+
+                positionsById.get(
+
+                  page.id,
+
+                )
+
+
+              if (
+
+                newPosition === undefined
+
+              ) {
+
+                return page
+
+              }
+
+
+              return {
+
+                ...page,
+
+                position:
+
+                  newPosition,
+
+              }
+
+            },
+
+          ),
+
+      )
+
+    } catch (error) {
+
+      console.error(error)
+
+
+      alert(
+
+        'Não foi possível reordenar as páginas.',
+
+      )
+
+    }
+
+  }
+
+
+
   function renderPageButton(
 
     page: PlannerPage,
 
   ) {
 
+    const groupPages =
+
+      getPagesForFolder(
+
+        page.folderId,
+
+      )
+
+
+    const pageIndex =
+
+      groupPages.findIndex(
+
+        (currentPage) =>
+
+          currentPage.id ===
+
+          page.id,
+
+      )
+
+
+    const isFirst =
+
+      pageIndex === 0
+
+
+    const isLast =
+
+      pageIndex ===
+
+      groupPages.length - 1
+
+
     return (
 
-      <button
+      <div
+
+        className="page-row"
 
         key={page.id}
 
-        className={
-
-          page.id ===
-
-          activePageId
-
-            ? 'page-button active'
-
-            : 'page-button'
-
-        }
-
-        type="button"
-
-        onClick={() =>
-
-          setActivePageId(
-
-            page.id,
-
-          )
-
-        }
-
       >
 
-        {page.favorite &&
+        <button
 
-          '★ '}
+          className={
 
-        {page.title ||
+            page.id ===
 
-          'Sem título'}
+            activePageId
 
-      </button>
+              ? 'page-button active'
+
+              : 'page-button'
+
+          }
+
+          type="button"
+
+          onClick={() =>
+
+            setActivePageId(
+
+              page.id,
+
+            )
+
+          }
+
+        >
+
+          {page.favorite &&
+
+            '★ '}
+
+          {page.title ||
+
+            'Sem título'}
+
+        </button>
+
+
+        <div className="page-order-actions">
+
+          <button
+
+            type="button"
+
+            aria-label="Mover página para cima"
+
+            title="Mover página para cima"
+
+            disabled={isFirst}
+
+            onClick={() =>
+
+              void handleMovePage(
+
+                page.id,
+
+                page.folderId,
+
+                'up',
+
+              )
+
+            }
+
+          >
+
+            ↑
+
+          </button>
+
+
+          <button
+
+            type="button"
+
+            aria-label="Mover página para baixo"
+
+            title="Mover página para baixo"
+
+            disabled={isLast}
+
+            onClick={() =>
+
+              void handleMovePage(
+
+                page.id,
+
+                page.folderId,
+
+                'down',
+
+              )
+
+            }
+
+          >
+
+            ↓
+
+          </button>
+
+        </div>
+
+      </div>
 
     )
 
@@ -2588,7 +3053,10 @@ function AgendaPage() {
 
           {sortedFolders.map(
 
-            (folder) => {
+            (
+              folder,
+              folderIndex,
+            ) => {
 
               const folderPages =
 
@@ -2627,6 +3095,76 @@ function AgendaPage() {
 
 
                     <div className="folder-group-actions">
+
+                      <button
+
+                        type="button"
+
+                        aria-label={`Mover pasta ${folder.title} para cima`}
+
+                        title="Mover pasta para cima"
+
+                        disabled={
+
+                          folderIndex === 0
+
+                        }
+
+                        onClick={() =>
+
+                          void handleMoveFolder(
+
+                            folder.id,
+
+                            'up',
+
+                          )
+
+                        }
+
+                      >
+
+                        ↑
+
+                      </button>
+
+
+
+                      <button
+
+                        type="button"
+
+                        aria-label={`Mover pasta ${folder.title} para baixo`}
+
+                        title="Mover pasta para baixo"
+
+                        disabled={
+
+                          folderIndex ===
+
+                          sortedFolders.length - 1
+
+                        }
+
+                        onClick={() =>
+
+                          void handleMoveFolder(
+
+                            folder.id,
+
+                            'down',
+
+                          )
+
+                        }
+
+                      >
+
+                        ↓
+
+                      </button>
+
+
 
                       <button
 
