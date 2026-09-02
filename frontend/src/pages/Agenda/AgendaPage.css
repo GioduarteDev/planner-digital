@@ -421,7 +421,38 @@
 .folder-drag-handle:active {
   cursor: grabbing;
 }
+/* =========================
+   ROLAGEM DA LATERAL
+   ========================= */
 
+.agenda-sidebar {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.pages-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+}
+
+
+/* Celular / telas menores */
+
+@media (max-width: 768px) {
+  .agenda-sidebar {
+    height: auto;
+    max-height: 45vh;
+  }
+
+  .pages-list {
+    max-height: 35vh;
+  }
+}
 
 }
 
