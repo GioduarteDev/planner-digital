@@ -37,6 +37,19 @@ type StudySession = {
 }
 
 
+type SubjectStat = {
+  subject: string
+  minutes: number
+}
+
+
+type DayStat = {
+  date: string
+  label: string
+  minutes: number
+}
+
+
 function getLocalDateKey(
   date: Date,
 ) {
@@ -707,6 +720,7 @@ function StudiesPage() {
                 Number,
               )
 
+
           return (
             year
               === today.getFullYear()
@@ -736,6 +750,234 @@ function StudiesPage() {
         total
         + session.durationMinutes,
       0,
+    )
+
+
+  const subjectStats =
+    useMemo(
+      () => {
+        const totals =
+          new Map<
+            string,
+            number
+          >()
+
+
+        sessions.forEach(
+          (
+            session,
+          ) => {
+            const current =
+              totals.get(
+                session.subject,
+              ) ?? 0
+
+
+            totals.set(
+              session.subject,
+              current
+              + session.durationMinutes,
+            )
+          },
+        )
+
+
+        return Array.from(
+          totals.entries(),
+        )
+          .map(
+            (
+              [
+                subjectName,
+                total,
+              ],
+            ): SubjectStat => ({
+              subject:
+                subjectName,
+
+              minutes:
+                total,
+            }),
+          )
+          .sort(
+            (
+              first,
+              second,
+            ) =>
+              second.minutes
+              - first.minutes,
+          )
+      },
+      [sessions],
+    )
+
+
+  const mostStudiedSubject =
+    subjectStats[0]
+    ?? null
+
+
+  const maxSubjectMinutes =
+    mostStudiedSubject
+      ?.minutes
+    ?? 0
+
+
+  const lastSevenDays =
+    useMemo(
+      () => {
+        const result:
+          DayStat[] = []
+
+
+        for (
+          let index = 6;
+          index >= 0;
+          index -= 1
+        ) {
+          const date =
+            new Date(
+              today,
+            )
+
+
+          date.setDate(
+            today.getDate()
+            - index,
+          )
+
+
+          const dateKey =
+            getLocalDateKey(
+              date,
+            )
+
+
+          const dayMinutes =
+            sessions
+              .filter(
+                (
+                  session,
+                ) =>
+                  session.studyDate
+                  === dateKey,
+              )
+              .reduce(
+                (
+                  total,
+                  session,
+                ) =>
+                  total
+                  + session.durationMinutes,
+                0,
+              )
+
+
+          result.push({
+            date:
+              dateKey,
+
+            label:
+              date
+                .toLocaleDateString(
+                  'pt-BR',
+                  {
+                    weekday:
+                      'short',
+                  },
+                )
+                .replace(
+                  '.',
+                  '',
+                ),
+
+            minutes:
+              dayMinutes,
+          })
+        }
+
+
+        return result
+      },
+      [
+        sessions,
+        today,
+      ],
+    )
+
+
+  const maxDayMinutes =
+    Math.max(
+      1,
+      ...lastSevenDays.map(
+        (
+          day,
+        ) =>
+          day.minutes,
+      ),
+    )
+
+
+  const studyStreak =
+    useMemo(
+      () => {
+        const studyDays =
+          new Set(
+            sessions.map(
+              (
+                session,
+              ) =>
+                session.studyDate,
+            ),
+          )
+
+
+        const cursor =
+          new Date(
+            today,
+          )
+
+
+        if (
+          !studyDays.has(
+            getLocalDateKey(
+              cursor,
+            ),
+          )
+        ) {
+          cursor.setDate(
+            cursor.getDate()
+            - 1,
+          )
+        }
+
+
+        let streak = 0
+
+
+        while (
+          studyDays.has(
+            getLocalDateKey(
+              cursor,
+            ),
+          )
+        ) {
+          streak += 1
+
+
+          cursor.setDate(
+            cursor.getDate()
+            - 1,
+          )
+        }
+
+
+        return streak
+      },
+      [
+        sessions,
+        today,
+      ],
     )
 
 
@@ -832,6 +1074,213 @@ function StudiesPage() {
       </section>
 
 
+      <section className="study-highlight-grid">
+        <article className="study-highlight-card">
+          <span>
+            Sequência atual
+          </span>
+
+          <strong>
+            {studyStreak}
+            {' '}
+            {studyStreak === 1
+              ? 'dia'
+              : 'dias'}
+          </strong>
+
+          <p>
+            Dias consecutivos estudando.
+          </p>
+        </article>
+
+
+        <article className="study-highlight-card">
+          <span>
+            🏆 Matéria mais estudada
+          </span>
+
+          {mostStudiedSubject ? (
+            <>
+              <strong>
+                {
+                  mostStudiedSubject.subject
+                }
+              </strong>
+
+              <p>
+                {
+                  formatDuration(
+                    mostStudiedSubject.minutes,
+                  )
+                } no total
+              </p>
+            </>
+          ) : (
+            <>
+              <strong>
+                —
+              </strong>
+
+              <p>
+                Registre um estudo primeiro.
+              </p>
+            </>
+          )}
+        </article>
+      </section>
+
+
+      <section className="study-dashboard">
+        <article className="study-dashboard-card">
+          <div className="dashboard-card-header">
+            <div>
+              <span>
+                Distribuição
+              </span>
+
+              <h2>
+                Horas por matéria
+              </h2>
+            </div>
+          </div>
+
+
+          {subjectStats.length
+            === 0 && (
+            <p className="no-study-sessions">
+              Ainda não existem dados suficientes.
+            </p>
+          )}
+
+
+          <div className="subject-chart">
+            {subjectStats.map(
+              (
+                item,
+              ) => {
+                const percentage =
+                  maxSubjectMinutes
+                    === 0
+                    ? 0
+                    : (
+                        item.minutes
+                        / maxSubjectMinutes
+                      )
+                      * 100
+
+
+                return (
+                  <div
+                    key={
+                      item.subject
+                    }
+                    className="subject-row"
+                  >
+                    <div className="subject-row-info">
+                      <strong>
+                        {
+                          item.subject
+                        }
+                      </strong>
+
+                      <span>
+                        {
+                          formatDuration(
+                            item.minutes,
+                          )
+                        }
+                      </span>
+                    </div>
+
+
+                    <div className="subject-bar-track">
+                      <div
+                        className="subject-bar"
+                        style={{
+                          width:
+                            `${percentage}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )
+              },
+            )}
+          </div>
+        </article>
+
+
+        <article className="study-dashboard-card">
+          <div className="dashboard-card-header">
+            <div>
+              <span>
+                Atividade
+              </span>
+
+              <h2>
+                Últimos 7 dias
+              </h2>
+            </div>
+          </div>
+
+
+          <div className="week-chart">
+            {lastSevenDays.map(
+              (
+                day,
+              ) => {
+                const percentage =
+                  (
+                    day.minutes
+                    / maxDayMinutes
+                  )
+                  * 100
+
+
+                return (
+                  <div
+                    key={
+                      day.date
+                    }
+                    className="week-column"
+                  >
+                    <span className="week-value">
+                      {
+                        day.minutes
+                          > 0
+                          ? formatDuration(
+                              day.minutes,
+                            )
+                          : '0'
+                      }
+                    </span>
+
+
+                    <div className="week-bar-area">
+                      <div
+                        className="week-bar"
+                        style={{
+                          height:
+                            `${percentage}%`,
+                        }}
+                      />
+                    </div>
+
+
+                    <span className="week-label">
+                      {
+                        day.label
+                      }
+                    </span>
+                  </div>
+                )
+              },
+            )}
+          </div>
+        </article>
+      </section>
+
+
       <section className="studies-layout">
         <div className="study-form-card">
           <h2>
@@ -847,17 +1296,13 @@ function StudiesPage() {
 
             <input
               type="text"
-
               value={
                 subject
               }
-
               placeholder="Python"
-
               maxLength={
                 100
               }
-
               onChange={(
                 event,
               ) =>
@@ -874,17 +1319,13 @@ function StudiesPage() {
 
             <input
               type="text"
-
               value={
                 topic
               }
-
               placeholder="Funções e parâmetros"
-
               maxLength={
                 200
               }
-
               onChange={(
                 event,
               ) =>
@@ -901,11 +1342,9 @@ function StudiesPage() {
 
             <input
               type="date"
-
               value={
                 studyDate
               }
-
               onChange={(
                 event,
               ) =>
@@ -923,14 +1362,11 @@ function StudiesPage() {
 
               <input
                 type="number"
-
                 min="0"
                 max="24"
-
                 value={
                   hours
                 }
-
                 onChange={(
                   event,
                 ) =>
@@ -947,14 +1383,11 @@ function StudiesPage() {
 
               <input
                 type="number"
-
                 min="0"
                 max="59"
-
                 value={
                   minutes
                 }
-
                 onChange={(
                   event,
                 ) =>
@@ -974,13 +1407,10 @@ function StudiesPage() {
               value={
                 notes
               }
-
               placeholder="O que você estudou hoje?"
-
               maxLength={
                 2000
               }
-
               onChange={(
                 event,
               ) =>
@@ -994,13 +1424,10 @@ function StudiesPage() {
 
           <button
             type="button"
-
             className="save-study-button"
-
             disabled={
               isSaving
             }
-
             onClick={
               saveStudy
             }
@@ -1018,7 +1445,6 @@ function StudiesPage() {
             !== null && (
             <button
               type="button"
-
               onClick={
                 resetForm
               }
@@ -1067,7 +1493,6 @@ function StudiesPage() {
                 key={
                   session.id
                 }
-
                 className="study-card"
               >
                 <div className="study-card-main">
@@ -1119,7 +1544,6 @@ function StudiesPage() {
                 <div className="study-card-actions">
                   <button
                     type="button"
-
                     onClick={() =>
                       startEditing(
                         session,
@@ -1132,7 +1556,6 @@ function StudiesPage() {
 
                   <button
                     type="button"
-
                     onClick={() =>
                       deleteStudy(
                         session.id,
