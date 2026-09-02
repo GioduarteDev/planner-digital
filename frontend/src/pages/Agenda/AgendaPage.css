@@ -351,6 +351,77 @@
   cursor: not-allowed;
 }
 
+/* =========================
+   DRAG AND DROP DE PÁGINAS
+   ========================= */
+
+.page-row.dragging {
+  opacity: 0.55;
+  z-index: 20;
+}
+
+.page-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #8a817c;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.page-drag-handle:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.page-drag-handle:active {
+  cursor: grabbing;
+}
+/* =========================
+   DRAG AND DROP DE PASTAS
+   ========================= */
+
+.folder-group.dragging {
+  opacity: 0.6;
+  z-index: 30;
+}
+
+.folder-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #8a817c;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.folder-drag-handle:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.folder-drag-handle:active {
+  cursor: grabbing;
+}
+
 
 }
 

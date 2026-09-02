@@ -16,7 +16,47 @@ import {
 
   useState,
 
+  type CSSProperties,
+
+  type ReactNode,
+
 } from 'react'
+
+import {
+
+  DndContext,
+
+  KeyboardSensor,
+
+  PointerSensor,
+
+  TouchSensor,
+
+  closestCenter,
+
+  useSensor,
+
+  useSensors,
+
+  type DragEndEvent,
+
+} from '@dnd-kit/core'
+
+import {
+
+  SortableContext,
+
+  arrayMove,
+
+  sortableKeyboardCoordinates,
+
+  useSortable,
+
+  verticalListSortingStrategy,
+
+} from '@dnd-kit/sortable'
+
+import { CSS } from '@dnd-kit/utilities'
 
 import { apiRequest } from '../../services/api'
 
@@ -192,6 +232,517 @@ type SaveStatus =
 
 
 
+type SortablePageRowProps = {
+
+  page: PlannerPage
+
+  activePageId: number | null
+
+  isFirst: boolean
+
+  isLast: boolean
+
+  onSelect: (pageId: number) => void
+
+  onMove: (
+
+    pageId: number,
+
+    folderId: number | null,
+
+    direction: 'up' | 'down',
+
+  ) => void
+
+}
+
+
+
+function SortablePageRow({
+
+  page,
+
+  activePageId,
+
+  isFirst,
+
+  isLast,
+
+  onSelect,
+
+  onMove,
+
+}: SortablePageRowProps) {
+
+  const {
+
+    attributes,
+
+    listeners,
+
+    setNodeRef,
+
+    setActivatorNodeRef,
+
+    transform,
+
+    transition,
+
+    isDragging,
+
+  } = useSortable({
+
+    id: page.id,
+
+  })
+
+
+
+  const style: CSSProperties = {
+
+    transform:
+
+      CSS.Transform.toString(
+
+        transform,
+
+      ),
+
+    transition,
+
+  }
+
+
+
+  return (
+
+    <div
+
+      ref={setNodeRef}
+
+      style={style}
+
+      className={
+
+        isDragging
+
+          ? 'page-row dragging'
+
+          : 'page-row'
+
+      }
+
+    >
+
+      <button
+
+        ref={setActivatorNodeRef}
+
+        type="button"
+
+        className="page-drag-handle"
+
+        aria-label={`Arrastar página ${page.title || 'Sem título'}`}
+
+        title="Arrastar para reordenar"
+
+        {...attributes}
+
+        {...listeners}
+
+      >
+
+        ⋮⋮
+
+      </button>
+
+
+
+      <button
+
+        className={
+
+          page.id ===
+
+          activePageId
+
+            ? 'page-button active'
+
+            : 'page-button'
+
+        }
+
+        type="button"
+
+        onClick={() =>
+
+          onSelect(
+
+            page.id,
+
+          )
+
+        }
+
+      >
+
+        {page.favorite &&
+
+          '★ '}
+
+        {page.title ||
+
+          'Sem título'}
+
+      </button>
+
+
+
+      <div className="page-order-actions">
+
+        <button
+
+          type="button"
+
+          aria-label="Mover página para cima"
+
+          title="Mover página para cima"
+
+          disabled={isFirst}
+
+          onClick={() =>
+
+            onMove(
+
+              page.id,
+
+              page.folderId,
+
+              'up',
+
+            )
+
+          }
+
+        >
+
+          ↑
+
+        </button>
+
+
+
+        <button
+
+          type="button"
+
+          aria-label="Mover página para baixo"
+
+          title="Mover página para baixo"
+
+          disabled={isLast}
+
+          onClick={() =>
+
+            onMove(
+
+              page.id,
+
+              page.folderId,
+
+              'down',
+
+            )
+
+          }
+
+        >
+
+          ↓
+
+        </button>
+
+      </div>
+
+    </div>
+
+  )
+
+}
+
+
+
+
+type SortableFolderGroupProps = {
+
+  folder: PlannerFolder
+
+  isFirst: boolean
+
+  isLast: boolean
+
+  children: ReactNode
+
+  onMove: (
+
+    folderId: number,
+
+    direction: 'up' | 'down',
+
+  ) => void
+
+  onRename: (
+
+    folder: PlannerFolder,
+
+  ) => void
+
+  onDelete: (
+
+    folder: PlannerFolder,
+
+  ) => void
+
+}
+
+
+function SortableFolderGroup({
+
+  folder,
+
+  isFirst,
+
+  isLast,
+
+  children,
+
+  onMove,
+
+  onRename,
+
+  onDelete,
+
+}: SortableFolderGroupProps) {
+
+  const {
+
+    attributes,
+
+    listeners,
+
+    setNodeRef,
+
+    setActivatorNodeRef,
+
+    transform,
+
+    transition,
+
+    isDragging,
+
+  } = useSortable({
+
+    id: `folder-${folder.id}`,
+
+  })
+
+
+  const style: CSSProperties = {
+
+    transform:
+
+      CSS.Transform.toString(
+
+        transform,
+
+      ),
+
+    transition,
+
+  }
+
+
+  return (
+
+    <section
+
+      ref={setNodeRef}
+
+      style={style}
+
+      className={
+
+        isDragging
+
+          ? 'folder-group dragging'
+
+          : 'folder-group'
+
+      }
+
+    >
+
+      <div className="folder-group-header">
+
+        <button
+
+          ref={setActivatorNodeRef}
+
+          type="button"
+
+          className="folder-drag-handle"
+
+          aria-label={`Arrastar pasta ${folder.title}`}
+
+          title="Arrastar para reordenar pasta"
+
+          {...attributes}
+
+          {...listeners}
+
+        >
+
+          ⋮⋮
+
+        </button>
+
+
+        <span
+
+          className="folder-group-title"
+
+          title={folder.title}
+
+        >
+
+          📁 {folder.title}
+
+        </span>
+
+
+        <div className="folder-group-actions">
+
+          <button
+
+            type="button"
+
+            aria-label={`Mover pasta ${folder.title} para cima`}
+
+            title="Mover pasta para cima"
+
+            disabled={isFirst}
+
+            onClick={() =>
+
+              onMove(
+
+                folder.id,
+
+                'up',
+
+              )
+
+            }
+
+          >
+
+            ↑
+
+          </button>
+
+
+          <button
+
+            type="button"
+
+            aria-label={`Mover pasta ${folder.title} para baixo`}
+
+            title="Mover pasta para baixo"
+
+            disabled={isLast}
+
+            onClick={() =>
+
+              onMove(
+
+                folder.id,
+
+                'down',
+
+              )
+
+            }
+
+          >
+
+            ↓
+
+          </button>
+
+
+          <button
+
+            type="button"
+
+            aria-label={`Renomear pasta ${folder.title}`}
+
+            title="Renomear pasta"
+
+            onClick={() =>
+
+              onRename(
+
+                folder,
+
+              )
+
+            }
+
+          >
+
+            ✎
+
+          </button>
+
+
+          <button
+
+            type="button"
+
+            aria-label={`Excluir pasta ${folder.title}`}
+
+            title="Excluir pasta"
+
+            onClick={() =>
+
+              onDelete(
+
+                folder,
+
+              )
+
+            }
+
+          >
+
+            ×
+
+          </button>
+
+        </div>
+
+      </div>
+
+
+      {children}
+
+    </section>
+
+  )
+
+}
+
+
 function AgendaPage() {
 
   const { id } = useParams()
@@ -308,6 +859,60 @@ function AgendaPage() {
       >
 
     >({})
+
+
+
+  const sensors = useSensors(
+
+    useSensor(
+
+      PointerSensor,
+
+      {
+
+        activationConstraint: {
+
+          distance: 6,
+
+        },
+
+      },
+
+    ),
+
+    useSensor(
+
+      TouchSensor,
+
+      {
+
+        activationConstraint: {
+
+          delay: 180,
+
+          tolerance: 6,
+
+        },
+
+      },
+
+    ),
+
+    useSensor(
+
+      KeyboardSensor,
+
+      {
+
+        coordinateGetter:
+
+          sortableKeyboardCoordinates,
+
+      },
+
+    ),
+
+  )
 
 
 
@@ -832,6 +1437,410 @@ function AgendaPage() {
 
 
 
+
+  async function handleFolderDragEnd(
+
+    event: DragEndEvent,
+
+  ) {
+
+    const {
+
+      active,
+
+      over,
+
+    } = event
+
+
+    if (
+
+      over === null
+
+      || active.id === over.id
+
+    ) {
+
+      return
+
+    }
+
+
+    const activeId =
+
+      String(active.id)
+
+
+    const overId =
+
+      String(over.id)
+
+
+    const oldIndex =
+
+      sortedFolders.findIndex(
+
+        (folder) =>
+
+          `folder-${folder.id}`
+
+          === activeId,
+
+      )
+
+
+    const newIndex =
+
+      sortedFolders.findIndex(
+
+        (folder) =>
+
+          `folder-${folder.id}`
+
+          === overId,
+
+      )
+
+
+    if (
+
+      oldIndex === -1
+
+      || newIndex === -1
+
+    ) {
+
+      return
+
+    }
+
+
+    const reordered =
+
+      arrayMove(
+
+        sortedFolders,
+
+        oldIndex,
+
+        newIndex,
+
+      )
+
+
+    try {
+
+      const updatedFolders =
+
+        await apiRequest<
+
+          FolderFromApi[]
+
+        >(
+
+          `/agendas/${agendaId}/folders/reorder`,
+
+          {
+
+            method: 'PATCH',
+
+            body: JSON.stringify({
+
+              folder_ids:
+
+                reordered.map(
+
+                  (folder) =>
+
+                    folder.id,
+
+                ),
+
+            }),
+
+          },
+
+        )
+
+
+      setFolders(
+
+        updatedFolders.map(
+
+          (folder) => ({
+
+            id: folder.id,
+
+            title: folder.title,
+
+            position:
+
+              folder.position,
+
+          }),
+
+        ),
+
+      )
+
+    } catch (error) {
+
+      console.error(error)
+
+
+      alert(
+
+        'Não foi possível reordenar a pasta.',
+
+      )
+
+    }
+
+  }
+
+
+  async function savePageOrder(
+
+    folderId: number | null,
+
+    reordered: PlannerPage[],
+
+  ) {
+
+    const updatedPages =
+
+      await apiRequest<
+
+        PageFromApi[]
+
+      >(
+
+        `/agendas/${agendaId}/pages/reorder`,
+
+        {
+
+          method: 'PATCH',
+
+          body: JSON.stringify({
+
+            folder_id:
+
+              folderId,
+
+            page_ids:
+
+              reordered.map(
+
+                (page) =>
+
+                  page.id,
+
+              ),
+
+          }),
+
+        },
+
+      )
+
+
+
+    const positionsById =
+
+      new Map(
+
+        updatedPages.map(
+
+          (page) => [
+
+            page.id,
+
+            page.position,
+
+          ],
+
+        ),
+
+      )
+
+
+
+    setPages(
+
+      (currentPages) =>
+
+        currentPages.map(
+
+          (page) => {
+
+            const newPosition =
+
+              positionsById.get(
+
+                page.id,
+
+              )
+
+
+
+            if (
+
+              newPosition === undefined
+
+            ) {
+
+              return page
+
+            }
+
+
+
+            return {
+
+              ...page,
+
+              position:
+
+                newPosition,
+
+            }
+
+          },
+
+        ),
+
+    )
+
+  }
+
+
+
+  async function handlePageDragEnd(
+
+    folderId: number | null,
+
+    event: DragEndEvent,
+
+  ) {
+
+    const {
+
+      active,
+
+      over,
+
+    } = event
+
+
+
+    if (
+
+      over === null
+
+      || active.id === over.id
+
+    ) {
+
+      return
+
+    }
+
+
+
+    const groupPages =
+
+      getPagesForFolder(
+
+        folderId,
+
+      )
+
+
+
+    const oldIndex =
+
+      groupPages.findIndex(
+
+        (page) =>
+
+          page.id ===
+
+          Number(active.id),
+
+      )
+
+
+
+    const newIndex =
+
+      groupPages.findIndex(
+
+        (page) =>
+
+          page.id ===
+
+          Number(over.id),
+
+      )
+
+
+
+    if (
+
+      oldIndex === -1
+
+      || newIndex === -1
+
+    ) {
+
+      return
+
+    }
+
+
+
+    const reordered =
+
+      arrayMove(
+
+        groupPages,
+
+        oldIndex,
+
+        newIndex,
+
+      )
+
+
+
+    try {
+
+      await savePageOrder(
+
+        folderId,
+
+        reordered,
+
+      )
+
+    } catch (error) {
+
+      console.error(error)
+
+
+
+      alert(
+
+        'Não foi possível reordenar a página.',
+
+      )
+
+    }
+
+  }
+
+
+
   async function handleMovePage(
 
     pageId: number,
@@ -920,109 +1929,18 @@ function AgendaPage() {
 
     try {
 
-      const updatedPages =
+      await savePageOrder(
 
-        await apiRequest<
+        folderId,
 
-          PageFromApi[]
-
-        >(
-
-          `/agendas/${agendaId}/pages/reorder`,
-
-          {
-
-            method: 'PATCH',
-
-            body: JSON.stringify({
-
-              folder_id:
-
-                folderId,
-
-              page_ids:
-
-                reordered.map(
-
-                  (page) =>
-
-                    page.id,
-
-                ),
-
-            }),
-
-          },
-
-        )
-
-
-      const positionsById =
-
-        new Map(
-
-          updatedPages.map(
-
-            (page) => [
-
-              page.id,
-
-              page.position,
-
-            ],
-
-          ),
-
-        )
-
-
-      setPages(
-
-        (currentPages) =>
-
-          currentPages.map(
-
-            (page) => {
-
-              const newPosition =
-
-                positionsById.get(
-
-                  page.id,
-
-                )
-
-
-              if (
-
-                newPosition === undefined
-
-              ) {
-
-                return page
-
-              }
-
-
-              return {
-
-                ...page,
-
-                position:
-
-                  newPosition,
-
-              }
-
-            },
-
-          ),
+        reordered,
 
       )
 
     } catch (error) {
 
       console.error(error)
+
 
 
       alert(
@@ -1052,6 +1970,7 @@ function AgendaPage() {
       )
 
 
+
     const pageIndex =
 
       groupPages.findIndex(
@@ -1065,9 +1984,11 @@ function AgendaPage() {
       )
 
 
+
     const isFirst =
 
       pageIndex === 0
+
 
 
     const isLast =
@@ -1077,126 +1998,58 @@ function AgendaPage() {
       groupPages.length - 1
 
 
+
     return (
 
-      <div
-
-        className="page-row"
+      <SortablePageRow
 
         key={page.id}
 
-      >
+        page={page}
 
-        <button
+        activePageId={
 
-          className={
+          activePageId
 
-            page.id ===
+        }
 
-            activePageId
+        isFirst={isFirst}
 
-              ? 'page-button active'
+        isLast={isLast}
 
-              : 'page-button'
+        onSelect={
 
-          }
+          setActivePageId
 
-          type="button"
+        }
 
-          onClick={() =>
+        onMove={(
 
-            setActivePageId(
+          pageId,
 
-              page.id,
+          folderId,
 
-            )
+          direction,
 
-          }
+        ) => {
 
-        >
+          void handleMovePage(
 
-          {page.favorite &&
+            pageId,
 
-            '★ '}
+            folderId,
 
-          {page.title ||
+            direction,
 
-            'Sem título'}
+          )
 
-        </button>
+        }}
 
-
-        <div className="page-order-actions">
-
-          <button
-
-            type="button"
-
-            aria-label="Mover página para cima"
-
-            title="Mover página para cima"
-
-            disabled={isFirst}
-
-            onClick={() =>
-
-              void handleMovePage(
-
-                page.id,
-
-                page.folderId,
-
-                'up',
-
-              )
-
-            }
-
-          >
-
-            ↑
-
-          </button>
-
-
-          <button
-
-            type="button"
-
-            aria-label="Mover página para baixo"
-
-            title="Mover página para baixo"
-
-            disabled={isLast}
-
-            onClick={() =>
-
-              void handleMovePage(
-
-                page.id,
-
-                page.folderId,
-
-                'down',
-
-              )
-
-            }
-
-          >
-
-            ↓
-
-          </button>
-
-        </div>
-
-      </div>
+      />
 
     )
 
   }
-
 
 
   function queuePageUpdate(
@@ -3051,94 +3904,86 @@ function AgendaPage() {
 
         <div className="folder-list">
 
-          {sortedFolders.map(
+          {sortedFolders.length > 0 && (
 
-            (
-              folder,
-              folderIndex,
-            ) => {
+            <DndContext
 
-              const folderPages =
+              sensors={sensors}
 
-                getPagesForFolder(
+              collisionDetection={
 
-                  folder.id,
+                closestCenter
+
+              }
+
+              onDragEnd={(event) =>
+
+                void handleFolderDragEnd(
+
+                  event,
 
                 )
 
+              }
+
+            >
+
+              <SortableContext
+
+                items={
+
+                  sortedFolders.map(
+
+                    (folder) =>
+
+                      `folder-${folder.id}`,
+
+                  )
+
+                }
+
+                strategy={
+
+                  verticalListSortingStrategy
+
+                }
+
+              >
+
+                {sortedFolders.map(
+
+                  (
+
+                    folder,
+
+                    folderIndex,
+
+                  ) => {
+
+                    const folderPages =
+
+                      getPagesForFolder(
+
+                        folder.id,
+
+                      )
 
 
-              return (
+                    return (
 
-                <section
+                      <SortableFolderGroup
 
-                  className="folder-group"
+                        key={folder.id}
 
-                  key={folder.id}
+                        folder={folder}
 
-                >
-
-                  <div className="folder-group-header">
-
-                    <span
-
-                      className="folder-group-title"
-
-                      title={folder.title}
-
-                    >
-
-                      📁 {folder.title}
-
-                    </span>
-
-
-
-                    <div className="folder-group-actions">
-
-                      <button
-
-                        type="button"
-
-                        aria-label={`Mover pasta ${folder.title} para cima`}
-
-                        title="Mover pasta para cima"
-
-                        disabled={
+                        isFirst={
 
                           folderIndex === 0
 
                         }
 
-                        onClick={() =>
-
-                          void handleMoveFolder(
-
-                            folder.id,
-
-                            'up',
-
-                          )
-
-                        }
-
-                      >
-
-                        ↑
-
-                      </button>
-
-
-
-                      <button
-
-                        type="button"
-
-                        aria-label={`Mover pasta ${folder.title} para baixo`}
-
-                        title="Mover pasta para baixo"
-
-                        disabled={
+                        isLast={
 
                           folderIndex ===
 
@@ -3146,112 +3991,135 @@ function AgendaPage() {
 
                         }
 
-                        onClick={() =>
+                        onMove={(
+
+                          folderId,
+
+                          direction,
+
+                        ) => {
 
                           void handleMoveFolder(
 
-                            folder.id,
+                            folderId,
 
-                            'down',
+                            direction,
 
                           )
 
-                        }
+                        }}
 
-                      >
-
-                        ↓
-
-                      </button>
-
-
-
-                      <button
-
-                        type="button"
-
-                        aria-label={`Renomear pasta ${folder.title}`}
-
-                        title="Renomear pasta"
-
-                        onClick={() =>
+                        onRename={(folderToRename) => {
 
                           void handleRenameFolder(
 
-                            folder,
+                            folderToRename,
 
                           )
 
-                        }
+                        }}
 
-                      >
-
-                        ✎
-
-                      </button>
-
-
-
-                      <button
-
-                        type="button"
-
-                        aria-label={`Excluir pasta ${folder.title}`}
-
-                        title="Excluir pasta"
-
-                        onClick={() =>
+                        onDelete={(folderToDelete) => {
 
                           void handleDeleteFolder(
 
-                            folder,
+                            folderToDelete,
 
                           )
 
-                        }
+                        }}
 
                       >
 
-                        ×
+                        <div className="folder-pages">
 
-                      </button>
+                          {folderPages.length > 0
 
-                    </div>
+                            ? (
 
-                  </div>
+                              <DndContext
 
+                                sensors={sensors}
 
+                                collisionDetection={
 
-                  <div className="folder-pages">
+                                  closestCenter
 
-                    {folderPages.length > 0
+                                }
 
-                      ? folderPages.map(
+                                onDragEnd={(event) =>
 
-                          renderPageButton,
+                                  void handlePageDragEnd(
 
-                        )
+                                    folder.id,
 
-                      : (
+                                    event,
 
-                        <span className="folder-empty-message">
+                                  )
 
-                          Pasta vazia
+                                }
 
-                        </span>
+                              >
 
-                      )}
+                                <SortableContext
 
-                  </div>
+                                  items={
 
-                </section>
+                                    folderPages.map(
 
-              )
+                                      (page) =>
 
-            },
+                                        page.id,
+
+                                    )
+
+                                  }
+
+                                  strategy={
+
+                                    verticalListSortingStrategy
+
+                                  }
+
+                                >
+
+                                  {folderPages.map(
+
+                                    renderPageButton,
+
+                                  )}
+
+                                </SortableContext>
+
+                              </DndContext>
+
+                            )
+
+                            : (
+
+                              <span className="folder-empty-message">
+
+                                Pasta vazia
+
+                              </span>
+
+                            )}
+
+                        </div>
+
+                      </SortableFolderGroup>
+
+                    )
+
+                  },
+
+                )}
+
+              </SortableContext>
+
+            </DndContext>
 
           )}
-
 
 
           <section className="folder-group">
@@ -3276,15 +4144,73 @@ function AgendaPage() {
 
               ).length > 0
 
-                ? getPagesForFolder(
+                ? (
 
-                    null,
+                  <DndContext
 
-                  ).map(
+                    sensors={sensors}
 
-                    renderPageButton,
+                    collisionDetection={
 
-                  )
+                      closestCenter
+
+                    }
+
+                    onDragEnd={(event) =>
+
+                      void handlePageDragEnd(
+
+                        null,
+
+                        event,
+
+                      )
+
+                    }
+
+                  >
+
+                    <SortableContext
+
+                      items={
+
+                        getPagesForFolder(
+
+                          null,
+
+                        ).map(
+
+                          (page) =>
+
+                            page.id,
+
+                        )
+
+                      }
+
+                      strategy={
+
+                        verticalListSortingStrategy
+
+                      }
+
+                    >
+
+                      {getPagesForFolder(
+
+                        null,
+
+                      ).map(
+
+                        renderPageButton,
+
+                      )}
+
+                    </SortableContext>
+
+                  </DndContext>
+
+                )
 
                 : (
 
