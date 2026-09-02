@@ -64,6 +64,10 @@ type PlannerPage = {
 
   favorite: boolean
 
+  folderId: number | null
+
+  position: number
+
   tasks: PlannerTask[]
 
 }
@@ -102,11 +106,43 @@ type PageFromApi = {
 
   agenda_id: number
 
+  folder_id: number | null
+
+  position: number
+
   title: string
 
   content: string
 
   favorite: boolean
+
+  created_at: string
+
+}
+
+
+
+type PlannerFolder = {
+
+  id: number
+
+  title: string
+
+  position: number
+
+}
+
+
+
+type FolderFromApi = {
+
+  id: number
+
+  agenda_id: number
+
+  title: string
+
+  position: number
 
   created_at: string
 
@@ -182,6 +218,14 @@ function AgendaPage() {
   const [pages, setPages] =
 
     useState<PlannerPage[]>([])
+
+  const [
+
+    folders,
+
+    setFolders,
+
+  ] = useState<PlannerFolder[]>([])
 
   const [
 
@@ -291,6 +335,8 @@ function AgendaPage() {
 
           tasksData,
 
+          foldersData,
+
         ] = await Promise.all([
 
           apiRequest<AgendaFromApi>(
@@ -308,6 +354,12 @@ function AgendaPage() {
           apiRequest<TaskFromApi[]>(
 
             '/tasks',
+
+          ),
+
+          apiRequest<FolderFromApi[]>(
+
+            `/agendas/${agendaId}/folders`,
 
           ),
 
@@ -334,6 +386,28 @@ function AgendaPage() {
             agendaData.cover_color,
 
         })
+
+
+
+        setFolders(
+
+          foldersData.map(
+
+            (folder) => ({
+
+              id: folder.id,
+
+              title: folder.title,
+
+              position:
+
+                folder.position,
+
+            }),
+
+          ),
+
+        )
 
 
 
@@ -434,6 +508,14 @@ function AgendaPage() {
               favorite:
 
                 page.favorite,
+
+              folderId:
+
+                page.folder_id,
+
+              position:
+
+                page.position,
 
               tasks:
 
@@ -793,6 +875,14 @@ function AgendaPage() {
           favorite:
 
             newPage.favorite,
+
+          folderId:
+
+            newPage.folder_id,
+
+          position:
+
+            newPage.position,
 
           tasks: [],
 
@@ -1622,6 +1712,100 @@ function AgendaPage() {
 
 
 
+  async function handleMovePageToFolder(
+
+    folderId: number | null,
+
+  ) {
+
+    if (
+
+      activePageId === null
+
+    ) {
+
+      return
+
+    }
+
+
+
+    try {
+
+      const updatedPage =
+
+        await apiRequest<PageFromApi>(
+
+          `/pages/${activePageId}/folder`,
+
+          {
+
+            method: 'PATCH',
+
+            body: JSON.stringify({
+
+              folder_id:
+
+                folderId,
+
+            }),
+
+          },
+
+        )
+
+
+
+      setPages(
+
+        (currentPages) =>
+
+          currentPages.map(
+
+            (page) =>
+
+              page.id ===
+
+              activePageId
+
+                ? {
+
+                    ...page,
+
+                    folderId:
+
+                      updatedPage.folder_id,
+
+                    position:
+
+                      updatedPage.position,
+
+                  }
+
+                : page,
+
+          ),
+
+      )
+
+    } catch (error) {
+
+      console.error(error)
+
+
+
+      alert(
+
+        'Não foi possível mover a página.',
+
+      )
+
+    }
+
+  }
+
+
+
   async function handleDeletePage() {
 
     if (
@@ -2031,6 +2215,80 @@ function AgendaPage() {
                 }
 
               />
+
+
+
+              <select
+
+                className="folder-select"
+
+                value={
+
+                  activePage.folderId
+
+                  ?? ''
+
+                }
+
+                onChange={(event) => {
+
+                  const value =
+
+                    event.target.value
+
+
+
+                  void handleMovePageToFolder(
+
+                    value === ''
+
+                      ? null
+
+                      : Number(value),
+
+                  )
+
+                }}
+
+              >
+
+                <option value="">
+
+                  📄 Sem pasta
+
+                </option>
+
+
+
+                {folders.map(
+
+                  (folder) => (
+
+                    <option
+
+                      key={
+
+                        folder.id
+
+                      }
+
+                      value={
+
+                        folder.id
+
+                      }
+
+                    >
+
+                      📁 {folder.title}
+
+                    </option>
+
+                  ),
+
+                )}
+
+              </select>
 
 
 
