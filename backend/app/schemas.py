@@ -1,4 +1,8 @@
-from datetime import date, datetime
+from datetime import (
+    date,
+    datetime,
+)
+
 from typing import Literal
 
 from pydantic import (
@@ -89,9 +93,15 @@ class PageUpdate(BaseModel):
     )
 
 
+class PageMoveFolder(BaseModel):
+    folder_id: int | None = None
+
+
 class PageResponse(BaseModel):
     id: int
     agenda_id: int
+    folder_id: int | None
+    position: int
     title: str
     content: str
     favorite: bool
@@ -237,9 +247,7 @@ class EventCreate(BaseModel):
     )
 
     starts_at: datetime
-
     ends_at: datetime | None = None
-
     all_day: bool = False
 
     reminder_minutes: int | None = Field(
@@ -262,9 +270,7 @@ class EventUpdate(BaseModel):
     )
 
     starts_at: datetime | None = None
-
     ends_at: datetime | None = None
-
     all_day: bool | None = None
 
     reminder_minutes: int | None = Field(
@@ -289,7 +295,8 @@ class EventResponse(BaseModel):
         from_attributes=True
     )
 
-    # =========================
+
+# =========================
 # ESTUDOS
 # =========================
 
@@ -365,7 +372,8 @@ class StudySessionResponse(BaseModel):
         from_attributes=True
     )
 
-    # =========================
+
+# =========================
 # BUSCA
 # =========================
 
@@ -376,3 +384,47 @@ class SearchResult(BaseModel):
     subtitle: str = ""
     agenda_id: int | None = None
     page_id: int | None = None
+
+
+# =========================
+# PASTAS
+# =========================
+
+class FolderCreate(BaseModel):
+    title: str = Field(
+        min_length=1,
+        max_length=120,
+    )
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True
+    )
+
+
+class FolderUpdate(BaseModel):
+    title: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=120,
+    )
+
+    position: int | None = Field(
+        default=None,
+        ge=0,
+    )
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True
+    )
+
+
+class FolderResponse(BaseModel):
+    id: int
+    agenda_id: int
+    title: str
+    position: int
+    created_at: datetime
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )

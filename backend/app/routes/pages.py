@@ -13,18 +13,21 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+
 from app.dependencies import (
     get_current_user,
 )
 
 from app.models import (
     Agenda,
+    Folder,
     Page,
     User,
 )
 
 from app.schemas import (
     PageCreate,
+    PageMoveFolder,
     PageResponse,
     PageUpdate,
 )
@@ -47,11 +50,13 @@ def get_user_page(
         select(Page)
         .join(
             Agenda,
-            Page.agenda_id == Agenda.id,
+            Page.agenda_id
+            == Agenda.id,
         )
         .where(
             Page.id == page_id,
-            Agenda.user_id == user_id,
+            Agenda.user_id
+            == user_id,
         )
     )
 
@@ -62,11 +67,9 @@ def get_user_page(
 )
 def list_pages(
     agenda_id: int,
-
     db: Session = Depends(
         get_db
     ),
-
     current_user: User = Depends(
         get_current_user
     ),
@@ -91,9 +94,11 @@ def list_pages(
     statement = (
         select(Page)
         .where(
-            Page.agenda_id == agenda_id
+            Page.agenda_id
+            == agenda_id
         )
         .order_by(
+            Page.position,
             Page.created_at,
             Page.id,
         )
@@ -110,11 +115,9 @@ def list_pages(
 )
 def get_page(
     page_id: int,
-
     db: Session = Depends(
         get_db
     ),
-
     current_user: User = Depends(
         get_current_user
     ),
@@ -146,11 +149,9 @@ def get_page(
 def create_page(
     agenda_id: int,
     data: PageCreate,
-
     db: Session = Depends(
         get_db
     ),
-
     current_user: User = Depends(
         get_current_user
     ),
@@ -188,8 +189,8 @@ def create_page(
     )
 
     if (
-        page_count >=
-        MAX_PAGES
+        page_count
+        >= MAX_PAGES
     ):
         raise HTTPException(
             status_code=400,
@@ -207,6 +208,8 @@ def create_page(
 
     page = Page(
         agenda_id=agenda_id,
+        folder_id=None,
+        position=page_count,
         title=title,
         content="",
         favorite=False,
@@ -226,11 +229,9 @@ def create_page(
 def update_page(
     page_id: int,
     data: PageUpdate,
-
     db: Session = Depends(
         get_db
     ),
-
     current_user: User = Depends(
         get_current_user
     ),
@@ -271,6 +272,100 @@ def update_page(
     return page
 
 
+@router.patch(
+    "/pages/{page_id}/folder",
+    response_model=PageResponse,
+)
+def move_page_to_folder(
+    page_id: int,
+    data: PageMoveFolder,
+    db: Session = Depends(
+        get_db
+    ),
+    current_user: User = Depends(
+        get_current_user
+    ),
+):
+    page = get_user_page(
+        page_id,
+        current_user.id,
+        db,
+    )
+
+    if page is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Página não encontrada."
+            ),
+        )
+
+    # =========================
+    # VOLTAR PARA SEM PASTA
+    # =========================
+
+    if data.folder_id is None:
+        page.folder_id = None
+
+        db.commit()
+        db.refresh(page)
+
+        return page
+
+
+    # =========================
+    # PROCURAR PASTA
+    # =========================
+
+    folder = db.scalar(
+        select(Folder)
+        .join(
+            Agenda,
+            Folder.agenda_id
+            == Agenda.id,
+        )
+        .where(
+            Folder.id
+            == data.folder_id,
+            Agenda.user_id
+            == current_user.id,
+        )
+    )
+
+    if folder is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Pasta não encontrada."
+            ),
+        )
+
+
+    # =========================
+    # SEGURANÇA
+    # =========================
+
+    if (
+        folder.agenda_id
+        != page.agenda_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "A página e a pasta "
+                "precisam pertencer "
+                "à mesma agenda."
+            ),
+        )
+
+    page.folder_id = folder.id
+
+    db.commit()
+    db.refresh(page)
+
+    return page
+
+
 @router.delete(
     "/pages/{page_id}",
     status_code=(
@@ -279,11 +374,9 @@ def update_page(
 )
 def delete_page(
     page_id: int,
-
     db: Session = Depends(
         get_db
     ),
-
     current_user: User = Depends(
         get_current_user
     ),

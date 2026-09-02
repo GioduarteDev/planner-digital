@@ -102,6 +102,50 @@ class Agenda(Base):
         cascade="all, delete-orphan",
     )
 
+    folders: Mapped[list[Folder]] = relationship(
+        back_populates="agenda",
+        cascade="all, delete-orphan",
+    )
+
+
+class Folder(Base):
+    __tablename__ = "folders"
+
+    id: Mapped[int] = mapped_column(
+        primary_key=True
+    )
+
+    agenda_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "agendas.id",
+            ondelete="CASCADE",
+        ),
+        index=True,
+    )
+
+    title: Mapped[str] = mapped_column(
+        String(120)
+    )
+
+    position: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+    )
+
+    agenda: Mapped[Agenda] = relationship(
+        back_populates="folders"
+    )
+
+    pages: Mapped[list[Page]] = relationship(
+        back_populates="folder",
+        passive_deletes=True,
+    )
+
 
 class Page(Base):
     __tablename__ = "pages"
@@ -115,6 +159,20 @@ class Page(Base):
             "agendas.id",
             ondelete="CASCADE",
         )
+    )
+
+    folder_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "folders.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    position: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
     )
 
     title: Mapped[str] = mapped_column(
@@ -137,6 +195,10 @@ class Page(Base):
     )
 
     agenda: Mapped[Agenda] = relationship(
+        back_populates="pages"
+    )
+
+    folder: Mapped[Folder | None] = relationship(
         back_populates="pages"
     )
 

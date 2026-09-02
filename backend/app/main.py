@@ -33,6 +33,10 @@ from app.routes.search import (
     router as search_router,
 )
 
+from app.routes.folders import (
+    router as folders_router,
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -43,6 +47,10 @@ app = FastAPI(
     title="Planner Digital API",
     version="1.0.0",
     lifespan=lifespan,
+)
+
+app.include_router(
+    folders_router
 )
 
 
