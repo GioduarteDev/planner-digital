@@ -636,6 +636,104 @@ function AgendaPage() {
 
 
 
+  const sortedFolders =
+
+    [...folders].sort(
+
+      (a, b) =>
+
+        a.position - b.position
+
+        || a.id - b.id,
+
+    )
+
+
+
+  function getPagesForFolder(
+
+    folderId: number | null,
+
+  ) {
+
+    return pages
+
+      .filter(
+
+        (page) =>
+
+          page.folderId === folderId,
+
+      )
+
+      .sort(
+
+        (a, b) =>
+
+          a.position - b.position
+
+          || a.id - b.id,
+
+      )
+
+  }
+
+
+
+  function renderPageButton(
+
+    page: PlannerPage,
+
+  ) {
+
+    return (
+
+      <button
+
+        key={page.id}
+
+        className={
+
+          page.id ===
+
+          activePageId
+
+            ? 'page-button active'
+
+            : 'page-button'
+
+        }
+
+        type="button"
+
+        onClick={() =>
+
+          setActivePageId(
+
+            page.id,
+
+          )
+
+        }
+
+      >
+
+        {page.favorite &&
+
+          '★ '}
+
+        {page.title ||
+
+          'Sem título'}
+
+      </button>
+
+    )
+
+  }
+
+
+
   function queuePageUpdate(
 
     pageId: number,
@@ -1712,6 +1810,346 @@ function AgendaPage() {
 
 
 
+  async function handleCreateFolder() {
+
+    const title =
+
+      window.prompt(
+
+        'Nome da nova pasta:',
+
+      )
+
+
+
+    if (
+
+      title === null
+
+      || title.trim() === ''
+
+    ) {
+
+      return
+
+    }
+
+
+
+    try {
+
+      const createdFolder =
+
+        await apiRequest<FolderFromApi>(
+
+          `/agendas/${agendaId}/folders`,
+
+          {
+
+            method: 'POST',
+
+            body: JSON.stringify({
+
+              title: title.trim(),
+
+            }),
+
+          },
+
+        )
+
+
+
+      setFolders(
+
+        (currentFolders) => [
+
+          ...currentFolders,
+
+          {
+
+            id: createdFolder.id,
+
+            title:
+
+              createdFolder.title,
+
+            position:
+
+              createdFolder.position,
+
+          },
+
+        ],
+
+      )
+
+    } catch (error) {
+
+      console.error(error)
+
+
+
+      if (
+
+        error instanceof Error
+
+      ) {
+
+        alert(error.message)
+
+      } else {
+
+        alert(
+
+          'Não foi possível criar a pasta.',
+
+        )
+
+      }
+
+    }
+
+  }
+
+
+
+  async function handleRenameFolder(
+
+    folder: PlannerFolder,
+
+  ) {
+
+    const title =
+
+      window.prompt(
+
+        'Novo nome da pasta:',
+
+        folder.title,
+
+      )
+
+
+
+    if (
+
+      title === null
+
+      || title.trim() === ''
+
+      || title.trim() ===
+
+        folder.title
+
+    ) {
+
+      return
+
+    }
+
+
+
+    try {
+
+      const updatedFolder =
+
+        await apiRequest<FolderFromApi>(
+
+          `/folders/${folder.id}`,
+
+          {
+
+            method: 'PATCH',
+
+            body: JSON.stringify({
+
+              title: title.trim(),
+
+            }),
+
+          },
+
+        )
+
+
+
+      setFolders(
+
+        (currentFolders) =>
+
+          currentFolders.map(
+
+            (currentFolder) =>
+
+              currentFolder.id ===
+
+              folder.id
+
+                ? {
+
+                    ...currentFolder,
+
+                    title:
+
+                      updatedFolder.title,
+
+                    position:
+
+                      updatedFolder.position,
+
+                  }
+
+                : currentFolder,
+
+          ),
+
+      )
+
+    } catch (error) {
+
+      console.error(error)
+
+
+
+      if (
+
+        error instanceof Error
+
+      ) {
+
+        alert(error.message)
+
+      } else {
+
+        alert(
+
+          'Não foi possível renomear a pasta.',
+
+        )
+
+      }
+
+    }
+
+  }
+
+
+
+  async function handleDeleteFolder(
+
+    folder: PlannerFolder,
+
+  ) {
+
+    const confirmed =
+
+      window.confirm(
+
+        `Excluir a pasta "${folder.title}"? As páginas dela voltarão para "Sem pasta".`,
+
+      )
+
+
+
+    if (!confirmed) {
+
+      return
+
+    }
+
+
+
+    try {
+
+      await apiRequest<void>(
+
+        `/folders/${folder.id}`,
+
+        {
+
+          method: 'DELETE',
+
+        },
+
+      )
+
+
+
+      setFolders(
+
+        (currentFolders) =>
+
+          currentFolders.filter(
+
+            (currentFolder) =>
+
+              currentFolder.id !==
+
+              folder.id,
+
+          ),
+
+      )
+
+
+
+      setPages(
+
+        (currentPages) =>
+
+          currentPages.map(
+
+            (page) =>
+
+              page.folderId ===
+
+              folder.id
+
+                ? {
+
+                    ...page,
+
+                    folderId: null,
+
+                  }
+
+                : page,
+
+          ),
+
+      )
+
+    } catch (error) {
+
+      console.error(error)
+
+
+
+      if (
+
+        error instanceof Error
+
+      ) {
+
+        alert(error.message)
+
+      } else {
+
+        alert(
+
+          'Não foi possível excluir a pasta.',
+
+        )
+
+      }
+
+    }
+
+  }
+
+
+
   async function handleMovePageToFolder(
 
     folderId: number | null,
@@ -2102,73 +2540,227 @@ function AgendaPage() {
 
           </span>
 
-          <button
 
-            type="button"
 
-            onClick={
+          <div className="sidebar-create-actions">
 
-              handleCreatePage
+            <button
 
-            }
+              type="button"
 
-          >
+              onClick={() =>
 
-            + Página
+                void handleCreateFolder()
 
-          </button>
+              }
+
+            >
+
+              + Pasta
+
+            </button>
+
+
+
+            <button
+
+              type="button"
+
+              onClick={
+
+                handleCreatePage
+
+              }
+
+            >
+
+              + Página
+
+            </button>
+
+          </div>
 
         </div>
 
-        <div className="pages-list">
 
-          {pages.map(
 
-            (page) => (
+        <div className="folder-list">
 
-              <button
+          {sortedFolders.map(
 
-                key={page.id}
+            (folder) => {
 
-                className={
+              const folderPages =
 
-                  page.id ===
+                getPagesForFolder(
 
-                  activePageId
+                  folder.id,
 
-                    ? 'page-button active'
+                )
 
-                    : 'page-button'
 
-                }
 
-                type="button"
+              return (
 
-                onClick={() =>
+                <section
 
-                  setActivePageId(
+                  className="folder-group"
 
-                    page.id,
+                  key={folder.id}
+
+                >
+
+                  <div className="folder-group-header">
+
+                    <span
+
+                      className="folder-group-title"
+
+                      title={folder.title}
+
+                    >
+
+                      📁 {folder.title}
+
+                    </span>
+
+
+
+                    <div className="folder-group-actions">
+
+                      <button
+
+                        type="button"
+
+                        aria-label={`Renomear pasta ${folder.title}`}
+
+                        title="Renomear pasta"
+
+                        onClick={() =>
+
+                          void handleRenameFolder(
+
+                            folder,
+
+                          )
+
+                        }
+
+                      >
+
+                        ✎
+
+                      </button>
+
+
+
+                      <button
+
+                        type="button"
+
+                        aria-label={`Excluir pasta ${folder.title}`}
+
+                        title="Excluir pasta"
+
+                        onClick={() =>
+
+                          void handleDeleteFolder(
+
+                            folder,
+
+                          )
+
+                        }
+
+                      >
+
+                        ×
+
+                      </button>
+
+                    </div>
+
+                  </div>
+
+
+
+                  <div className="folder-pages">
+
+                    {folderPages.length > 0
+
+                      ? folderPages.map(
+
+                          renderPageButton,
+
+                        )
+
+                      : (
+
+                        <span className="folder-empty-message">
+
+                          Pasta vazia
+
+                        </span>
+
+                      )}
+
+                  </div>
+
+                </section>
+
+              )
+
+            },
+
+          )}
+
+
+
+          <section className="folder-group">
+
+            <div className="folder-group-header">
+
+              <span className="folder-group-title">
+
+                📄 Sem pasta
+
+              </span>
+
+            </div>
+
+
+
+            <div className="folder-pages">
+
+              {getPagesForFolder(
+
+                null,
+
+              ).length > 0
+
+                ? getPagesForFolder(
+
+                    null,
+
+                  ).map(
+
+                    renderPageButton,
 
                   )
 
-                }
+                : (
 
-              >
+                  <span className="folder-empty-message">
 
-                {page.favorite &&
+                    Nenhuma página sem pasta
 
-                  '★ '}
+                  </span>
 
-                {page.title ||
+                )}
 
-                  'Sem título'}
+            </div>
 
-              </button>
-
-            ),
-
-          )}
+          </section>
 
         </div>
 

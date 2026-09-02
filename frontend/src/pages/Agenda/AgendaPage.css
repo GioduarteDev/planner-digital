@@ -236,4 +236,86 @@
     align-items: stretch;
     flex-direction: column;
   }
+
+/* ===== PASTAS NA LATERAL ===== */
+
+.sidebar-create-actions {
+  display: flex;
+  gap: 8px;
 }
+
+.folder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.folder-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.folder-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.folder-group-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.folder-group-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.folder-group-actions button {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.folder-pages {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-left: 10px;
+}
+
+.folder-empty-message {
+  padding: 6px 10px;
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+.folder-select {
+  min-width: 150px;
+  padding: 9px 10px;
+  border-radius: 10px;
+}
+
+@media (max-width: 800px) {
+  .sidebar-create-actions {
+    flex-wrap: wrap;
+  }
+}
+
+}
+
