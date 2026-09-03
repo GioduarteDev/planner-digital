@@ -189,6 +189,12 @@ class Page(Base):
         default=False,
     )
 
+    paper_type: Mapped[str] = mapped_column(
+    String(20),
+    default="blank",
+    server_default="blank",
+)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         server_default=func.now(),

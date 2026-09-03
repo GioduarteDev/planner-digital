@@ -453,6 +453,50 @@
     max-height: 35vh;
   }
 }
+ /* =========================
+   TIPOS DE PAPEL
+   ========================= */
+
+.page-content.paper-blank {
+  background-color: #ffffff;
+  background-image: none;
+}
+
+.page-content.paper-lined {
+  background-color: #ffffff;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 31px,
+    rgba(120, 120, 140, 0.22) 32px
+  );
+  background-size: 100% 32px;
+}
+
+.page-content.paper-grid {
+  background-color: #ffffff;
+  background-image:
+    linear-gradient(
+      rgba(120, 120, 140, 0.16) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(120, 120, 140, 0.16) 1px,
+      transparent 1px
+    );
+  background-size: 24px 24px;
+}
+
+.page-content.paper-dotted {
+  background-color: #ffffff;
+  background-image: radial-gradient(
+    circle,
+    rgba(110, 110, 130, 0.32) 1px,
+    transparent 1.2px
+  );
+  background-size: 24px 24px;
+}
 
 }
 

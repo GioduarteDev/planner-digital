@@ -78,6 +78,18 @@ type TaskPriority =
 
 
 
+type PaperType =
+
+  | 'blank'
+
+  | 'lined'
+
+  | 'grid'
+
+  | 'dotted'
+
+
+
 type PlannerTask = {
 
   id: number
@@ -107,6 +119,8 @@ type PlannerPage = {
   folderId: number | null
 
   position: number
+
+  paperType: PaperType
 
   tasks: PlannerTask[]
 
@@ -155,6 +169,8 @@ type PageFromApi = {
   content: string
 
   favorite: boolean
+
+  paper_type: PaperType
 
   created_at: string
 
@@ -217,6 +233,8 @@ type PagePatch = {
   content?: string
 
   favorite?: boolean
+
+  paper_type?: PaperType
 
 }
 
@@ -1121,6 +1139,10 @@ function AgendaPage() {
               position:
 
                 page.position,
+
+              paperType:
+
+                page.paper_type,
 
               tasks:
 
@@ -2300,6 +2322,10 @@ function AgendaPage() {
 
             newPage.position,
 
+          paperType:
+
+            newPage.paper_type,
+
           tasks: [],
 
         }
@@ -2567,6 +2593,72 @@ function AgendaPage() {
         content:
 
           newContent,
+
+      },
+
+    )
+
+  }
+
+
+
+  function handleChangePaperType(
+
+    newPaperType: PaperType,
+
+  ) {
+
+    if (
+
+      activePageId === null
+
+    ) {
+
+      return
+
+    }
+
+
+
+    setPages(
+
+      (currentPages) =>
+
+        currentPages.map(
+
+          (page) =>
+
+            page.id ===
+
+            activePageId
+
+              ? {
+
+                  ...page,
+
+                  paperType:
+
+                    newPaperType,
+
+                }
+
+              : page,
+
+        ),
+
+    )
+
+
+
+    queuePageUpdate(
+
+      activePageId,
+
+      {
+
+        paper_type:
+
+          newPaperType,
 
       },
 
@@ -4348,6 +4440,62 @@ function AgendaPage() {
 
 
 
+              <select
+
+                className="folder-select paper-select"
+
+                aria-label="Tipo de papel"
+
+                title="Tipo de papel"
+
+                value={
+
+                  activePage.paperType
+
+                }
+
+                onChange={(event) =>
+
+                  handleChangePaperType(
+
+                    event.target
+
+                      .value as PaperType,
+
+                  )
+
+                }
+
+              >
+
+                <option value="blank">
+
+                  ⬜ Branco
+
+                </option>
+
+                <option value="lined">
+
+                  ━ Pautado
+
+                </option>
+
+                <option value="grid">
+
+                  ▦ Quadriculado
+
+                </option>
+
+                <option value="dotted">
+
+                  ⠿ Pontilhado
+
+                </option>
+
+              </select>
+
+
+
               <button
 
                 className="favorite-button"
@@ -4670,7 +4818,7 @@ function AgendaPage() {
 
             <textarea
 
-              className="page-content"
+              className={`page-content paper-${activePage.paperType}`}
 
               value={
 

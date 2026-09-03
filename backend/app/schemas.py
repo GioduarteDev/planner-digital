@@ -19,8 +19,15 @@ TaskPriority = Literal[
     "high",
 ]
 
+PaperType = Literal[
+    "blank",
+    "lined",
+    "grid",
+    "dotted",
+]
 
 # =========================
+# 
 # AGENDAS
 # =========================
 
@@ -87,6 +94,8 @@ class PageUpdate(BaseModel):
 
     content: str | None = None
     favorite: bool | None = None
+    paper_type: PaperType | None = None
+
 
     model_config = ConfigDict(
         str_strip_whitespace=True
@@ -105,6 +114,7 @@ class PageResponse(BaseModel):
     title: str
     content: str
     favorite: bool
+    paper_type: PaperType
     created_at: datetime
 
     model_config = ConfigDict(
