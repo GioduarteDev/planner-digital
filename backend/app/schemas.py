@@ -3,7 +3,7 @@ from datetime import (
     datetime,
 )
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -24,6 +24,12 @@ PaperType = Literal[
     "lined",
     "grid",
     "dotted",
+]
+BlockType = Literal[
+    "text",
+    "heading",
+    "checkbox",
+    "list",
 ]
 
 # =========================
@@ -450,3 +456,34 @@ class FolderReorderRequest(BaseModel):
 class PageReorderRequest(BaseModel):
     folder_id: int | None = None
     page_ids: list[int]
+
+
+
+class PageBlockCreate(BaseModel):
+    block_type: BlockType = "text"
+    data: dict[str, Any] = Field(
+        default_factory=dict,
+    )
+
+
+class PageBlockUpdate(BaseModel):
+    block_type: BlockType | None = None
+    data: dict[str, Any] | None = None
+
+
+class PageBlockResponse(BaseModel):
+    id: int
+    page_id: int
+    block_type: BlockType
+    data: dict[str, Any]
+    position: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )
+
+
+class PageBlockReorderRequest(BaseModel):
+    block_ids: list[int]

@@ -12,6 +12,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    JSON,
     Text,
     func,
 )
@@ -211,6 +212,63 @@ class Page(Base):
     tasks: Mapped[list[Task]] = relationship(
         back_populates="page",
         cascade="all, delete-orphan",
+    )
+    blocks: Mapped[list["PageBlock"]] = relationship(
+    back_populates="page",
+    cascade="all, delete-orphan",
+    passive_deletes=True,
+)
+
+
+class PageBlock(Base):
+    __tablename__ = "page_blocks"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    page_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "pages.id",
+            ondelete="CASCADE",
+        ),
+        index=True,
+        nullable=False,
+    )
+
+    block_type: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        default="text",
+        server_default="text",
+    )
+
+    data: Mapped[dict] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
+    )
+
+    position: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    page: Mapped["Page"] = relationship(
+        back_populates="blocks",
     )
 
 

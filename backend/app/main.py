@@ -37,6 +37,18 @@ from app.routes.folders import (
     router as folders_router,
 )
 
+from app.routes import (
+    agendas,
+    auth,
+    blocks,
+    events,
+    folders,
+    pages,
+    search,
+    studies,
+    tasks,
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -53,6 +65,7 @@ app.include_router(
     folders_router
 )
 
+app.include_router(blocks.router)
 
 app.add_middleware(
     CORSMiddleware,
