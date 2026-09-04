@@ -742,5 +742,87 @@
   }
 }
 
+/* =========================
+   MÍDIA DA PÁGINA - TESTE FUNCIONAL
+   ========================= */
+
+.media-section {
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.media-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.media-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.media-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #f8f8f8;
+}
+
+.media-file-input {
+  display: none;
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.media-card {
+  overflow: hidden;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.media-card img {
+  display: block;
+  width: 100%;
+  height: 140px;
+  object-fit: contain;
+  background: #fafafa;
+}
+
+.media-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px;
+}
+
+.media-empty-message,
+.media-error-message {
+  margin: 12px 0 0;
+}
+
+.media-error-message {
+  font-weight: 600;
+}
+
+
 }
 

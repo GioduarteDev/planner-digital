@@ -33,6 +33,8 @@ import { apiRequest } from '../../services/api'
 import './AgendaPage.css'
 
 const MAX_PAGES = 400
+const API_BASE_URL = 'http://127.0.0.1:8000'
+const TOKEN_KEY = 'planner-access-token'
 
 type TaskPriority = 'low' | 'medium' | 'high'
 
@@ -47,6 +49,10 @@ type BlockType =
   | 'heading'
   | 'checkbox'
   | 'list'
+
+type MediaType =
+  | 'image'
+  | 'sticker'
 
 type SaveStatus =
   | 'saved'
@@ -88,6 +94,17 @@ type PlannerBlock = {
   position: number
   createdAt: string
   updatedAt: string
+}
+
+type PlannerMedia = {
+  id: number
+  pageId: number
+  mediaType: MediaType
+  originalName: string
+  mimeType: string
+  sizeBytes: number
+  fileUrl: string
+  createdAt: string
 }
 
 type Agenda = {
@@ -143,6 +160,17 @@ type BlockFromApi = {
   updated_at: string
 }
 
+type MediaFromApi = {
+  id: number
+  page_id: number
+  media_type: MediaType
+  original_name: string
+  mime_type: string
+  size_bytes: number
+  file_url: string
+  created_at: string
+}
+
 type PagePatch = {
   title?: string
   content?: string
@@ -167,6 +195,34 @@ function convertBlock(
     createdAt: block.created_at,
     updatedAt: block.updated_at,
   }
+}
+
+function convertMedia(
+  media: MediaFromApi,
+): PlannerMedia {
+  return {
+    id: media.id,
+    pageId: media.page_id,
+    mediaType: media.media_type,
+    originalName: media.original_name,
+    mimeType: media.mime_type,
+    sizeBytes: media.size_bytes,
+    fileUrl: media.file_url,
+    createdAt: media.created_at,
+  }
+}
+
+function getMediaUrl(
+  fileUrl: string,
+) {
+  if (
+    fileUrl.startsWith('http://')
+    || fileUrl.startsWith('https://')
+  ) {
+    return fileUrl
+  }
+
+  return `${API_BASE_URL}${fileUrl}`
 }
 
 function getBlockText(
@@ -653,6 +709,15 @@ function AgendaPage() {
   const [blockLoadError, setBlockLoadError] =
     useState('')
 
+  const [mediaItems, setMediaItems] =
+    useState<PlannerMedia[]>([])
+  const [mediaType, setMediaType] =
+    useState<MediaType>('image')
+  const [mediaUploading, setMediaUploading] =
+    useState(false)
+  const [mediaError, setMediaError] =
+    useState('')
+
   const [isLoading, setIsLoading] =
     useState(true)
   const [loadError, setLoadError] =
@@ -935,6 +1000,56 @@ function AgendaPage() {
     }
 
     void loadBlocks()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activePageId])
+
+  useEffect(() => {
+    if (activePageId === null) {
+      return
+    }
+
+    let cancelled = false
+
+    async function loadMedia() {
+      try {
+        const data =
+          await apiRequest<MediaFromApi[]>(
+            `/pages/${activePageId}/media`,
+          )
+
+        if (cancelled) {
+          return
+        }
+
+        setMediaItems(
+          data.map(convertMedia),
+        )
+        setMediaError('')
+      } catch (error) {
+        if (cancelled) {
+          return
+        }
+
+        console.error(error)
+
+        if (
+          error instanceof Error
+        ) {
+          setMediaError(
+            error.message,
+          )
+        } else {
+          setMediaError(
+            'Não foi possível carregar a mídia.',
+          )
+        }
+      }
+    }
+
+    void loadMedia()
 
     return () => {
       cancelled = true
@@ -2155,6 +2270,140 @@ function AgendaPage() {
     }
   }
 
+  async function handleUploadMedia(
+    file: File | undefined,
+  ) {
+    if (
+      !file
+      || activePageId === null
+    ) {
+      return
+    }
+
+    setMediaUploading(true)
+    setMediaError('')
+
+    try {
+      const token =
+        localStorage.getItem(
+          TOKEN_KEY,
+        )
+
+      const formData =
+        new FormData()
+
+      formData.append(
+        'media_type',
+        mediaType,
+      )
+      formData.append(
+        'file',
+        file,
+      )
+
+      const response = await fetch(
+        `${API_BASE_URL}/pages/${activePageId}/media`,
+        {
+          method: 'POST',
+          headers: token
+            ? {
+                Authorization:
+                  `Bearer ${token}`,
+              }
+            : undefined,
+          body: formData,
+        },
+      )
+
+      if (!response.ok) {
+        let message =
+          'Não foi possível enviar o arquivo.'
+
+        try {
+          const errorBody = (
+            await response.json()
+          ) as {
+            detail?: string
+          }
+
+          if (
+            typeof errorBody.detail
+            === 'string'
+          ) {
+            message =
+              errorBody.detail
+          }
+        } catch {
+          // Mantém a mensagem padrão.
+        }
+
+        throw new Error(message)
+      }
+
+      const created = (
+        await response.json()
+      ) as MediaFromApi
+
+      setMediaItems(
+        (currentItems) => [
+          ...currentItems,
+          convertMedia(created),
+        ],
+      )
+    } catch (error) {
+      console.error(error)
+
+      if (
+        error instanceof Error
+      ) {
+        setMediaError(
+          error.message,
+        )
+      } else {
+        setMediaError(
+          'Não foi possível enviar o arquivo.',
+        )
+      }
+    } finally {
+      setMediaUploading(false)
+    }
+  }
+
+  async function handleDeleteMedia(
+    mediaId: number,
+  ) {
+    try {
+      await apiRequest<void>(
+        `/media/${mediaId}`,
+        {
+          method: 'DELETE',
+        },
+      )
+
+      setMediaItems(
+        (currentItems) =>
+          currentItems.filter(
+            (item) =>
+              item.id !== mediaId,
+          ),
+      )
+    } catch (error) {
+      console.error(error)
+
+      if (
+        error instanceof Error
+      ) {
+        setMediaError(
+          error.message,
+        )
+      } else {
+        setMediaError(
+          'Não foi possível excluir a mídia.',
+        )
+      }
+    }
+  }
+
   async function handleCreateBlock(
     blockType: BlockType,
   ) {
@@ -2962,6 +3211,113 @@ function AgendaPage() {
                   ),
                 )}
               </div>
+            </section>
+
+            <section className="media-section">
+              <div className="media-toolbar">
+                <strong>
+                  Imagens e stickers
+                </strong>
+
+                <div className="media-toolbar-actions">
+                  <select
+                    value={mediaType}
+                    onChange={(event) =>
+                      setMediaType(
+                        event.target
+                          .value as MediaType,
+                      )
+                    }
+                  >
+                    <option value="image">
+                      Imagem
+                    </option>
+                    <option value="sticker">
+                      Sticker
+                    </option>
+                  </select>
+
+                  <label
+                    className="media-upload-button"
+                  >
+                    {mediaUploading
+                      ? 'Enviando...'
+                      : '+ Escolher arquivo'}
+
+                    <input
+                      className="media-file-input"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      disabled={mediaUploading}
+                      onChange={(event) => {
+                        const file =
+                          event.target
+                            .files?.[0]
+
+                        event.target.value = ''
+
+                        void handleUploadMedia(
+                          file,
+                        )
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {mediaError && (
+                <p className="media-error-message">
+                  {mediaError}
+                </p>
+              )}
+
+              {mediaItems.length === 0
+                ? (
+                  <p className="media-empty-message">
+                    Nenhuma imagem ou sticker nesta página.
+                  </p>
+                )
+                : (
+                  <div className="media-grid">
+                    {mediaItems.map(
+                      (item) => (
+                        <article
+                          className="media-card"
+                          key={item.id}
+                        >
+                          <img
+                            src={getMediaUrl(
+                              item.fileUrl,
+                            )}
+                            alt={
+                              item.originalName
+                            }
+                          />
+
+                          <div className="media-card-footer">
+                            <span>
+                              {item.mediaType ===
+                              'sticker'
+                                ? 'Sticker'
+                                : 'Imagem'}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleDeleteMedia(
+                                  item.id,
+                                )
+                              }
+                            >
+                              Excluir
+                            </button>
+                          </div>
+                        </article>
+                      ),
+                    )}
+                  </div>
+                )}
             </section>
 
             <section className="blocks-section">
