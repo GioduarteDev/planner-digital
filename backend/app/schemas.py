@@ -31,6 +31,10 @@ BlockType = Literal[
     "checkbox",
     "list",
 ]
+MediaType = Literal[
+    "image",
+    "sticker",
+]
 
 # =========================
 # 
@@ -487,3 +491,19 @@ class PageBlockResponse(BaseModel):
 
 class PageBlockReorderRequest(BaseModel):
     block_ids: list[int]
+
+
+
+class PageMediaResponse(BaseModel):
+    id: int
+    page_id: int
+    media_type: MediaType
+    original_name: str
+    mime_type: str
+    size_bytes: int
+    file_url: str
+    created_at: datetime
+
+    model_config = ConfigDict(
+        from_attributes=True,
+    )

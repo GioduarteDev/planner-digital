@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-from datetime import (
-    date,
-    datetime,
-)
+from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
@@ -11,12 +8,11 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
-    String,
     JSON,
+    String,
     Text,
     func,
 )
-
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -191,10 +187,10 @@ class Page(Base):
     )
 
     paper_type: Mapped[str] = mapped_column(
-    String(20),
-    default="blank",
-    server_default="blank",
-)
+        String(20),
+        default="blank",
+        server_default="blank",
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -213,11 +209,18 @@ class Page(Base):
         back_populates="page",
         cascade="all, delete-orphan",
     )
-    blocks: Mapped[list["PageBlock"]] = relationship(
-    back_populates="page",
-    cascade="all, delete-orphan",
-    passive_deletes=True,
-)
+
+    blocks: Mapped[list[PageBlock]] = relationship(
+        back_populates="page",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    media_items: Mapped[list[PageMedia]] = relationship(
+        back_populates="page",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class PageBlock(Base):
@@ -267,8 +270,68 @@ class PageBlock(Base):
         onupdate=func.now(),
     )
 
-    page: Mapped["Page"] = relationship(
+    page: Mapped[Page] = relationship(
         back_populates="blocks",
+    )
+
+
+class PageMedia(Base):
+    __tablename__ = "page_media"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    page_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "pages.id",
+            ondelete="CASCADE",
+        ),
+        index=True,
+        nullable=False,
+    )
+
+    media_type: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        default="image",
+        server_default="image",
+    )
+
+    original_name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    stored_name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        unique=True,
+    )
+
+    mime_type: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
+    size_bytes: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    file_url: Mapped[str] = mapped_column(
+        String(500),
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+    )
+
+    page: Mapped[Page] = relationship(
+        back_populates="media_items",
     )
 
 
