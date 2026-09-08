@@ -367,6 +367,13 @@ class PageMedia(Base):
         server_default="0",
     )
 
+    locked: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         server_default=func.now(),
@@ -374,6 +381,68 @@ class PageMedia(Base):
 
     page: Mapped[Page] = relationship(
         back_populates="media_items",
+    )
+
+
+class MediaLibraryItem(Base):
+    __tablename__ = "media_library_items"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE",
+        ),
+        index=True,
+        nullable=False,
+    )
+
+    media_type: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        default="sticker",
+        server_default="sticker",
+    )
+
+    name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    stored_name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        unique=True,
+    )
+
+    mime_type: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
+    size_bytes: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    file_url: Mapped[str] = mapped_column(
+        String(500),
+        nullable=False,
+    )
+
+    kit_name: Mapped[str | None] = mapped_column(
+        String(120),
+        nullable=True,
+        index=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
     )
 
 

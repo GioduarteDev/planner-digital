@@ -1,4 +1,5 @@
 from pathlib import Path
+from shutil import copy2
 from uuid import uuid4
 
 from fastapi import (
@@ -335,6 +336,105 @@ def update_page_media(
     db.refresh(media)
 
     return media
+
+
+@router.post(
+    "/media/{media_id}/duplicate",
+    response_model=PageMediaResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def duplicate_page_media(
+    media_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        get_current_user
+    ),
+):
+    media = get_user_media(
+        media_id,
+        current_user,
+        db,
+    )
+
+    source_path = (
+        UPLOAD_DIRECTORY
+        / media.stored_name
+    )
+
+    if not source_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "O arquivo original da mídia "
+                "não foi encontrado."
+            ),
+        )
+
+    extension = source_path.suffix.lower()
+    stored_name = (
+        f"{uuid4().hex}{extension}"
+    )
+    destination = (
+        UPLOAD_DIRECTORY
+        / stored_name
+    )
+
+    highest_z_index = db.scalar(
+        select(PageMedia.z_index)
+        .where(
+            PageMedia.page_id == media.page_id,
+        )
+        .order_by(
+            PageMedia.z_index.desc()
+        )
+        .limit(1)
+    )
+
+    new_z_index = (
+        highest_z_index + 1
+        if highest_z_index is not None
+        else 0
+    )
+
+    copy2(
+        source_path,
+        destination,
+    )
+
+    duplicated = PageMedia(
+        page_id=media.page_id,
+        media_type=media.media_type,
+        original_name=media.original_name,
+        stored_name=stored_name,
+        mime_type=media.mime_type,
+        size_bytes=media.size_bytes,
+        file_url=(
+            f"/uploads/page_media/"
+            f"{stored_name}"
+        ),
+        x=media.x + 24,
+        y=media.y + 24,
+        width=media.width,
+        height=media.height,
+        rotation=media.rotation,
+        z_index=new_z_index,
+        locked=False,
+    )
+
+    try:
+        db.add(duplicated)
+        db.commit()
+        db.refresh(duplicated)
+
+    except Exception:
+        db.rollback()
+
+        if destination.exists():
+            destination.unlink()
+
+        raise
+
+    return duplicated
 
 
 @router.delete(

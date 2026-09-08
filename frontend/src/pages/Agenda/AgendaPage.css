@@ -949,7 +949,373 @@
   line-height: 1;
   user-select: none;
 }
+/* ===== BLOQUEIO DE MÍDIA ===== */
 
+.media-lock-button {
+  position: absolute;
+  top: 4px;
+  right: 42px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  line-height: 1;
+  z-index: 5;
+}
+
+.media-canvas-item.is-locked {
+  cursor: default;
+}
+
+.media-canvas-item.is-selected.is-locked {
+  outline-style: dashed;
+}
+
+/* ===== DUPLICAR MÍDIA ===== */
+
+.media-duplicate-button {
+  position: absolute;
+  top: 4px;
+  right: 80px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  font-size: 17px;
+  line-height: 1;
+  z-index: 5;
+}
+/* ===== BIBLIOTECA DE STICKERS E IMAGENS ===== */
+
+.media-library-section {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 16px;
+}
+
+.media-library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.media-library-header p {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+.media-library-upload-row,
+.media-library-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.media-library-upload-row input[type='text'],
+.media-library-upload-row select,
+.media-library-filters select {
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 10px;
+  background: inherit;
+  color: inherit;
+}
+
+.media-library-upload-row input[type='text'] {
+  min-width: 170px;
+  flex: 1 1 170px;
+}
+
+.media-library-upload-button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.media-library-filters {
+  padding-top: 4px;
+}
+
+.media-library-filters span {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.media-library-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(
+      auto-fill,
+      minmax(150px, 1fr)
+    );
+  gap: 12px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.media-library-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 14px;
+}
+
+.media-library-preview {
+  height: 120px;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  background:
+    repeating-conic-gradient(
+      rgba(0, 0, 0, 0.035) 0 25%,
+      transparent 0 50%
+    )
+    50% / 18px 18px;
+}
+
+.media-library-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.media-library-card-body {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+}
+
+.media-library-card-body strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-library-card-body > span {
+  overflow: hidden;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.68;
+}
+
+.media-library-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.media-library-card-actions button {
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+  .media-library-grid {
+    grid-template-columns:
+      repeat(
+        2,
+        minmax(0, 1fr)
+      );
+  }
+
+  .media-library-upload-row {
+    align-items: stretch;
+  }
+
+  .media-library-upload-row > * {
+    width: 100%;
+  }
+}
+/* ===== BIBLIOTECA DE STICKERS / IMAGENS ===== */
+
+.media-library-panel {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.media-library-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.media-library-header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  opacity: 0.72;
+}
+
+.media-library-upload-row,
+.media-library-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.media-library-upload-row {
+  margin-bottom: 10px;
+}
+
+.media-library-upload-row input[type="text"],
+.media-library-upload-row select,
+.media-library-filters select {
+  min-height: 36px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 10px;
+  padding: 0 10px;
+  background: white;
+}
+
+.media-library-upload-row input[type="text"] {
+  min-width: 140px;
+  flex: 1 1 150px;
+}
+
+.media-library-upload-button {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  font-weight: 600;
+}
+
+.media-library-filters {
+  margin-bottom: 12px;
+}
+
+.media-library-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(140px, 1fr)
+  );
+  gap: 10px;
+}
+
+.media-library-card {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 14px;
+  background: white;
+}
+
+.media-library-preview-button {
+  width: 100%;
+  height: 112px;
+  padding: 8px;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.035);
+  overflow: hidden;
+}
+
+.media-library-preview-button img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.media-library-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 2px 6px;
+  min-width: 0;
+}
+
+.media-library-card-info strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.media-library-card-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  opacity: 0.68;
+}
+
+.media-library-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.media-library-card-actions button {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.03);
+  font-size: 12px;
+}
+
+.media-library-card-actions button:first-child {
+  flex: 1;
+}
+
+.media-library-empty {
+  margin: 12px 0 0;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+@media (max-width: 700px) {
+  .media-library-upload-row > * {
+    width: 100%;
+  }
+
+  .media-library-grid {
+    grid-template-columns: repeat(
+      2,
+      minmax(0, 1fr)
+    );
+  }
+}
 
 
 }

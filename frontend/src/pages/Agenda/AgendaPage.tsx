@@ -111,6 +111,7 @@ type PlannerMedia = {
   height: number
   rotation: number
   zIndex: number
+  locked: boolean
   createdAt: string
 }
 
@@ -181,8 +182,25 @@ type MediaFromApi = {
   height: number
   rotation: number
   z_index: number
+  locked: boolean
   created_at: string
 }
+
+type MediaLibraryItem = {
+  id: number
+  user_id: number
+  media_type: MediaType
+  name: string
+  mime_type: string
+  size_bytes: number
+  file_url: string
+  kit_name: string | null
+  created_at: string
+}
+
+type LibraryTypeFilter =
+  | 'all'
+  | MediaType
 
 type PagePatch = {
   title?: string
@@ -203,6 +221,7 @@ type MediaPatch = {
   height?: number
   rotation?: number
   z_index?: number
+  locked?: boolean
 }
 
 type MediaDragState = {
@@ -270,6 +289,7 @@ function convertMedia(
     height: media.height,
     rotation: media.rotation,
     zIndex: media.z_index,
+    locked: media.locked,
     createdAt: media.created_at,
   }
 }
@@ -779,6 +799,25 @@ function AgendaPage() {
     useState(false)
   const [mediaError, setMediaError] =
     useState('')
+
+  const [libraryItems, setLibraryItems] =
+    useState<MediaLibraryItem[]>([])
+  const [libraryLoading, setLibraryLoading] =
+    useState(true)
+  const [libraryUploading, setLibraryUploading] =
+    useState(false)
+  const [libraryError, setLibraryError] =
+    useState('')
+  const [libraryMediaType, setLibraryMediaType] =
+    useState<MediaType>('sticker')
+  const [libraryName, setLibraryName] =
+    useState('')
+  const [libraryKit, setLibraryKit] =
+    useState('')
+  const [libraryTypeFilter, setLibraryTypeFilter] =
+    useState<LibraryTypeFilter>('all')
+  const [libraryKitFilter, setLibraryKitFilter] =
+    useState('')
   const mediaDragRef =
     useRef<MediaDragState | null>(null)
   const mediaResizeRef =
@@ -1129,6 +1168,52 @@ function AgendaPage() {
     }
   }, [activePageId])
 
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadMediaLibrary() {
+      try {
+        setLibraryLoading(true)
+        setLibraryError('')
+
+        const items =
+          await apiRequest<
+            MediaLibraryItem[]
+          >(
+            '/library/media',
+          )
+
+        if (!cancelled) {
+          setLibraryItems(items)
+        }
+      } catch (error) {
+        console.error(error)
+
+        if (!cancelled) {
+          if (error instanceof Error) {
+            setLibraryError(
+              error.message,
+            )
+          } else {
+            setLibraryError(
+              'Não foi possível carregar a biblioteca.',
+            )
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setLibraryLoading(false)
+        }
+      }
+    }
+
+    void loadMediaLibrary()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const activePage =
     pages.find(
       (page) =>
@@ -1147,6 +1232,46 @@ function AgendaPage() {
       (a, b) =>
         a.position - b.position
         || a.id - b.id,
+    )
+
+  const libraryKits =
+    Array.from(
+      new Set(
+        libraryItems
+          .map(
+            (item) =>
+              item.kit_name,
+          )
+          .filter(
+            (
+              kitName,
+            ): kitName is string =>
+              Boolean(kitName),
+          ),
+      ),
+    ).sort(
+      (a, b) =>
+        a.localeCompare(b),
+    )
+
+  const visibleLibraryItems =
+    libraryItems.filter(
+      (item) => {
+        const typeMatches =
+          libraryTypeFilter === 'all'
+          || item.media_type
+            === libraryTypeFilter
+
+        const kitMatches =
+          libraryKitFilter === ''
+          || item.kit_name
+            === libraryKitFilter
+
+        return (
+          typeMatches
+          && kitMatches
+        )
+      },
     )
 
   function getPagesForFolder(
@@ -2493,11 +2618,44 @@ function AgendaPage() {
     )
   }
 
+  function handleToggleMediaLocked(
+    item: PlannerMedia,
+  ) {
+    const nextLocked = !item.locked
+
+    setMediaItems(
+      (currentItems) =>
+        currentItems.map(
+          (currentItem) =>
+            currentItem.id === item.id
+              ? {
+                  ...currentItem,
+                  locked: nextLocked,
+                }
+              : currentItem,
+        ),
+    )
+
+    mediaDragRef.current = null
+    mediaResizeRef.current = null
+    mediaRotateRef.current = null
+
+    void persistMediaPatch(
+      item.id,
+      {
+        locked: nextLocked,
+      },
+    )
+  }
+
   function handleMediaPointerDown(
     event: ReactPointerEvent<HTMLElement>,
     item: PlannerMedia,
   ) {
-    if (event.button !== 0) {
+    if (
+      event.button !== 0
+      || item.locked
+    ) {
       return
     }
 
@@ -2666,7 +2824,10 @@ function AgendaPage() {
     event: ReactPointerEvent<HTMLButtonElement>,
     item: PlannerMedia,
   ) {
-    if (event.button !== 0) {
+    if (
+      event.button !== 0
+      || item.locked
+    ) {
       return
     }
 
@@ -2838,7 +2999,10 @@ function AgendaPage() {
     event: ReactPointerEvent<HTMLButtonElement>,
     item: PlannerMedia,
   ) {
-    if (event.button !== 0) {
+    if (
+      event.button !== 0
+      || item.locked
+    ) {
       return
     }
 
@@ -2967,6 +3131,291 @@ function AgendaPage() {
     event.stopPropagation()
   }
 
+  async function handleUploadLibraryMedia(
+    file: File | undefined,
+  ) {
+    if (!file) {
+      return
+    }
+
+    setLibraryUploading(true)
+    setLibraryError('')
+
+    try {
+      const token =
+        localStorage.getItem(
+          TOKEN_KEY,
+        )
+
+      const formData =
+        new FormData()
+
+      formData.append(
+        'media_type',
+        libraryMediaType,
+      )
+
+      if (
+        libraryName.trim() !== ''
+      ) {
+        formData.append(
+          'name',
+          libraryName.trim(),
+        )
+      }
+
+      if (
+        libraryKit.trim() !== ''
+      ) {
+        formData.append(
+          'kit_name',
+          libraryKit.trim(),
+        )
+      }
+
+      formData.append(
+        'file',
+        file,
+      )
+
+      const response = await fetch(
+        `${API_BASE_URL}/library/media`,
+        {
+          method: 'POST',
+          headers: token
+            ? {
+                Authorization:
+                  `Bearer ${token}`,
+              }
+            : undefined,
+          body: formData,
+        },
+      )
+
+      if (!response.ok) {
+        let message =
+          'Não foi possível salvar na biblioteca.'
+
+        try {
+          const errorBody = (
+            await response.json()
+          ) as {
+            detail?: string
+          }
+
+          if (
+            typeof errorBody.detail
+            === 'string'
+          ) {
+            message =
+              errorBody.detail
+          }
+        } catch {
+          // Mantém a mensagem padrão.
+        }
+
+        throw new Error(message)
+      }
+
+      const created = (
+        await response.json()
+      ) as MediaLibraryItem
+
+      setLibraryItems(
+        (currentItems) => [
+          created,
+          ...currentItems,
+        ],
+      )
+
+      setLibraryName('')
+      setLibraryKit('')
+    } catch (error) {
+      console.error(error)
+
+      if (error instanceof Error) {
+        setLibraryError(
+          error.message,
+        )
+      } else {
+        setLibraryError(
+          'Não foi possível salvar na biblioteca.',
+        )
+      }
+    } finally {
+      setLibraryUploading(false)
+    }
+  }
+
+  async function handleInsertLibraryMedia(
+    item: MediaLibraryItem,
+  ) {
+    if (activePageId === null) {
+      return
+    }
+
+    try {
+      setLibraryError('')
+
+      const created =
+        await apiRequest<MediaFromApi>(
+          `/pages/${activePageId}/media/from-library/${item.id}`,
+          {
+            method: 'POST',
+          },
+        )
+
+      const converted =
+        convertMedia(created)
+
+      setMediaItems(
+        (currentItems) => [
+          ...currentItems,
+          converted,
+        ],
+      )
+
+      setSelectedMediaId(
+        converted.id,
+      )
+    } catch (error) {
+      console.error(error)
+
+      if (error instanceof Error) {
+        setLibraryError(
+          error.message,
+        )
+      } else {
+        setLibraryError(
+          'Não foi possível inserir o item na página.',
+        )
+      }
+    }
+  }
+
+  async function handleEditLibraryMedia(
+    item: MediaLibraryItem,
+  ) {
+    const newName =
+      window.prompt(
+        'Nome do item:',
+        item.name,
+      )
+
+    if (newName === null) {
+      return
+    }
+
+    const cleanName =
+      newName.trim()
+
+    if (cleanName === '') {
+      alert(
+        'O nome não pode ficar vazio.',
+      )
+      return
+    }
+
+    const newKit =
+      window.prompt(
+        'Nome do kit (deixe vazio para remover do kit):',
+        item.kit_name ?? '',
+      )
+
+    if (newKit === null) {
+      return
+    }
+
+    try {
+      setLibraryError('')
+
+      const updated =
+        await apiRequest<
+          MediaLibraryItem
+        >(
+          `/library/media/${item.id}`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({
+              name: cleanName,
+              kit_name:
+                newKit.trim() === ''
+                  ? null
+                  : newKit.trim(),
+            }),
+          },
+        )
+
+      setLibraryItems(
+        (currentItems) =>
+          currentItems.map(
+            (currentItem) =>
+              currentItem.id
+                === item.id
+                ? updated
+                : currentItem,
+          ),
+      )
+    } catch (error) {
+      console.error(error)
+
+      if (error instanceof Error) {
+        setLibraryError(
+          error.message,
+        )
+      } else {
+        setLibraryError(
+          'Não foi possível editar o item.',
+        )
+      }
+    }
+  }
+
+  async function handleDeleteLibraryMedia(
+    item: MediaLibraryItem,
+  ) {
+    const confirmed =
+      window.confirm(
+        `Excluir "${item.name}" da biblioteca? As cópias já usadas nas páginas continuarão funcionando.`,
+      )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setLibraryError('')
+
+      await apiRequest<void>(
+        `/library/media/${item.id}`,
+        {
+          method: 'DELETE',
+        },
+      )
+
+      setLibraryItems(
+        (currentItems) =>
+          currentItems.filter(
+            (currentItem) =>
+              currentItem.id
+              !== item.id,
+          ),
+      )
+    } catch (error) {
+      console.error(error)
+
+      if (error instanceof Error) {
+        setLibraryError(
+          error.message,
+        )
+      } else {
+        setLibraryError(
+          'Não foi possível excluir o item.',
+        )
+      }
+    }
+  }
+
   async function handleUploadMedia(
     file: File | undefined,
   ) {
@@ -3063,6 +3512,45 @@ function AgendaPage() {
       }
     } finally {
       setMediaUploading(false)
+    }
+  }
+
+  async function handleDuplicateMedia(
+    item: PlannerMedia,
+  ) {
+    try {
+      const duplicated =
+        await apiRequest<MediaFromApi>(
+          `/media/${item.id}/duplicate`,
+          {
+            method: 'POST',
+          },
+        )
+
+      const converted =
+        convertMedia(duplicated)
+
+      setMediaItems(
+        (currentItems) => [
+          ...currentItems,
+          converted,
+        ],
+      )
+
+      setSelectedMediaId(
+        converted.id,
+      )
+      setMediaError('')
+    } catch (error) {
+      console.error(error)
+
+      if (error instanceof Error) {
+        setMediaError(error.message)
+      } else {
+        setMediaError(
+          'Não foi possível duplicar a mídia.',
+        )
+      }
     }
   }
 
@@ -3969,6 +4457,239 @@ function AgendaPage() {
                 </div>
               </div>
 
+              <section className="media-library-panel">
+                <div className="media-library-header">
+                  <div>
+                    <strong>
+                      Minha biblioteca
+                    </strong>
+
+                    <p>
+                      Salve uma vez e reutilize em qualquer página.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="media-library-upload-row">
+                  <select
+                    value={libraryMediaType}
+                    onChange={(event) =>
+                      setLibraryMediaType(
+                        event.target
+                          .value as MediaType,
+                      )
+                    }
+                    aria-label="Tipo do item da biblioteca"
+                  >
+                    <option value="sticker">
+                      Sticker
+                    </option>
+                    <option value="image">
+                      Imagem
+                    </option>
+                  </select>
+
+                  <input
+                    type="text"
+                    placeholder="Nome opcional"
+                    value={libraryName}
+                    onChange={(event) =>
+                      setLibraryName(
+                        event.target.value,
+                      )
+                    }
+                  />
+
+                  <input
+                    type="text"
+                    placeholder="Kit opcional"
+                    value={libraryKit}
+                    onChange={(event) =>
+                      setLibraryKit(
+                        event.target.value,
+                      )
+                    }
+                  />
+
+                  <label className="media-library-upload-button">
+                    {libraryUploading
+                      ? 'Salvando...'
+                      : '+ Salvar na biblioteca'}
+
+                    <input
+                      className="media-file-input"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      disabled={libraryUploading}
+                      onChange={(event) => {
+                        const file =
+                          event.target
+                            .files?.[0]
+
+                        event.target.value = ''
+
+                        void handleUploadLibraryMedia(
+                          file,
+                        )
+                      }}
+                    />
+                  </label>
+                </div>
+
+                <div className="media-library-filters">
+                  <select
+                    value={libraryTypeFilter}
+                    onChange={(event) =>
+                      setLibraryTypeFilter(
+                        event.target
+                          .value as LibraryTypeFilter,
+                      )
+                    }
+                    aria-label="Filtrar biblioteca por tipo"
+                  >
+                    <option value="all">
+                      Todos
+                    </option>
+                    <option value="sticker">
+                      Stickers
+                    </option>
+                    <option value="image">
+                      Imagens
+                    </option>
+                  </select>
+
+                  <select
+                    value={libraryKitFilter}
+                    onChange={(event) =>
+                      setLibraryKitFilter(
+                        event.target.value,
+                      )
+                    }
+                    aria-label="Filtrar biblioteca por kit"
+                  >
+                    <option value="">
+                      Todos os kits
+                    </option>
+
+                    {libraryKits.map(
+                      (kitName) => (
+                        <option
+                          key={kitName}
+                          value={kitName}
+                        >
+                          {kitName}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </div>
+
+                {libraryError && (
+                  <p className="media-error-message">
+                    {libraryError}
+                  </p>
+                )}
+
+                {libraryLoading
+                  ? (
+                    <p className="media-library-empty">
+                      Carregando biblioteca...
+                    </p>
+                  )
+                  : visibleLibraryItems.length === 0
+                    ? (
+                      <p className="media-library-empty">
+                        Nenhum item salvo nesta seleção.
+                      </p>
+                    )
+                    : (
+                      <div className="media-library-grid">
+                        {visibleLibraryItems.map(
+                          (item) => (
+                            <article
+                              className="media-library-card"
+                              key={item.id}
+                            >
+                              <button
+                                className="media-library-preview-button"
+                                type="button"
+                                title="Inserir na página"
+                                onClick={() =>
+                                  void handleInsertLibraryMedia(
+                                    item,
+                                  )
+                                }
+                              >
+                                <img
+                                  src={getMediaUrl(
+                                    item.file_url,
+                                  )}
+                                  alt={item.name}
+                                  draggable={false}
+                                />
+                              </button>
+
+                              <div className="media-library-card-info">
+                                <strong
+                                  title={item.name}
+                                >
+                                  {item.name}
+                                </strong>
+
+                                <span>
+                                  {item.media_type
+                                    === 'sticker'
+                                    ? 'Sticker'
+                                    : 'Imagem'}
+                                  {item.kit_name
+                                    ? ` · ${item.kit_name}`
+                                    : ''}
+                                </span>
+                              </div>
+
+                              <div className="media-library-card-actions">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleInsertLibraryMedia(
+                                      item,
+                                    )
+                                  }
+                                >
+                                  Inserir
+                                </button>
+
+                                <button
+                                  type="button"
+                                  title="Renomear ou mudar de kit"
+                                  onClick={() =>
+                                    void handleEditLibraryMedia(
+                                      item,
+                                    )
+                                  }
+                                >
+                                  Editar
+                                </button>
+
+                                <button
+                                  type="button"
+                                  title="Excluir da biblioteca"
+                                  onClick={() =>
+                                    void handleDeleteLibraryMedia(
+                                      item,
+                                    )
+                                  }
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </article>
+                          ),
+                        )}
+                      </div>
+                    )}
+              </section>
+
               {mediaError && (
                 <p className="media-error-message">
                   {mediaError}
@@ -3984,7 +4705,7 @@ function AgendaPage() {
                 : (
                   <>
                     <p className="media-drag-hint">
-                      Clique para editar. Use ↑/↓ para camadas, ↘ para redimensionar e ↻ para girar.
+                      Clique para editar. Use ↑/↓ para camadas, ⧉ para duplicar, ↘ para redimensionar, ↻ para girar e 🔒 para bloquear.
                     </p>
 
                     <div
@@ -3998,8 +4719,12 @@ function AgendaPage() {
                           <article
                             className={
                               selectedMediaId === item.id
-                                ? 'media-canvas-item is-selected'
-                                : 'media-canvas-item'
+                                ? item.locked
+                                  ? 'media-canvas-item is-selected is-locked'
+                                  : 'media-canvas-item is-selected'
+                                : item.locked
+                                  ? 'media-canvas-item is-locked'
+                                  : 'media-canvas-item'
                             }
                             key={item.id}
                             style={{
@@ -4090,6 +4815,54 @@ function AgendaPage() {
                                 </div>
 
                                 <button
+                                  className="media-lock-button"
+                                  type="button"
+                                  aria-label={
+                                    item.locked
+                                      ? 'Desbloquear mídia'
+                                      : 'Bloquear mídia'
+                                  }
+                                  title={
+                                    item.locked
+                                      ? 'Desbloquear'
+                                      : 'Bloquear'
+                                  }
+                                  onPointerDown={(event) =>
+                                    event.stopPropagation()
+                                  }
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    handleToggleMediaLocked(
+                                      item,
+                                    )
+                                  }}
+                                >
+                                  {item.locked
+                                    ? '🔓'
+                                    : '🔒'}
+                                </button>
+
+                                <button
+                                  className="media-duplicate-button"
+                                  type="button"
+                                  aria-label="Duplicar mídia"
+                                  title="Duplicar"
+                                  onPointerDown={(event) =>
+                                    event.stopPropagation()
+                                  }
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    void handleDuplicateMedia(
+                                      item,
+                                    )
+                                  }}
+                                >
+                                  ⧉
+                                </button>
+
+                                {!item.locked && (
+                                  <>
+                                <button
                                   className="media-rotate-handle"
                                   type="button"
                                   aria-label="Girar mídia"
@@ -4142,6 +4915,9 @@ function AgendaPage() {
                                 >
                                   ↘
                                 </button>
+
+                                  </>
+                                )}
 
                                 <button
                                   className="media-delete-button"

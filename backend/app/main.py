@@ -14,6 +14,7 @@ from app.routes.blocks import router as blocks_router
 from app.routes.events import router as events_router
 from app.routes.folders import router as folders_router
 from app.routes.media import router as media_router
+from app.routes.media_library import router as media_library_router
 from app.routes.pages import router as pages_router
 from app.routes.search import router as search_router
 from app.routes.studies import router as studies_router
@@ -68,6 +69,7 @@ app.include_router(pages_router)
 app.include_router(folders_router)
 app.include_router(blocks_router)
 app.include_router(media_router)
+app.include_router(media_library_router)
 app.include_router(tasks_router)
 app.include_router(events_router)
 app.include_router(studies_router)

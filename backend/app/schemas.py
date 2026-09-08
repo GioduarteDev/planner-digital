@@ -501,6 +501,7 @@ class PageMediaUpdate(BaseModel):
     height: int | None = None
     rotation: int | None = None
     z_index: int | None = None
+    locked: bool | None = None
 
 
 class PageMediaResponse(BaseModel):
@@ -518,6 +519,7 @@ class PageMediaResponse(BaseModel):
     height: int
     rotation: int
     z_index: int
+    locked: bool
 
     created_at: datetime
 
