@@ -198,6 +198,14 @@ type MediaLibraryItem = {
   created_at: string
 }
 
+type PageTemplateItem = {
+  id: number
+  user_id: number
+  name: string
+  created_at: string
+  updated_at: string
+}
+
 type LibraryTypeFilter =
   | 'all'
   | MediaType
@@ -818,6 +826,17 @@ function AgendaPage() {
     useState<LibraryTypeFilter>('all')
   const [libraryKitFilter, setLibraryKitFilter] =
     useState('')
+
+  const [pageTemplates, setPageTemplates] =
+    useState<PageTemplateItem[]>([])
+  const [templatesLoading, setTemplatesLoading] =
+    useState(true)
+  const [templatesError, setTemplatesError] =
+    useState('')
+  const [templateBusyId, setTemplateBusyId] =
+    useState<number | null>(null)
+  const [savingTemplate, setSavingTemplate] =
+    useState(false)
   const mediaDragRef =
     useRef<MediaDragState | null>(null)
   const mediaResizeRef =
@@ -1208,6 +1227,52 @@ function AgendaPage() {
     }
 
     void loadMediaLibrary()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadTemplates() {
+      try {
+        setTemplatesLoading(true)
+        setTemplatesError('')
+
+        const data =
+          await apiRequest<
+            PageTemplateItem[]
+          >(
+            '/templates',
+          )
+
+        if (!cancelled) {
+          setPageTemplates(data)
+        }
+      } catch (error) {
+        console.error(error)
+
+        if (!cancelled) {
+          if (error instanceof Error) {
+            setTemplatesError(
+              error.message,
+            )
+          } else {
+            setTemplatesError(
+              'Não foi possível carregar os templates.',
+            )
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setTemplatesLoading(false)
+        }
+      }
+    }
+
+    void loadTemplates()
 
     return () => {
       cancelled = true
@@ -3131,6 +3196,442 @@ function AgendaPage() {
     event.stopPropagation()
   }
 
+  async function flushCurrentEditorBeforeTemplateSave() {
+    if (activePageId === null) {
+      return
+    }
+
+    await flushPageUpdate(
+      activePageId,
+    )
+
+    for (const block of blocks) {
+      if (
+        pendingBlockUpdatesRef
+          .current[block.id]
+      ) {
+        await flushBlockUpdate(
+          block.id,
+        )
+      }
+    }
+  }
+
+  function clearPendingEditorSaves(
+    pageId: number,
+  ) {
+    const pageTimer =
+      saveTimersRef.current[
+        pageId
+      ]
+
+    if (pageTimer) {
+      clearTimeout(pageTimer)
+      delete saveTimersRef
+        .current[pageId]
+    }
+
+    delete pendingUpdatesRef
+      .current[pageId]
+
+    for (const block of blocks) {
+      const blockTimer =
+        blockSaveTimersRef.current[
+          block.id
+        ]
+
+      if (blockTimer) {
+        clearTimeout(blockTimer)
+        delete blockSaveTimersRef
+          .current[block.id]
+      }
+
+      delete pendingBlockUpdatesRef
+        .current[block.id]
+    }
+  }
+
+  async function reloadEditorPageData(
+    pageId: number,
+  ) {
+    const [
+      pageData,
+      blocksData,
+      mediaData,
+    ] = await Promise.all([
+      apiRequest<PageFromApi>(
+        `/pages/${pageId}`,
+      ),
+      apiRequest<BlockFromApi[]>(
+        `/pages/${pageId}/blocks`,
+      ),
+      apiRequest<MediaFromApi[]>(
+        `/pages/${pageId}/media`,
+      ),
+    ])
+
+    setPages(
+      (currentPages) =>
+        currentPages.map(
+          (page) =>
+            page.id === pageId
+              ? {
+                  ...page,
+                  title: pageData.title,
+                  content:
+                    pageData.content,
+                  favorite:
+                    pageData.favorite,
+                  folderId:
+                    pageData.folder_id,
+                  position:
+                    pageData.position,
+                  paperType:
+                    pageData.paper_type,
+                }
+              : page,
+        ),
+    )
+
+    setBlocks(
+      blocksData
+        .map(convertBlock)
+        .sort(
+          (a, b) =>
+            a.position - b.position
+            || a.id - b.id,
+        ),
+    )
+
+    setMediaItems(
+      mediaData.map(
+        convertMedia,
+      ),
+    )
+
+    setSelectedMediaId(null)
+    setSaveStatus('saved')
+    setBlockSaveStatus('saved')
+    setBlockLoadError('')
+    setMediaError('')
+  }
+
+  async function handleSaveCurrentPageAsTemplate() {
+    if (
+      activePageId === null
+      || !activePage
+    ) {
+      return
+    }
+
+    const suggestedName =
+      activePage.title.trim()
+      || 'Meu template'
+
+    const templateName =
+      window.prompt(
+        'Nome do template:',
+        suggestedName,
+      )
+
+    if (templateName === null) {
+      return
+    }
+
+    const cleanName =
+      templateName.trim()
+
+    if (cleanName === '') {
+      alert(
+        'Digite um nome para o template.',
+      )
+      return
+    }
+
+    try {
+      setSavingTemplate(true)
+      setTemplatesError('')
+
+      await flushCurrentEditorBeforeTemplateSave()
+
+      const created =
+        await apiRequest<
+          PageTemplateItem
+        >(
+          `/pages/${activePageId}/templates`,
+          {
+            method: 'POST',
+            body: JSON.stringify({
+              name: cleanName,
+            }),
+          },
+        )
+
+      setPageTemplates(
+        (currentTemplates) => [
+          created,
+          ...currentTemplates,
+        ],
+      )
+    } catch (error) {
+      console.error(error)
+
+      if (error instanceof Error) {
+        setTemplatesError(
+          error.message,
+        )
+      } else {
+        setTemplatesError(
+          'Não foi possível salvar o template.',
+        )
+      }
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
+
+  async function handleRenameTemplate(
+    template: PageTemplateItem,
+  ) {
+    const newName =
+      window.prompt(
+        'Novo nome do template:',
+        template.name,
+      )
+
+    if (newName === null) {
+      return
+    }
+
+    const cleanName =
+      newName.trim()
+
+    if (cleanName === '') {
+      alert(
+        'O nome não pode ficar vazio.',
+      )
+      return
+    }
+
+    try {
+      setTemplateBusyId(
+        template.id,
+      )
+      setTemplatesError('')
+
+      const updated =
+        await apiRequest<
+          PageTemplateItem
+        >(
+          `/templates/${template.id}`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify({
+              name: cleanName,
+            }),
+          },
+        )
+
+      setPageTemplates(
+        (currentTemplates) =>
+          currentTemplates.map(
+            (currentTemplate) =>
+              currentTemplate.id
+                === template.id
+                ? updated
+                : currentTemplate,
+          ),
+      )
+    } catch (error) {
+      console.error(error)
+
+      if (error instanceof Error) {
+        setTemplatesError(
+          error.message,
+        )
+      } else {
+        setTemplatesError(
+          'Não foi possível renomear o template.',
+        )
+      }
+    } finally {
+      setTemplateBusyId(null)
+    }
+  }
+
+  async function handleDeleteTemplate(
+    template: PageTemplateItem,
+  ) {
+    const confirmed =
+      window.confirm(
+        `Excluir o template "${template.name}"?`,
+      )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setTemplateBusyId(
+        template.id,
+      )
+      setTemplatesError('')
+
+      await apiRequest<void>(
+        `/templates/${template.id}`,
+        {
+          method: 'DELETE',
+        },
+      )
+
+      setPageTemplates(
+        (currentTemplates) =>
+          currentTemplates.filter(
+            (currentTemplate) =>
+              currentTemplate.id
+              !== template.id,
+          ),
+      )
+    } catch (error) {
+      console.error(error)
+
+      if (error instanceof Error) {
+        setTemplatesError(
+          error.message,
+        )
+      } else {
+        setTemplatesError(
+          'Não foi possível excluir o template.',
+        )
+      }
+    } finally {
+      setTemplateBusyId(null)
+    }
+  }
+
+  async function handleApplyTemplate(
+    template: PageTemplateItem,
+  ) {
+    if (activePageId === null) {
+      return
+    }
+
+    const confirmed =
+      window.confirm(
+        `Aplicar "${template.name}" nesta página? O conteúdo, os blocos e as imagens/stickers atuais serão substituídos. As tarefas da página serão mantidas.`,
+      )
+
+    if (!confirmed) {
+      return
+    }
+
+    try {
+      setTemplateBusyId(
+        template.id,
+      )
+      setTemplatesError('')
+
+      clearPendingEditorSaves(
+        activePageId,
+      )
+
+      await apiRequest<PageFromApi>(
+        `/pages/${activePageId}/apply-template/${template.id}`,
+        {
+          method: 'POST',
+        },
+      )
+
+      await reloadEditorPageData(
+        activePageId,
+      )
+    } catch (error) {
+      console.error(error)
+
+      if (error instanceof Error) {
+        setTemplatesError(
+          error.message,
+        )
+      } else {
+        setTemplatesError(
+          'Não foi possível aplicar o template.',
+        )
+      }
+    } finally {
+      setTemplateBusyId(null)
+    }
+  }
+
+  async function handleCreatePageFromTemplate(
+    template: PageTemplateItem,
+  ) {
+    if (pages.length >= MAX_PAGES) {
+      alert(
+        `Uma agenda pode ter no máximo ${MAX_PAGES} páginas.`,
+      )
+      return
+    }
+
+    try {
+      setTemplateBusyId(
+        template.id,
+      )
+      setTemplatesError('')
+
+      const newPage =
+        await apiRequest<PageFromApi>(
+          `/agendas/${agendaId}/pages/from-template/${template.id}`,
+          {
+            method: 'POST',
+          },
+        )
+
+      const convertedPage:
+        PlannerPage = {
+          id: newPage.id,
+          title: newPage.title,
+          content:
+            newPage.content,
+          favorite:
+            newPage.favorite,
+          folderId:
+            newPage.folder_id,
+          position:
+            newPage.position,
+          paperType:
+            newPage.paper_type,
+          tasks: [],
+        }
+
+      setPages(
+        (currentPages) => [
+          ...currentPages,
+          convertedPage,
+        ],
+      )
+
+      setBlocksLoading(true)
+      setBlockLoadError('')
+      setActivePageId(
+        convertedPage.id,
+      )
+    } catch (error) {
+      console.error(error)
+
+      if (error instanceof Error) {
+        setTemplatesError(
+          error.message,
+        )
+      } else {
+        setTemplatesError(
+          'Não foi possível criar a página pelo template.',
+        )
+      }
+    } finally {
+      setTemplateBusyId(null)
+    }
+  }
+
   async function handleUploadLibraryMedia(
     file: File | undefined,
   ) {
@@ -4280,6 +4781,129 @@ function AgendaPage() {
                 Excluir página
               </button>
             </div>
+
+            <section className="templates-section">
+              <div className="templates-section-header">
+                <div>
+                  <h3>Templates de página</h3>
+                  <p>
+                    Salve a página atual como modelo e reutilize quando quiser.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={
+                    savingTemplate
+                    || activePageId === null
+                  }
+                  onClick={() =>
+                    void handleSaveCurrentPageAsTemplate()
+                  }
+                >
+                  {savingTemplate
+                    ? 'Salvando...'
+                    : '+ Salvar página como template'}
+                </button>
+              </div>
+
+              {templatesError && (
+                <p className="templates-error-message">
+                  {templatesError}
+                </p>
+              )}
+
+              {templatesLoading
+                ? (
+                  <p className="templates-empty-message">
+                    Carregando templates...
+                  </p>
+                )
+                : pageTemplates.length === 0
+                  ? (
+                    <p className="templates-empty-message">
+                      Você ainda não salvou nenhum template.
+                    </p>
+                  )
+                  : (
+                    <div className="templates-grid">
+                      {pageTemplates.map(
+                        (template) => {
+                          const busy =
+                            templateBusyId
+                            === template.id
+
+                          return (
+                            <article
+                              className="template-card"
+                              key={template.id}
+                            >
+                              <div className="template-card-title">
+                                <strong>
+                                  {template.name}
+                                </strong>
+                              </div>
+
+                              <div className="template-card-actions">
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  title="Criar uma nova página usando este template"
+                                  onClick={() =>
+                                    void handleCreatePageFromTemplate(
+                                      template,
+                                    )
+                                  }
+                                >
+                                  + Nova página
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  title="Aplicar este template na página atual"
+                                  onClick={() =>
+                                    void handleApplyTemplate(
+                                      template,
+                                    )
+                                  }
+                                >
+                                  Aplicar
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  title="Renomear template"
+                                  onClick={() =>
+                                    void handleRenameTemplate(
+                                      template,
+                                    )
+                                  }
+                                >
+                                  ✎
+                                </button>
+
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  title="Excluir template"
+                                  onClick={() =>
+                                    void handleDeleteTemplate(
+                                      template,
+                                    )
+                                  }
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            </article>
+                          )
+                        },
+                      )}
+                    </div>
+                  )}
+            </section>
 
             <section className="tasks-section">
               <h3>Tarefas</h3>

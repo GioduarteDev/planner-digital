@@ -1317,6 +1317,132 @@
   }
 }
 
+/* ===== TEMPLATES DE PÁGINA ===== */
+
+.templates-section {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.templates-section-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.templates-section-header h3 {
+  margin: 0;
+}
+
+.templates-section-header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  opacity: 0.72;
+}
+
+.templates-section-header > button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 10px;
+  cursor: pointer;
+  background: white;
+  font-weight: 600;
+}
+
+.templates-section-header > button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.templates-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(210px, 1fr)
+  );
+  gap: 10px;
+}
+
+.template-card {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  background: white;
+}
+
+.template-card-title {
+  min-width: 0;
+  margin-bottom: 8px;
+}
+
+.template-card-title strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.template-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.template-card-actions button {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.03);
+  font-size: 12px;
+}
+
+.template-card-actions button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.template-card-actions button:first-child,
+.template-card-actions button:nth-child(2) {
+  flex: 1 1 auto;
+}
+
+.templates-empty-message,
+.templates-error-message {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.templates-empty-message {
+  opacity: 0.7;
+}
+
+.templates-error-message {
+  font-weight: 600;
+}
+
+@media (max-width: 700px) {
+  .templates-section-header {
+    flex-direction: column;
+  }
+
+  .templates-section-header > button {
+    width: 100%;
+  }
+
+  .templates-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 
 }
 
