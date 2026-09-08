@@ -1099,6 +1099,7 @@ function AgendaPage() {
         setMediaItems(
           data.map(convertMedia),
         )
+        setSelectedMediaId(null)
         setMediaError('')
       } catch (error) {
         if (cancelled) {
@@ -2411,6 +2412,87 @@ function AgendaPage() {
     }
   }
 
+
+  function handleBringMediaToFront(
+    item: PlannerMedia,
+  ) {
+    const highestZ =
+      mediaItems.reduce(
+        (highest, currentItem) =>
+          Math.max(
+            highest,
+            currentItem.zIndex,
+          ),
+        item.zIndex,
+      )
+
+    if (item.zIndex >= highestZ) {
+      return
+    }
+
+    const nextZ = highestZ + 1
+
+    setMediaItems(
+      (currentItems) =>
+        currentItems.map(
+          (currentItem) =>
+            currentItem.id === item.id
+              ? {
+                  ...currentItem,
+                  zIndex: nextZ,
+                }
+              : currentItem,
+        ),
+    )
+
+    void persistMediaPatch(
+      item.id,
+      {
+        z_index: nextZ,
+      },
+    )
+  }
+
+  function handleSendMediaToBack(
+    item: PlannerMedia,
+  ) {
+    const lowestZ =
+      mediaItems.reduce(
+        (lowest, currentItem) =>
+          Math.min(
+            lowest,
+            currentItem.zIndex,
+          ),
+        item.zIndex,
+      )
+
+    if (item.zIndex <= lowestZ) {
+      return
+    }
+
+    const nextZ = lowestZ - 1
+
+    setMediaItems(
+      (currentItems) =>
+        currentItems.map(
+          (currentItem) =>
+            currentItem.id === item.id
+              ? {
+                  ...currentItem,
+                  zIndex: nextZ,
+                }
+              : currentItem,
+        ),
+    )
+
+    void persistMediaPatch(
+      item.id,
+      {
+        z_index: nextZ,
+      },
+    )
+  }
+
   function handleMediaPointerDown(
     event: ReactPointerEvent<HTMLElement>,
     item: PlannerMedia,
@@ -2429,16 +2511,6 @@ function AgendaPage() {
     const stageRect =
       stage.getBoundingClientRect()
 
-    const topZ =
-      mediaItems.reduce(
-        (highest, currentItem) =>
-          Math.max(
-            highest,
-            currentItem.zIndex,
-          ),
-        0,
-      ) + 1
-
     mediaDragRef.current = {
       mediaId: item.id,
       pointerId: event.pointerId,
@@ -2454,24 +2526,11 @@ function AgendaPage() {
         0,
         stageRect.height - item.height,
       ),
-      zIndex: topZ,
+      zIndex: item.zIndex,
     }
 
     event.currentTarget.setPointerCapture(
       event.pointerId,
-    )
-
-    setMediaItems(
-      (currentItems) =>
-        currentItems.map(
-          (currentItem) =>
-            currentItem.id === item.id
-              ? {
-                  ...currentItem,
-                  zIndex: topZ,
-                }
-              : currentItem,
-        ),
     )
 
     event.preventDefault()
@@ -2625,16 +2684,6 @@ function AgendaPage() {
     const stageRect =
       stage.getBoundingClientRect()
 
-    const topZ =
-      mediaItems.reduce(
-        (highest, currentItem) =>
-          Math.max(
-            highest,
-            currentItem.zIndex,
-          ),
-        0,
-      ) + 1
-
     mediaResizeRef.current = {
       mediaId: item.id,
       pointerId: event.pointerId,
@@ -2650,24 +2699,11 @@ function AgendaPage() {
         1,
         stageRect.height - item.y,
       ),
-      zIndex: topZ,
+      zIndex: item.zIndex,
     }
 
     event.currentTarget.setPointerCapture(
       event.pointerId,
-    )
-
-    setMediaItems(
-      (currentItems) =>
-        currentItems.map(
-          (currentItem) =>
-            currentItem.id === item.id
-              ? {
-                  ...currentItem,
-                  zIndex: topZ,
-                }
-              : currentItem,
-        ),
     )
 
     event.preventDefault()
@@ -2830,16 +2866,6 @@ function AgendaPage() {
       + item.y
       + item.height / 2
 
-    const topZ =
-      mediaItems.reduce(
-        (highest, currentItem) =>
-          Math.max(
-            highest,
-            currentItem.zIndex,
-          ),
-        0,
-      ) + 1
-
     mediaRotateRef.current = {
       mediaId: item.id,
       pointerId: event.pointerId,
@@ -2853,24 +2879,11 @@ function AgendaPage() {
           centerY,
         ),
       startRotation: item.rotation,
-      zIndex: topZ,
+      zIndex: item.zIndex,
     }
 
     event.currentTarget.setPointerCapture(
       event.pointerId,
-    )
-
-    setMediaItems(
-      (currentItems) =>
-        currentItems.map(
-          (currentItem) =>
-            currentItem.id === item.id
-              ? {
-                  ...currentItem,
-                  zIndex: topZ,
-                }
-              : currentItem,
-        ),
     )
 
     event.preventDefault()
@@ -3971,7 +3984,7 @@ function AgendaPage() {
                 : (
                   <>
                     <p className="media-drag-hint">
-                      Arraste para mover, use ↘ para redimensionar e ↻ para girar.
+                      Clique para editar. Use ↑/↓ para camadas, ↘ para redimensionar e ↻ para girar.
                     </p>
 
                     <div
@@ -4036,6 +4049,46 @@ function AgendaPage() {
                             {selectedMediaId
                               === item.id && (
                               <>
+                                <div
+                                  className="media-layer-controls"
+                                >
+                                  <button
+                                    className="media-layer-button"
+                                    type="button"
+                                    aria-label="Trazer mídia para frente"
+                                    title="Trazer para frente"
+                                    onPointerDown={(event) =>
+                                      event.stopPropagation()
+                                    }
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      handleBringMediaToFront(
+                                        item,
+                                      )
+                                    }}
+                                  >
+                                    ↑
+                                  </button>
+
+                                  <button
+                                    className="media-layer-button"
+                                    type="button"
+                                    aria-label="Mandar mídia para trás"
+                                    title="Mandar para trás"
+                                    onPointerDown={(event) =>
+                                      event.stopPropagation()
+                                    }
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      handleSendMediaToBack(
+                                        item,
+                                      )
+                                    }}
+                                  >
+                                    ↓
+                                  </button>
+                                </div>
+
                                 <button
                                   className="media-rotate-handle"
                                   type="button"
