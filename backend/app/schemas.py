@@ -494,6 +494,15 @@ class PageBlockReorderRequest(BaseModel):
 
 
 
+class PageMediaUpdate(BaseModel):
+    x: int | None = None
+    y: int | None = None
+    width: int | None = None
+    height: int | None = None
+    rotation: int | None = None
+    z_index: int | None = None
+
+
 class PageMediaResponse(BaseModel):
     id: int
     page_id: int
@@ -502,6 +511,14 @@ class PageMediaResponse(BaseModel):
     mime_type: str
     size_bytes: int
     file_url: str
+
+    x: int
+    y: int
+    width: int
+    height: int
+    rotation: int
+    z_index: int
+
     created_at: datetime
 
     model_config = ConfigDict(

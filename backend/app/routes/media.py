@@ -21,7 +21,10 @@ from app.models import (
     PageMedia,
     User,
 )
-from app.schemas import PageMediaResponse
+from app.schemas import (
+    PageMediaResponse,
+    PageMediaUpdate,
+)
 
 
 router = APIRouter(
@@ -131,6 +134,7 @@ def list_page_media(
             PageMedia.page_id == page_id,
         )
         .order_by(
+            PageMedia.z_index,
             PageMedia.created_at,
             PageMedia.id,
         )
@@ -208,15 +212,11 @@ async def upload_page_media(
                 total_size += len(chunk)
 
                 if total_size > MAX_FILE_SIZE:
-                    output.close()
-
                     if destination.exists():
                         destination.unlink()
 
                     raise HTTPException(
-                        status_code=(
-                            status.HTTP_413_CONTENT_TOO_LARGE
-                        ),
+                        status_code=413,
                         detail=(
                             "Arquivo maior que 10 MB."
                         ),
@@ -237,6 +237,23 @@ async def upload_page_media(
         f"{stored_name}"
     )
 
+    highest_z_index = db.scalar(
+        select(PageMedia.z_index)
+        .where(
+            PageMedia.page_id == page_id,
+        )
+        .order_by(
+            PageMedia.z_index.desc()
+        )
+        .limit(1)
+    )
+
+    new_z_index = (
+        highest_z_index + 1
+        if highest_z_index is not None
+        else 0
+    )
+
     media = PageMedia(
         page_id=page_id,
         media_type=media_type,
@@ -245,6 +262,7 @@ async def upload_page_media(
         mime_type=file.content_type,
         size_bytes=total_size,
         file_url=file_url,
+        z_index=new_z_index,
     )
 
     try:
@@ -259,6 +277,62 @@ async def upload_page_media(
             destination.unlink()
 
         raise
+
+    return media
+
+
+@router.patch(
+    "/media/{media_id}",
+    response_model=PageMediaResponse,
+)
+def update_page_media(
+    media_id: int,
+    data: PageMediaUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(
+        get_current_user
+    ),
+):
+    media = get_user_media(
+        media_id,
+        current_user,
+        db,
+    )
+
+    updates = data.model_dump(
+        exclude_unset=True
+    )
+
+    if (
+        "width" in updates
+        and updates["width"] is not None
+        and updates["width"] <= 0
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A largura precisa ser maior que zero.",
+        )
+
+    if (
+        "height" in updates
+        and updates["height"] is not None
+        and updates["height"] <= 0
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A altura precisa ser maior que zero.",
+        )
+
+    for field, value in updates.items():
+        if value is not None:
+            setattr(
+                media,
+                field,
+                value,
+            )
+
+    db.commit()
+    db.refresh(media)
 
     return media
 

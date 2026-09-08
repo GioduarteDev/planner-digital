@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from 'react'
 import {
@@ -104,6 +105,12 @@ type PlannerMedia = {
   mimeType: string
   sizeBytes: number
   fileUrl: string
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation: number
+  zIndex: number
   createdAt: string
 }
 
@@ -168,6 +175,12 @@ type MediaFromApi = {
   mime_type: string
   size_bytes: number
   file_url: string
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation: number
+  z_index: number
   created_at: string
 }
 
@@ -181,6 +194,49 @@ type PagePatch = {
 type BlockPatch = {
   block_type?: BlockType
   data?: BlockData
+}
+
+type MediaPatch = {
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  rotation?: number
+  z_index?: number
+}
+
+type MediaDragState = {
+  mediaId: number
+  pointerId: number
+  startClientX: number
+  startClientY: number
+  startX: number
+  startY: number
+  maxX: number
+  maxY: number
+  zIndex: number
+}
+
+type MediaResizeState = {
+  mediaId: number
+  pointerId: number
+  startClientX: number
+  startClientY: number
+  startWidth: number
+  startHeight: number
+  maxWidth: number
+  maxHeight: number
+  zIndex: number
+}
+
+type MediaRotateState = {
+  mediaId: number
+  pointerId: number
+  centerX: number
+  centerY: number
+  startPointerAngle: number
+  startRotation: number
+  zIndex: number
 }
 
 function convertBlock(
@@ -208,6 +264,12 @@ function convertMedia(
     mimeType: media.mime_type,
     sizeBytes: media.size_bytes,
     fileUrl: media.file_url,
+    x: media.x,
+    y: media.y,
+    width: media.width,
+    height: media.height,
+    rotation: media.rotation,
+    zIndex: media.z_index,
     createdAt: media.created_at,
   }
 }
@@ -717,6 +779,12 @@ function AgendaPage() {
     useState(false)
   const [mediaError, setMediaError] =
     useState('')
+  const mediaDragRef =
+    useRef<MediaDragState | null>(null)
+  const mediaResizeRef =
+    useRef<MediaResizeState | null>(null)
+  const mediaRotateRef =
+    useRef<MediaRotateState | null>(null)
 
   const [isLoading, setIsLoading] =
     useState(true)
@@ -726,6 +794,10 @@ function AgendaPage() {
     useState<SaveStatus>('saved')
   const [blockSaveStatus, setBlockSaveStatus] =
     useState<SaveStatus>('saved')
+  
+
+  const [selectedMediaId, setSelectedMediaId] =
+    useState<number | null>(null)
 
   const pendingUpdatesRef =
     useRef<Record<number, PagePatch>>({})
@@ -2270,6 +2342,618 @@ function AgendaPage() {
     }
   }
 
+  function getMediaDragPosition(
+    event: ReactPointerEvent<HTMLElement>,
+    drag: MediaDragState,
+  ) {
+    const deltaX =
+      event.clientX - drag.startClientX
+    const deltaY =
+      event.clientY - drag.startClientY
+
+    const nextX = Math.max(
+      0,
+      Math.min(
+        drag.startX + deltaX,
+        drag.maxX,
+      ),
+    )
+
+    const nextY = Math.max(
+      0,
+      Math.min(
+        drag.startY + deltaY,
+        drag.maxY,
+      ),
+    )
+
+    return {
+      x: Math.round(nextX),
+      y: Math.round(nextY),
+    }
+  }
+
+  async function persistMediaPatch(
+    mediaId: number,
+    patch: MediaPatch,
+  ) {
+    try {
+      const updated =
+        await apiRequest<MediaFromApi>(
+          `/media/${mediaId}`,
+          {
+            method: 'PATCH',
+            body: JSON.stringify(patch),
+          },
+        )
+
+      setMediaItems(
+        (currentItems) =>
+          currentItems.map(
+            (item) =>
+              item.id === mediaId
+                ? convertMedia(updated)
+                : item,
+          ),
+      )
+
+      setMediaError('')
+    } catch (error) {
+      console.error(error)
+
+      if (error instanceof Error) {
+        setMediaError(error.message)
+      } else {
+        setMediaError(
+          'Não foi possível salvar as alterações da mídia.',
+        )
+      }
+    }
+  }
+
+  function handleMediaPointerDown(
+    event: ReactPointerEvent<HTMLElement>,
+    item: PlannerMedia,
+  ) {
+    if (event.button !== 0) {
+      return
+    }
+
+    const stage =
+      event.currentTarget.parentElement
+
+    if (!stage) {
+      return
+    }
+
+    const stageRect =
+      stage.getBoundingClientRect()
+
+    const topZ =
+      mediaItems.reduce(
+        (highest, currentItem) =>
+          Math.max(
+            highest,
+            currentItem.zIndex,
+          ),
+        0,
+      ) + 1
+
+    mediaDragRef.current = {
+      mediaId: item.id,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startX: item.x,
+      startY: item.y,
+      maxX: Math.max(
+        0,
+        stageRect.width - item.width,
+      ),
+      maxY: Math.max(
+        0,
+        stageRect.height - item.height,
+      ),
+      zIndex: topZ,
+    }
+
+    event.currentTarget.setPointerCapture(
+      event.pointerId,
+    )
+
+    setMediaItems(
+      (currentItems) =>
+        currentItems.map(
+          (currentItem) =>
+            currentItem.id === item.id
+              ? {
+                  ...currentItem,
+                  zIndex: topZ,
+                }
+              : currentItem,
+        ),
+    )
+
+    event.preventDefault()
+  }
+
+  function handleMediaPointerMove(
+    event: ReactPointerEvent<HTMLElement>,
+  ) {
+    const drag = mediaDragRef.current
+
+    if (
+      !drag
+      || drag.pointerId !== event.pointerId
+    ) {
+      return
+    }
+
+    const position =
+      getMediaDragPosition(
+        event,
+        drag,
+      )
+
+    setMediaItems(
+      (currentItems) =>
+        currentItems.map(
+          (item) =>
+            item.id === drag.mediaId
+              ? {
+                  ...item,
+                  x: position.x,
+                  y: position.y,
+                  zIndex: drag.zIndex,
+                }
+              : item,
+        ),
+    )
+  }
+
+  function finishMediaDrag(
+    event: ReactPointerEvent<HTMLElement>,
+  ) {
+    const drag = mediaDragRef.current
+
+    if (
+      !drag
+      || drag.pointerId !== event.pointerId
+    ) {
+      return
+    }
+
+    const position =
+      getMediaDragPosition(
+        event,
+        drag,
+      )
+
+    mediaDragRef.current = null
+
+    if (
+      event.currentTarget.hasPointerCapture(
+        event.pointerId,
+      )
+    ) {
+      event.currentTarget.releasePointerCapture(
+        event.pointerId,
+      )
+    }
+
+    void persistMediaPatch(
+      drag.mediaId,
+      {
+        x: position.x,
+        y: position.y,
+        z_index: drag.zIndex,
+      },
+    )
+  }
+
+  function getMediaResizeSize(
+    event: ReactPointerEvent<HTMLElement>,
+    resize: MediaResizeState,
+  ) {
+    const deltaX =
+      event.clientX - resize.startClientX
+    const deltaY =
+      event.clientY - resize.startClientY
+
+    const widthScale =
+      (resize.startWidth + deltaX)
+      / resize.startWidth
+    const heightScale =
+      (resize.startHeight + deltaY)
+      / resize.startHeight
+
+    let scale =
+      Math.abs(widthScale - 1)
+      >= Math.abs(heightScale - 1)
+        ? widthScale
+        : heightScale
+
+    const minSize = 48
+    const minScale = Math.max(
+      minSize / resize.startWidth,
+      minSize / resize.startHeight,
+    )
+    const maxScale = Math.min(
+      resize.maxWidth / resize.startWidth,
+      resize.maxHeight / resize.startHeight,
+    )
+    const lowerScale =
+      Math.min(
+        minScale,
+        maxScale,
+      )
+
+    scale = Math.max(
+      lowerScale,
+      Math.min(scale, maxScale),
+    )
+
+    return {
+      width: Math.round(
+        resize.startWidth * scale,
+      ),
+      height: Math.round(
+        resize.startHeight * scale,
+      ),
+    }
+  }
+
+  function handleMediaResizePointerDown(
+    event: ReactPointerEvent<HTMLButtonElement>,
+    item: PlannerMedia,
+  ) {
+    if (event.button !== 0) {
+      return
+    }
+
+    event.stopPropagation()
+
+    const mediaElement =
+      event.currentTarget.parentElement
+    const stage =
+      mediaElement?.parentElement
+
+    if (!stage) {
+      return
+    }
+
+    const stageRect =
+      stage.getBoundingClientRect()
+
+    const topZ =
+      mediaItems.reduce(
+        (highest, currentItem) =>
+          Math.max(
+            highest,
+            currentItem.zIndex,
+          ),
+        0,
+      ) + 1
+
+    mediaResizeRef.current = {
+      mediaId: item.id,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startWidth: item.width,
+      startHeight: item.height,
+      maxWidth: Math.max(
+        1,
+        stageRect.width - item.x,
+      ),
+      maxHeight: Math.max(
+        1,
+        stageRect.height - item.y,
+      ),
+      zIndex: topZ,
+    }
+
+    event.currentTarget.setPointerCapture(
+      event.pointerId,
+    )
+
+    setMediaItems(
+      (currentItems) =>
+        currentItems.map(
+          (currentItem) =>
+            currentItem.id === item.id
+              ? {
+                  ...currentItem,
+                  zIndex: topZ,
+                }
+              : currentItem,
+        ),
+    )
+
+    event.preventDefault()
+  }
+
+  function handleMediaResizePointerMove(
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    const resize =
+      mediaResizeRef.current
+
+    if (
+      !resize
+      || resize.pointerId
+        !== event.pointerId
+    ) {
+      return
+    }
+
+    const size =
+      getMediaResizeSize(
+        event,
+        resize,
+      )
+
+    setMediaItems(
+      (currentItems) =>
+        currentItems.map(
+          (item) =>
+            item.id === resize.mediaId
+              ? {
+                  ...item,
+                  width: size.width,
+                  height: size.height,
+                  zIndex: resize.zIndex,
+                }
+              : item,
+        ),
+    )
+  }
+
+  function finishMediaResize(
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    const resize =
+      mediaResizeRef.current
+
+    if (
+      !resize
+      || resize.pointerId
+        !== event.pointerId
+    ) {
+      return
+    }
+
+    const size =
+      getMediaResizeSize(
+        event,
+        resize,
+      )
+
+    mediaResizeRef.current = null
+
+    if (
+      event.currentTarget.hasPointerCapture(
+        event.pointerId,
+      )
+    ) {
+      event.currentTarget.releasePointerCapture(
+        event.pointerId,
+      )
+    }
+
+    void persistMediaPatch(
+      resize.mediaId,
+      {
+        width: size.width,
+        height: size.height,
+        z_index: resize.zIndex,
+      },
+    )
+
+    event.stopPropagation()
+  }
+
+  function getPointerAngle(
+    clientX: number,
+    clientY: number,
+    centerX: number,
+    centerY: number,
+  ) {
+    return Math.atan2(
+      clientY - centerY,
+      clientX - centerX,
+    ) * (180 / Math.PI)
+  }
+
+  function normalizeRotation(
+    rotation: number,
+  ) {
+    return (
+      ((rotation + 180) % 360 + 360) % 360
+    ) - 180
+  }
+
+  function getMediaRotation(
+    event: ReactPointerEvent<HTMLElement>,
+    rotate: MediaRotateState,
+  ) {
+    const currentPointerAngle =
+      getPointerAngle(
+        event.clientX,
+        event.clientY,
+        rotate.centerX,
+        rotate.centerY,
+      )
+
+    const delta =
+      normalizeRotation(
+        currentPointerAngle
+        - rotate.startPointerAngle,
+      )
+
+    return Math.round(
+      normalizeRotation(
+        rotate.startRotation + delta,
+      ),
+    )
+  }
+
+  function handleMediaRotatePointerDown(
+    event: ReactPointerEvent<HTMLButtonElement>,
+    item: PlannerMedia,
+  ) {
+    if (event.button !== 0) {
+      return
+    }
+
+    event.stopPropagation()
+
+    const mediaElement =
+      event.currentTarget.parentElement
+    const stage =
+      mediaElement?.parentElement
+
+    if (!stage) {
+      return
+    }
+
+    const stageRect =
+      stage.getBoundingClientRect()
+
+    const centerX =
+      stageRect.left
+      + item.x
+      + item.width / 2
+
+    const centerY =
+      stageRect.top
+      + item.y
+      + item.height / 2
+
+    const topZ =
+      mediaItems.reduce(
+        (highest, currentItem) =>
+          Math.max(
+            highest,
+            currentItem.zIndex,
+          ),
+        0,
+      ) + 1
+
+    mediaRotateRef.current = {
+      mediaId: item.id,
+      pointerId: event.pointerId,
+      centerX,
+      centerY,
+      startPointerAngle:
+        getPointerAngle(
+          event.clientX,
+          event.clientY,
+          centerX,
+          centerY,
+        ),
+      startRotation: item.rotation,
+      zIndex: topZ,
+    }
+
+    event.currentTarget.setPointerCapture(
+      event.pointerId,
+    )
+
+    setMediaItems(
+      (currentItems) =>
+        currentItems.map(
+          (currentItem) =>
+            currentItem.id === item.id
+              ? {
+                  ...currentItem,
+                  zIndex: topZ,
+                }
+              : currentItem,
+        ),
+    )
+
+    event.preventDefault()
+  }
+
+  function handleMediaRotatePointerMove(
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    const rotate =
+      mediaRotateRef.current
+
+    if (
+      !rotate
+      || rotate.pointerId
+        !== event.pointerId
+    ) {
+      return
+    }
+
+    const rotation =
+      getMediaRotation(
+        event,
+        rotate,
+      )
+
+    setMediaItems(
+      (currentItems) =>
+        currentItems.map(
+          (item) =>
+            item.id === rotate.mediaId
+              ? {
+                  ...item,
+                  rotation,
+                  zIndex: rotate.zIndex,
+                }
+              : item,
+        ),
+    )
+  }
+
+  function finishMediaRotate(
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    const rotate =
+      mediaRotateRef.current
+
+    if (
+      !rotate
+      || rotate.pointerId
+        !== event.pointerId
+    ) {
+      return
+    }
+
+    const rotation =
+      getMediaRotation(
+        event,
+        rotate,
+      )
+
+    mediaRotateRef.current = null
+
+    if (
+      event.currentTarget.hasPointerCapture(
+        event.pointerId,
+      )
+    ) {
+      event.currentTarget.releasePointerCapture(
+        event.pointerId,
+      )
+    }
+
+    void persistMediaPatch(
+      rotate.mediaId,
+      {
+        rotation,
+        z_index: rotate.zIndex,
+      },
+    )
+
+    event.stopPropagation()
+  }
+
   async function handleUploadMedia(
     file: File | undefined,
   ) {
@@ -2386,6 +3070,13 @@ function AgendaPage() {
             (item) =>
               item.id !== mediaId,
           ),
+      )
+
+      setSelectedMediaId(
+        (currentSelectedId) =>
+          currentSelectedId === mediaId
+            ? null
+            : currentSelectedId,
       )
     } catch (error) {
       console.error(error)
@@ -3278,45 +3969,150 @@ function AgendaPage() {
                   </p>
                 )
                 : (
-                  <div className="media-grid">
-                    {mediaItems.map(
-                      (item) => (
-                        <article
-                          className="media-card"
-                          key={item.id}
-                        >
-                          <img
-                            src={getMediaUrl(
-                              item.fileUrl,
-                            )}
-                            alt={
-                              item.originalName
+                  <>
+                    <p className="media-drag-hint">
+                      Arraste para mover, use ↘ para redimensionar e ↻ para girar.
+                    </p>
+
+                    <div
+                      className="media-stage"
+                      onClick={() =>
+                        setSelectedMediaId(null)
+                      }
+                    >
+                      {mediaItems.map(
+                        (item) => (
+                          <article
+                            className={
+                              selectedMediaId === item.id
+                                ? 'media-canvas-item is-selected'
+                                : 'media-canvas-item'
                             }
-                          />
-
-                          <div className="media-card-footer">
-                            <span>
-                              {item.mediaType ===
-                              'sticker'
-                                ? 'Sticker'
-                                : 'Imagem'}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void handleDeleteMedia(
-                                  item.id,
-                                )
+                            key={item.id}
+                            style={{
+                              left: item.x,
+                              top: item.y,
+                              width: item.width,
+                              height: item.height,
+                              transform:
+                                `rotate(${item.rotation}deg)`,
+                              zIndex: item.zIndex,
+                            }}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setSelectedMediaId(
+                                item.id,
+                              )
+                            }}
+                            onPointerDown={(event) => {
+                              setSelectedMediaId(
+                                item.id,
+                              )
+                              handleMediaPointerDown(
+                                event,
+                                item,
+                              )
+                            }}
+                            onPointerMove={
+                              handleMediaPointerMove
+                            }
+                            onPointerUp={
+                              finishMediaDrag
+                            }
+                            onPointerCancel={
+                              finishMediaDrag
+                            }
+                          >
+                            <img
+                              src={getMediaUrl(
+                                item.fileUrl,
+                              )}
+                              alt={
+                                item.originalName
                               }
-                            >
-                              Excluir
-                            </button>
-                          </div>
-                        </article>
-                      ),
-                    )}
-                  </div>
+                              draggable={false}
+                            />
+
+                            {selectedMediaId
+                              === item.id && (
+                              <>
+                                <button
+                                  className="media-rotate-handle"
+                                  type="button"
+                                  aria-label="Girar mídia"
+                                  title="Arraste para girar"
+                                  onPointerDown={(event) =>
+                                    handleMediaRotatePointerDown(
+                                      event,
+                                      item,
+                                    )
+                                  }
+                                  onPointerMove={
+                                    handleMediaRotatePointerMove
+                                  }
+                                  onPointerUp={
+                                    finishMediaRotate
+                                  }
+                                  onPointerCancel={
+                                    finishMediaRotate
+                                  }
+                                  onClick={(event) =>
+                                    event.stopPropagation()
+                                  }
+                                >
+                                  ↻
+                                </button>
+
+                                <button
+                                  className="media-resize-handle"
+                                  type="button"
+                                  aria-label="Redimensionar mídia"
+                                  title="Arraste para aumentar ou diminuir"
+                                  onPointerDown={(event) =>
+                                    handleMediaResizePointerDown(
+                                      event,
+                                      item,
+                                    )
+                                  }
+                                  onPointerMove={
+                                    handleMediaResizePointerMove
+                                  }
+                                  onPointerUp={
+                                    finishMediaResize
+                                  }
+                                  onPointerCancel={
+                                    finishMediaResize
+                                  }
+                                  onClick={(event) =>
+                                    event.stopPropagation()
+                                  }
+                                >
+                                  ↘
+                                </button>
+
+                                <button
+                                  className="media-delete-button"
+                                  type="button"
+                                  aria-label="Excluir mídia"
+                                  onPointerDown={(event) =>
+                                    event.stopPropagation()
+                                  }
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    void handleDeleteMedia(
+                                      item.id,
+                                    )
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              </>
+                            )}
+                          </article>
+                        ),
+                      )}
+                    </div>
+                  </>
                 )}
             </section>
 

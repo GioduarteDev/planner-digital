@@ -325,6 +325,48 @@ class PageMedia(Base):
         nullable=False,
     )
 
+    x: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=40,
+        server_default="40",
+    )
+
+    y: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=40,
+        server_default="40",
+    )
+
+    width: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=240,
+        server_default="240",
+    )
+
+    height: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=180,
+        server_default="180",
+    )
+
+    rotation: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+
+    z_index: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         server_default=func.now(),
