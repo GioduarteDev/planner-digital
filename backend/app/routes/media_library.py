@@ -82,6 +82,7 @@ class MediaLibraryResponse(BaseModel):
     size_bytes: int
     file_url: str
     kit_name: str | None
+    metadata_json: dict = {}
     created_at: datetime
 
     model_config = ConfigDict(
@@ -169,12 +170,16 @@ def list_library_media(
         if media_type not in {
             "image",
             "sticker",
+            "stamp",
+            "washi",
+            "background",
+            "frame",
+            "icon",
         }:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
-                    "media_type deve ser "
-                    "'image' ou 'sticker'."
+                    "media_type inválido."
                 ),
             )
 
@@ -215,12 +220,16 @@ async def upload_library_media(
     if media_type not in {
         "image",
         "sticker",
+        "stamp",
+        "washi",
+        "background",
+        "frame",
+        "icon",
     }:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                "media_type deve ser "
-                "'image' ou 'sticker'."
+                "media_type inválido."
             ),
         )
 

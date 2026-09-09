@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -19,7 +21,9 @@ from app.dependencies import (
 
 from app.models import (
     Agenda,
+    CanvasElement,
     Page,
+    PageMedia,
     User,
 )
 
@@ -29,6 +33,9 @@ from app.schemas import (
     AgendaUpdate,
 )
 
+
+PAGE_MEDIA_DIRECTORY = Path(__file__).resolve().parents[2] / "uploads" / "page_media"
+CANVAS_MEDIA_DIRECTORY = Path(__file__).resolve().parents[2] / "uploads" / "canvas_media"
 
 MAX_AGENDAS = 6
 
@@ -151,9 +158,9 @@ def create_agenda(
     agenda = Agenda(
         user_id=current_user.id,
         title=data.title,
-        cover_color=(
-            data.cover_color
-        ),
+        cover_color=data.cover_color,
+        cover_image_url=data.cover_image_url,
+        settings=data.settings,
     )
 
     for page_number in range(
@@ -267,5 +274,36 @@ def delete_agenda(
             ),
         )
 
+    page_ids = list(
+        db.scalars(
+            select(Page.id).where(Page.agenda_id == agenda.id)
+        ).all()
+    )
+    media_items = (
+        db.scalars(select(PageMedia).where(PageMedia.page_id.in_(page_ids))).all()
+        if page_ids else []
+    )
+    canvas_items = (
+        db.scalars(
+            select(CanvasElement).where(
+                CanvasElement.user_id == current_user.id,
+                CanvasElement.page_id.in_(page_ids),
+            )
+        ).all()
+        if page_ids else []
+    )
+    file_paths = [
+        PAGE_MEDIA_DIRECTORY / item.stored_name
+        for item in media_items
+    ] + [
+        CANVAS_MEDIA_DIRECTORY / item.asset_stored_name
+        for item in canvas_items
+        if item.asset_stored_name
+    ]
+
     db.delete(agenda)
     db.commit()
+
+    for path in file_paths:
+        if path.exists():
+            path.unlink()

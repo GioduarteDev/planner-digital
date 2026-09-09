@@ -1,322 +1,185 @@
-from fastapi import (
-    APIRouter,
-    Depends,
-    HTTPException,
-    status,
-)
-
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.dependencies import (
-    get_current_user,
-)
+from app.dependencies import get_current_user
+from app.models import Category, Page, Project, Task, User
+from app.routes.helpers import get_user_page_or_404
+from app.schemas import TaskCreate, TaskResponse, TaskUpdate
 
-from app.models import (
-    Agenda,
-    Page,
-    Task,
-    User,
-)
-
-from app.schemas import (
-    TaskCreate,
-    TaskResponse,
-    TaskUpdate,
-)
+router = APIRouter(tags=["Tarefas"])
 
 
-router = APIRouter(
-    tags=["Tarefas"],
-)
-
-
-def get_user_page(
-    page_id: int,
-    user_id: int,
-    db: Session,
-) -> Page | None:
+def get_user_task(task_id: int, user_id: int, db: Session) -> Task | None:
     return db.scalar(
-        select(Page)
-        .join(
-            Agenda,
-            Page.agenda_id == Agenda.id,
-        )
-        .where(
-            Page.id == page_id,
-            Agenda.user_id == user_id,
-        )
+        select(Task).where(Task.id == task_id, Task.user_id == user_id)
     )
 
 
-def get_user_task(
-    task_id: int,
+def validate_links(
+    *,
     user_id: int,
     db: Session,
-) -> Task | None:
-    return db.scalar(
-        select(Task)
-        .join(
-            Page,
-            Task.page_id == Page.id,
+    project_id: int | None = None,
+    category_id: int | None = None,
+) -> None:
+    if project_id is not None:
+        project = db.scalar(
+            select(Project).where(Project.id == project_id, Project.user_id == user_id)
         )
-        .join(
-            Agenda,
-            Page.agenda_id == Agenda.id,
+        if project is None:
+            raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    if category_id is not None:
+        category = db.scalar(
+            select(Category).where(Category.id == category_id, Category.user_id == user_id)
         )
-        .where(
-            Task.id == task_id,
-            Agenda.user_id == user_id,
-        )
+        if category is None:
+            raise HTTPException(status_code=404, detail="Categoria não encontrada.")
+
+
+def build_task(
+    data: TaskCreate,
+    current_user: User,
+    page_id: int | None,
+) -> Task:
+    return Task(
+        user_id=current_user.id,
+        page_id=page_id,
+        text=data.text,
+        description=data.description,
+        done=False,
+        due_date=data.due_date,
+        due_at=data.due_at,
+        priority=data.priority,
+        project_id=data.project_id,
+        category_id=data.category_id,
+        show_in_calendar=data.show_in_calendar,
     )
 
 
-@router.get(
-    "/tasks",
-    response_model=list[TaskResponse],
-)
+@router.get("/tasks", response_model=list[TaskResponse])
 def list_all_tasks(
-    db: Session = Depends(
-        get_db
-    ),
-
-    current_user: User = Depends(
-        get_current_user
-    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    statement = (
-        select(Task)
-        .join(
-            Page,
-            Task.page_id == Page.id,
-        )
-        .join(
-            Agenda,
-            Page.agenda_id == Agenda.id,
-        )
-        .where(
-            Agenda.user_id
-            == current_user.id
-        )
-        .order_by(
-            Task.created_at,
-            Task.id,
-        )
-    )
-
     return db.scalars(
-        statement
+        select(Task)
+        .where(Task.user_id == current_user.id)
+        .order_by(Task.created_at, Task.id)
     ).all()
 
 
-@router.get(
-    "/pages/{page_id}/tasks",
-    response_model=list[TaskResponse],
-)
+@router.get("/pages/{page_id}/tasks", response_model=list[TaskResponse])
 def list_page_tasks(
     page_id: int,
-
-    db: Session = Depends(
-        get_db
-    ),
-
-    current_user: User = Depends(
-        get_current_user
-    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    page = get_user_page(
-        page_id,
-        current_user.id,
-        db,
-    )
-
-    if page is None:
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                "Página não encontrada."
-            ),
-        )
-
-    statement = (
-        select(Task)
-        .where(
-            Task.page_id == page_id
-        )
-        .order_by(
-            Task.created_at,
-            Task.id,
-        )
-    )
-
+    get_user_page_or_404(page_id, current_user, db)
     return db.scalars(
-        statement
+        select(Task)
+        .where(Task.user_id == current_user.id, Task.page_id == page_id)
+        .order_by(Task.created_at, Task.id)
     ).all()
 
 
-@router.get(
-    "/tasks/{task_id}",
-    response_model=TaskResponse,
-)
+@router.get("/tasks/{task_id}", response_model=TaskResponse)
 def get_task(
     task_id: int,
-
-    db: Session = Depends(
-        get_db
-    ),
-
-    current_user: User = Depends(
-        get_current_user
-    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    task = get_user_task(
-        task_id,
-        current_user.id,
-        db,
-    )
-
+    task = get_user_task(task_id, current_user.id, db)
     if task is None:
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                "Tarefa não encontrada."
-            ),
-        )
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
+    return task
 
+
+@router.post("/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
+def create_independent_task(
+    data: TaskCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    validate_links(
+        user_id=current_user.id,
+        db=db,
+        project_id=data.project_id,
+        category_id=data.category_id,
+    )
+    task = build_task(data, current_user, None)
+    db.add(task)
+    db.commit()
+    db.refresh(task)
     return task
 
 
 @router.post(
     "/pages/{page_id}/tasks",
     response_model=TaskResponse,
-    status_code=(
-        status.HTTP_201_CREATED
-    ),
+    status_code=status.HTTP_201_CREATED,
 )
 def create_task(
     page_id: int,
     data: TaskCreate,
-
-    db: Session = Depends(
-        get_db
-    ),
-
-    current_user: User = Depends(
-        get_current_user
-    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    page = get_user_page(
-        page_id,
-        current_user.id,
-        db,
+    get_user_page_or_404(page_id, current_user, db)
+    validate_links(
+        user_id=current_user.id,
+        db=db,
+        project_id=data.project_id,
+        category_id=data.category_id,
     )
-
-    if page is None:
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                "Página não encontrada."
-            ),
-        )
-
-    task = Task(
-        page_id=page_id,
-        text=data.text,
-        done=False,
-        due_date=data.due_date,
-        priority=data.priority,
-    )
-
+    task = build_task(data, current_user, page_id)
     db.add(task)
     db.commit()
     db.refresh(task)
-
     return task
 
 
-@router.patch(
-    "/tasks/{task_id}",
-    response_model=TaskResponse,
-)
+@router.patch("/tasks/{task_id}", response_model=TaskResponse)
 def update_task(
     task_id: int,
     data: TaskUpdate,
-
-    db: Session = Depends(
-        get_db
-    ),
-
-    current_user: User = Depends(
-        get_current_user
-    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    task = get_user_task(
-        task_id,
-        current_user.id,
-        db,
-    )
-
+    task = get_user_task(task_id, current_user.id, db)
     if task is None:
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                "Tarefa não encontrada."
-            ),
-        )
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
 
-    update_data = (
-        data.model_dump(
-            exclude_unset=True
-        )
+    updates = data.model_dump(exclude_unset=True)
+
+    if "page_id" in updates and updates["page_id"] is not None:
+        get_user_page_or_404(updates["page_id"], current_user, db)
+
+    validate_links(
+        user_id=current_user.id,
+        db=db,
+        project_id=updates.get("project_id") if "project_id" in updates else None,
+        category_id=updates.get("category_id") if "category_id" in updates else None,
     )
 
-    for (
-        field,
-        value,
-    ) in update_data.items():
-        setattr(
-            task,
-            field,
-            value,
-        )
+    for field, value in updates.items():
+        setattr(task, field, value)
 
     db.commit()
     db.refresh(task)
-
     return task
 
 
-@router.delete(
-    "/tasks/{task_id}",
-    status_code=(
-        status.HTTP_204_NO_CONTENT
-    ),
-)
+@router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_task(
     task_id: int,
-
-    db: Session = Depends(
-        get_db
-    ),
-
-    current_user: User = Depends(
-        get_current_user
-    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    task = get_user_task(
-        task_id,
-        current_user.id,
-        db,
-    )
-
+    task = get_user_task(task_id, current_user.id, db)
     if task is None:
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                "Tarefa não encontrada."
-            ),
-        )
-
+        raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
     db.delete(task)
     db.commit()
+    return None

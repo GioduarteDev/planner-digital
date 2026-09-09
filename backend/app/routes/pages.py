@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -20,8 +22,10 @@ from app.dependencies import (
 
 from app.models import (
     Agenda,
+    CanvasElement,
     Folder,
     Page,
+    PageMedia,
     User,
 )
 
@@ -33,6 +37,9 @@ from app.schemas import (
     PageUpdate,
 )
 
+
+PAGE_MEDIA_DIRECTORY = Path(__file__).resolve().parents[2] / "uploads" / "page_media"
+CANVAS_MEDIA_DIRECTORY = Path(__file__).resolve().parents[2] / "uploads" / "canvas_media"
 
 MAX_PAGES = 400
 
@@ -252,6 +259,8 @@ def create_page(
         title=title,
         content="",
         favorite=False,
+        paper_type=data.paper_type,
+        paper_settings=data.paper_settings,
     )
 
     db.add(page)
@@ -697,5 +706,27 @@ def delete_page(
             ),
         )
 
+    media_items = db.scalars(
+        select(PageMedia).where(PageMedia.page_id == page.id)
+    ).all()
+    canvas_items = db.scalars(
+        select(CanvasElement).where(
+            CanvasElement.user_id == current_user.id,
+            CanvasElement.page_id == page.id,
+        )
+    ).all()
+    file_paths = [
+        PAGE_MEDIA_DIRECTORY / item.stored_name
+        for item in media_items
+    ] + [
+        CANVAS_MEDIA_DIRECTORY / item.asset_stored_name
+        for item in canvas_items
+        if item.asset_stored_name
+    ]
+
     db.delete(page)
     db.commit()
+
+    for path in file_paths:
+        if path.exists():
+            path.unlink()

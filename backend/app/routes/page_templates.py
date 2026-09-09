@@ -17,6 +17,7 @@ from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import (
     Agenda,
+    CanvasElement,
     Page,
     PageBlock,
     PageMedia,
@@ -43,12 +44,34 @@ TEMPLATE_MEDIA_DIRECTORY = (
     / "template_media"
 )
 
+CANVAS_MEDIA_DIRECTORY = (
+    Path(__file__).resolve().parents[2]
+    / "uploads"
+    / "canvas_media"
+)
+
+TEMPLATE_CANVAS_MEDIA_DIRECTORY = (
+    Path(__file__).resolve().parents[2]
+    / "uploads"
+    / "template_canvas_media"
+)
+
 PAGE_MEDIA_DIRECTORY.mkdir(
     parents=True,
     exist_ok=True,
 )
 
 TEMPLATE_MEDIA_DIRECTORY.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+CANVAS_MEDIA_DIRECTORY.mkdir(
+    parents=True,
+    exist_ok=True,
+)
+
+TEMPLATE_CANVAS_MEDIA_DIRECTORY.mkdir(
     parents=True,
     exist_ok=True,
 )
@@ -171,6 +194,120 @@ def snapshot_blocks(
         }
         for block in blocks
     ]
+
+
+def snapshot_canvas_elements(
+    page_id: int,
+    current_user: User,
+    db: Session,
+) -> tuple[list[dict], list[Path]]:
+    elements = db.scalars(
+        select(CanvasElement)
+        .where(
+            CanvasElement.user_id == current_user.id,
+            CanvasElement.page_id == page_id,
+            CanvasElement.surface_type == "page",
+        )
+        .order_by(CanvasElement.z_index, CanvasElement.id)
+    ).all()
+
+    snapshots: list[dict] = []
+    created_files: list[Path] = []
+
+    try:
+        for element in elements:
+            template_asset_stored_name = None
+            if element.asset_stored_name:
+                source = CANVAS_MEDIA_DIRECTORY / element.asset_stored_name
+                if not source.exists():
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Um arquivo do canvas não foi encontrado.",
+                    )
+                template_asset_stored_name = f"{uuid4().hex}{source.suffix.lower()}"
+                destination = TEMPLATE_CANVAS_MEDIA_DIRECTORY / template_asset_stored_name
+                copy2(source, destination)
+                created_files.append(destination)
+
+            snapshots.append({
+                "element_type": element.element_type,
+                "template_asset_stored_name": template_asset_stored_name,
+                "asset_original_name": element.asset_original_name,
+                "asset_mime_type": element.asset_mime_type,
+                "asset_size_bytes": element.asset_size_bytes,
+                "x": element.x,
+                "y": element.y,
+                "width": element.width,
+                "height": element.height,
+                "rotation": element.rotation,
+                "z_index": element.z_index,
+                "locked": element.locked,
+                "data": element.data,
+            })
+    except Exception:
+        for path in created_files:
+            if path.exists():
+                path.unlink()
+        raise
+
+    return snapshots, created_files
+
+
+def build_canvas_for_page(
+    page_id: int,
+    current_user: User,
+    elements_data: list[dict],
+) -> tuple[list[CanvasElement], list[Path]]:
+    rows: list[CanvasElement] = []
+    created_files: list[Path] = []
+
+    try:
+        for index, element in enumerate(elements_data):
+            stored_name = None
+            asset_url = None
+            template_stored = element.get("template_asset_stored_name")
+            if template_stored:
+                source = TEMPLATE_CANVAS_MEDIA_DIRECTORY / template_stored
+                if not source.exists():
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Um arquivo de canvas do template não foi encontrado.",
+                    )
+                stored_name = f"{uuid4().hex}{source.suffix.lower()}"
+                destination = CANVAS_MEDIA_DIRECTORY / stored_name
+                copy2(source, destination)
+                created_files.append(destination)
+                asset_url = f"/uploads/canvas_media/{stored_name}"
+
+            rows.append(
+                CanvasElement(
+                    user_id=current_user.id,
+                    page_id=page_id,
+                    surface_type="page",
+                    surface_key="",
+                    element_type=element.get("element_type", "text"),
+                    asset_stored_name=stored_name,
+                    asset_original_name=element.get("asset_original_name"),
+                    asset_mime_type=element.get("asset_mime_type"),
+                    asset_size_bytes=element.get("asset_size_bytes"),
+                    asset_url=asset_url,
+                    x=float(element.get("x", 40)),
+                    y=float(element.get("y", 40)),
+                    width=float(element.get("width", 200)),
+                    height=float(element.get("height", 120)),
+                    rotation=float(element.get("rotation", 0)),
+                    z_index=int(element.get("z_index", index)),
+                    locked=bool(element.get("locked", False)),
+                    data=element.get("data", {}),
+                )
+            )
+    except Exception:
+        for path in created_files:
+            if path.exists():
+                path.unlink()
+        raise
+
+    return rows, created_files
 
 
 def snapshot_media(
@@ -508,6 +645,12 @@ def save_page_as_template(
             db,
         )
     )
+    canvas_data, canvas_created_files = snapshot_canvas_elements(
+        page.id,
+        current_user,
+        db,
+    )
+    created_files.extend(canvas_created_files)
 
     template = PageTemplate(
         user_id=current_user.id,
@@ -516,6 +659,8 @@ def save_page_as_template(
             "page_title": page.title,
             "content": page.content,
             "paper_type": page.paper_type,
+            "paper_settings": dict(page.paper_settings or {}),
+            "canvas_elements": canvas_data,
             "blocks": snapshot_blocks(
                 page.id,
                 db,
@@ -617,6 +762,13 @@ def delete_page_template(
                     / stored_name
                 )
 
+        for element in template.template_data.get("canvas_elements", []):
+            stored_name = element.get("template_asset_stored_name")
+            if stored_name:
+                template_files.append(
+                    TEMPLATE_CANVAS_MEDIA_DIRECTORY / stored_name
+                )
+
     db.delete(template)
     db.commit()
 
@@ -672,8 +824,23 @@ def apply_template_to_page(
         for media in old_media
     ]
 
+    old_canvas = db.scalars(
+        select(CanvasElement).where(
+            CanvasElement.user_id == current_user.id,
+            CanvasElement.page_id == page.id,
+            CanvasElement.surface_type == "page",
+        )
+    ).all()
+    old_canvas_paths = [
+        CANVAS_MEDIA_DIRECTORY / element.asset_stored_name
+        for element in old_canvas
+        if element.asset_stored_name
+    ]
+
     new_media_rows: list[PageMedia] = []
     new_media_paths: list[Path] = []
+    new_canvas_rows: list[CanvasElement] = []
+    new_canvas_paths: list[Path] = []
 
     try:
         new_media_rows, new_media_paths = (
@@ -684,6 +851,12 @@ def apply_template_to_page(
                     [],
                 ),
             )
+        )
+
+        new_canvas_rows, new_canvas_paths = build_canvas_for_page(
+            page.id,
+            current_user,
+            data.get("canvas_elements", []),
         )
 
         db.execute(
@@ -702,6 +875,15 @@ def apply_template_to_page(
             )
         )
 
+        db.execute(
+            delete(CanvasElement)
+            .where(
+                CanvasElement.user_id == current_user.id,
+                CanvasElement.page_id == page.id,
+                CanvasElement.surface_type == "page",
+            )
+        )
+
         page.content = data.get(
             "content",
             "",
@@ -710,6 +892,13 @@ def apply_template_to_page(
             "paper_type",
             "blank",
         )
+        page.paper_settings = data.get(
+            "paper_settings",
+            {},
+        )
+
+        for element in new_canvas_rows:
+            db.add(element)
 
         for block in build_blocks_for_page(
             page.id,
@@ -729,13 +918,13 @@ def apply_template_to_page(
     except Exception:
         db.rollback()
 
-        for path in new_media_paths:
+        for path in new_media_paths + new_canvas_paths:
             if path.exists():
                 path.unlink()
 
         raise
 
-    for path in old_paths:
+    for path in old_paths + old_canvas_paths:
         if path.exists():
             path.unlink()
 
@@ -827,13 +1016,26 @@ def create_page_from_template(
             "paper_type",
             "blank",
         ),
+        paper_settings=data.get(
+            "paper_settings",
+            {},
+        ),
     )
 
     new_media_paths: list[Path] = []
+    new_canvas_paths: list[Path] = []
 
     try:
         db.add(page)
         db.flush()
+
+        canvas_rows, new_canvas_paths = build_canvas_for_page(
+            page.id,
+            current_user,
+            data.get("canvas_elements", []),
+        )
+        for element in canvas_rows:
+            db.add(element)
 
         for block in build_blocks_for_page(
             page.id,
@@ -863,7 +1065,7 @@ def create_page_from_template(
     except Exception:
         db.rollback()
 
-        for path in new_media_paths:
+        for path in new_media_paths + new_canvas_paths:
             if path.exists():
                 path.unlink()
 
