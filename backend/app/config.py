@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiration_minutes: int = 1440
 
+    vapid_public_key: str = ""
+    vapid_private_key_path: str = ""
+    vapid_subject: str = (
+        "mailto:planner@example.com"
+    )
+
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
         env_file_encoding="utf-8",

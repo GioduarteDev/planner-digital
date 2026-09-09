@@ -15,3 +15,6 @@ frontend/dist/
 
 # User uploads
 backend/uploads/
+
+# Web Push private keys
+backend/secrets/

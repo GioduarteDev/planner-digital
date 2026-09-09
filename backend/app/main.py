@@ -1,4 +1,5 @@
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -16,6 +17,10 @@ from app.routes.folders import router as folders_router
 from app.routes.media import router as media_router
 from app.routes.media_library import router as media_library_router
 from app.routes.page_templates import router as page_templates_router
+from app.routes.notifications import (
+    reminder_worker,
+    router as notifications_router,
+)
 from app.routes.pages import router as pages_router
 from app.routes.search import router as search_router
 from app.routes.studies import router as studies_router
@@ -24,7 +29,19 @@ from app.routes.tasks import router as tasks_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
+    reminder_task = asyncio.create_task(
+        reminder_worker()
+    )
+
+    try:
+        yield
+    finally:
+        reminder_task.cancel()
+
+        with suppress(
+            asyncio.CancelledError
+        ):
+            await reminder_task
 
 
 app = FastAPI(
@@ -72,6 +89,7 @@ app.include_router(blocks_router)
 app.include_router(media_router)
 app.include_router(media_library_router)
 app.include_router(page_templates_router)
+app.include_router(notifications_router)
 app.include_router(tasks_router)
 app.include_router(events_router)
 app.include_router(studies_router)

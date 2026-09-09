@@ -11,6 +11,7 @@ from sqlalchemy import (
     JSON,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import (
@@ -483,6 +484,84 @@ class PageTemplate(Base):
         DateTime,
         server_default=func.now(),
         onupdate=func.now(),
+    )
+
+
+class PushSubscription(Base):
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE",
+        ),
+        index=True,
+        nullable=False,
+    )
+
+    endpoint: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        unique=True,
+    )
+
+    p256dh: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    auth: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
+
+
+class EventReminderDelivery(Base):
+    __tablename__ = "event_reminder_deliveries"
+
+    __table_args__ = (
+        UniqueConstraint(
+            "event_id",
+            "signature",
+            name=(
+                "uq_event_reminder_"
+                "delivery_signature"
+            ),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    event_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "events.id",
+            ondelete="CASCADE",
+        ),
+        index=True,
+        nullable=False,
+    )
+
+    signature: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+    )
+
+    sent_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
     )
 
 
