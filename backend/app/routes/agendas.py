@@ -29,9 +29,13 @@ from app.models import (
 
 from app.schemas import (
     AgendaCreate,
+    AgendaPinResponse,
+    AgendaPinSet,
+    AgendaPinVerify,
     AgendaResponse,
     AgendaUpdate,
 )
+from app.security import hash_password, verify_password
 
 
 PAGE_MEDIA_DIRECTORY = Path(__file__).resolve().parents[2] / "uploads" / "page_media"
@@ -307,3 +311,79 @@ def delete_agenda(
     for path in file_paths:
         if path.exists():
             path.unlink()
+
+@router.put(
+    "/{agenda_id}/pin",
+    response_model=AgendaPinResponse,
+)
+def set_agenda_pin(
+    agenda_id: int,
+    data: AgendaPinSet,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    agenda = db.scalar(
+        select(Agenda).where(
+            Agenda.id == agenda_id,
+            Agenda.user_id == current_user.id,
+        )
+    )
+    if agenda is None:
+        raise HTTPException(status_code=404, detail="Agenda não encontrada.")
+
+    agenda.lock_pin_hash = hash_password(data.pin)
+    db.commit()
+    return AgendaPinResponse(locked=True, valid=True)
+
+
+@router.post(
+    "/{agenda_id}/verify-pin",
+    response_model=AgendaPinResponse,
+)
+def verify_agenda_pin(
+    agenda_id: int,
+    data: AgendaPinVerify,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    agenda = db.scalar(
+        select(Agenda).where(
+            Agenda.id == agenda_id,
+            Agenda.user_id == current_user.id,
+        )
+    )
+    if agenda is None:
+        raise HTTPException(status_code=404, detail="Agenda não encontrada.")
+    if agenda.lock_pin_hash is None:
+        return AgendaPinResponse(locked=False, valid=True)
+
+    valid = verify_password(data.pin, agenda.lock_pin_hash)
+    return AgendaPinResponse(locked=True, valid=valid)
+
+
+@router.delete(
+    "/{agenda_id}/pin",
+    response_model=AgendaPinResponse,
+)
+def remove_agenda_pin(
+    agenda_id: int,
+    data: AgendaPinVerify,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    agenda = db.scalar(
+        select(Agenda).where(
+            Agenda.id == agenda_id,
+            Agenda.user_id == current_user.id,
+        )
+    )
+    if agenda is None:
+        raise HTTPException(status_code=404, detail="Agenda não encontrada.")
+    if agenda.lock_pin_hash is None:
+        return AgendaPinResponse(locked=False, valid=True)
+    if not verify_password(data.pin, agenda.lock_pin_hash):
+        raise HTTPException(status_code=400, detail="PIN incorreto.")
+
+    agenda.lock_pin_hash = None
+    db.commit()
+    return AgendaPinResponse(locked=False, valid=True)

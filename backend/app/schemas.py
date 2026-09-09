@@ -235,6 +235,31 @@ class TokenResponse(BaseModel):
     user: UserResponse
 
 
+class AuthSessionResponse(BaseModel):
+    id: int
+    user_agent: str | None = None
+    ip_address: str | None = None
+    created_at: datetime
+    last_seen_at: datetime
+    revoked_at: datetime | None = None
+    active: bool = True
+    current: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(min_length=8, max_length=128)
+    confirmation: str = Field(min_length=6, max_length=20)
+
+    @field_validator("confirmation")
+    @classmethod
+    def validate_confirmation(cls, value: str) -> str:
+        if value.strip().upper() != "DELETE":
+            raise ValueError("Digite DELETE para confirmar a exclusão da conta.")
+        return "DELETE"
+
+
 class ProfileUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=120)
     username: str | None = Field(default=None, min_length=3, max_length=50)
