@@ -1,5 +1,7 @@
 import {
 
+  useCallback,
+
   useEffect,
 
   useMemo,
@@ -431,51 +433,53 @@ function CalendarPage() {
       'checking',
     )
 
-  async function getPushRegistration() {
-    const registration =
-      await navigator.serviceWorker
-        .register(
-          '/push-sw.js',
-        )
-
-    await navigator.serviceWorker.ready
-
-    return registration
-  }
-
-  async function refreshPushStatus() {
-    if (
-      !('serviceWorker' in navigator)
-      || !('PushManager' in window)
-      || !('Notification' in window)
-    ) {
-      setPushStatus('error')
-      return
-    }
-
-    try {
+  const getPushRegistration =
+    useCallback(async () => {
       const registration =
-        await getPushRegistration()
+        await navigator.serviceWorker
+          .register(
+            '/push-sw.js',
+          )
 
-      const subscription =
-        await registration
-          .pushManager
-          .getSubscription()
+      await navigator.serviceWorker.ready
 
+      return registration
+    }, [])
+
+  const refreshPushStatus =
+    useCallback(async () => {
       if (
-        Notification.permission
-          === 'granted'
-        && subscription
+        !('serviceWorker' in navigator)
+        || !('PushManager' in window)
+        || !('Notification' in window)
       ) {
-        setPushStatus('enabled')
-      } else {
-        setPushStatus('disabled')
+        setPushStatus('error')
+        return
       }
-    } catch (error) {
-      console.error(error)
-      setPushStatus('error')
-    }
-  }
+
+      try {
+        const registration =
+          await getPushRegistration()
+
+        const subscription =
+          await registration
+            .pushManager
+            .getSubscription()
+
+        if (
+          Notification.permission
+            === 'granted'
+          && subscription
+        ) {
+          setPushStatus('enabled')
+        } else {
+          setPushStatus('disabled')
+        }
+      } catch (error) {
+        console.error(error)
+        setPushStatus('error')
+      }
+    }, [getPushRegistration])
 
   async function enableNotifications() {
     if (
@@ -647,18 +651,19 @@ function CalendarPage() {
       }
     }
   }
-useEffect(() => {
-  const timeoutId =
-    window.setTimeout(() => {
-      void refreshPushStatus()
-    }, 0)
 
-  return () => {
-    window.clearTimeout(
-      timeoutId,
-    )
-  }
-}, [])
+  useEffect(() => {
+    const timeoutId =
+      window.setTimeout(() => {
+        void refreshPushStatus()
+      }, 0)
+
+    return () => {
+      window.clearTimeout(
+        timeoutId,
+      )
+    }
+  }, [refreshPushStatus])
 
   useEffect(() => {
 
@@ -2600,6 +2605,12 @@ useEffect(() => {
                 <option value="">
 
                   Sem lembrete
+
+                </option>
+
+                <option value="0">
+
+                  Na hora do evento
 
                 </option>
 
