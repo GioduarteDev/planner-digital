@@ -1,10 +1,8 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app import models  # noqa: F401
@@ -25,6 +23,7 @@ from app.routes.page_templates import router as page_templates_router
 from app.routes.pages import router as pages_router
 from app.routes.presets import router as presets_router
 from app.routes.profile import router as profile_router
+from app.routes.private_uploads import router as private_uploads_router
 from app.routes.projects import router as projects_router
 from app.routes.reminders import router as reminders_router
 from app.routes.search import router as search_router
@@ -59,12 +58,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOADS_DIRECTORY = Path(__file__).resolve().parents[1] / "uploads"
-UPLOADS_DIRECTORY.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOADS_DIRECTORY), name="uploads")
-
 app.include_router(auth_router)
 app.include_router(profile_router)
+app.include_router(private_uploads_router)
 app.include_router(agendas_router)
 app.include_router(pages_router)
 app.include_router(folders_router)
