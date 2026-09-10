@@ -69,7 +69,18 @@ def search_planner(
         ).limit(20)
     ).all()
     for task in tasks:
-        page = db.get(Page, task.page_id) if task.page_id is not None else None
+        page = (
+            db.scalar(
+                select(Page)
+                .join(Agenda, Page.agenda_id == Agenda.id)
+                .where(
+                    Page.id == task.page_id,
+                    Agenda.user_id == current_user.id,
+                )
+            )
+            if task.page_id is not None
+            else None
+        )
         results.append(
             SearchResult(
                 type="task",
@@ -145,7 +156,18 @@ def search_planner(
         ).limit(20)
     ).all()
     for element in elements:
-        page = db.get(Page, element.page_id) if element.page_id is not None else None
+        page = (
+            db.scalar(
+                select(Page)
+                .join(Agenda, Page.agenda_id == Agenda.id)
+                .where(
+                    Page.id == element.page_id,
+                    Agenda.user_id == current_user.id,
+                )
+            )
+            if element.page_id is not None
+            else None
+        )
         label = element.data.get("text") if isinstance(element.data, dict) else None
         if not isinstance(label, str) or not label.strip():
             label = element.element_type
