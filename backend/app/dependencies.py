@@ -1,32 +1,65 @@
 from datetime import datetime, timedelta, timezone
+import secrets
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models import AuthSession, User
 from app.security import decode_access_token_payload
 
-bearer_scheme = HTTPBearer(auto_error=False)
-
 
 def get_token_payload(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    request: Request,
 ) -> dict[str, int | str | None]:
-    if credentials is None:
+    token = request.cookies.get(
+        settings.auth_cookie_name
+    )
+
+    if token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário não autenticado.",
+            detail="Usu?rio n?o autenticado.",
         )
 
-    payload = decode_access_token_payload(credentials.credentials)
+    if request.method.upper() in {
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+    }:
+        csrf_cookie = request.cookies.get(
+            settings.csrf_cookie_name
+        )
+        csrf_header = request.headers.get(
+            "x-csrf-token"
+        )
+
+        if (
+            not csrf_cookie
+            or not csrf_header
+            or not secrets.compare_digest(
+                csrf_cookie,
+                csrf_header,
+            )
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Token CSRF inv?lido.",
+            )
+
+    payload = decode_access_token_payload(
+        token
+    )
+
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token inválido ou expirado.",
+            detail="Sess?o inv?lida ou expirada.",
         )
+
     return payload
 
 

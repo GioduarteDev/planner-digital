@@ -68,28 +68,39 @@ function LibraryPage() {
     isLoading,
     setIsLoading,
   ] = useState(true)
-  function handleLogout() {
-  const confirmed =
-    window.confirm(
-      'Deseja sair da sua conta?',
-    )
+  async function handleLogout() {
+    const confirmed =
+      window.confirm(
+        'Deseja sair da sua conta?',
+      )
 
+    if (!confirmed) {
+      return
+    }
 
-  if (!confirmed) {
-    return
+    try {
+      await apiRequest<void>(
+        '/auth/logout',
+        {
+          method: 'POST',
+        },
+      )
+    } catch (error) {
+      console.error(
+        'Erro ao encerrar sess?o:',
+        error,
+      )
+    } finally {
+      clearAuth()
+
+      navigate(
+        '/login',
+        {
+          replace: true,
+        },
+      )
+    }
   }
-
-
-  clearAuth()
-
-
-  navigate(
-    '/login',
-    {
-      replace: true,
-    },
-  )
-}
 
 
   useEffect(() => {

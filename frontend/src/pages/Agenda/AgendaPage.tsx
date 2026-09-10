@@ -30,12 +30,15 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
-import { apiRequest } from '../../services/api'
+import {
+  apiRequest,
+  API_URL,
+  getCsrfToken,
+} from '../../services/api'
 import './AgendaPage.css'
 
 const MAX_PAGES = 400
-const API_BASE_URL = 'http://127.0.0.1:8000'
-const TOKEN_KEY = 'planner-access-token'
+const API_BASE_URL = API_URL
 
 type TaskPriority = 'low' | 'medium' | 'high'
 
@@ -3643,11 +3646,6 @@ function AgendaPage() {
     setLibraryError('')
 
     try {
-      const token =
-        localStorage.getItem(
-          TOKEN_KEY,
-        )
-
       const formData =
         new FormData()
 
@@ -3683,12 +3681,11 @@ function AgendaPage() {
         `${API_BASE_URL}/library/media`,
         {
           method: 'POST',
-          headers: token
-            ? {
-                Authorization:
-                  `Bearer ${token}`,
-              }
-            : undefined,
+          headers: {
+            'X-CSRF-Token':
+              getCsrfToken() ?? '',
+          },
+          credentials: 'include',
           body: formData,
         },
       )
@@ -3931,11 +3928,6 @@ function AgendaPage() {
     setMediaError('')
 
     try {
-      const token =
-        localStorage.getItem(
-          TOKEN_KEY,
-        )
-
       const formData =
         new FormData()
 
@@ -3952,12 +3944,11 @@ function AgendaPage() {
         `${API_BASE_URL}/pages/${activePageId}/media`,
         {
           method: 'POST',
-          headers: token
-            ? {
-                Authorization:
-                  `Bearer ${token}`,
-              }
-            : undefined,
+          headers: {
+            'X-CSRF-Token':
+              getCsrfToken() ?? '',
+          },
+          credentials: 'include',
           body: formData,
         },
       )

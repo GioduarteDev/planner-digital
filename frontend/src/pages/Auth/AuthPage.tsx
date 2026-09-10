@@ -31,8 +31,6 @@ type UserFromApi = {
 
 
 type AuthResponse = {
-  access_token: string
-  token_type: string
   user: UserFromApi
 }
 
@@ -124,7 +122,6 @@ function AuthPage() {
 
 
       saveAuth(
-        response.access_token,
         response.user,
       )
 

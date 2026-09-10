@@ -1,16 +1,18 @@
 from datetime import datetime, timezone
+import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_session_key, get_current_user
 from app.models import Agenda, AuthSession, User
 from app.schemas import (
     AuthSessionResponse,
     LoginRequest,
-    TokenResponse,
+    AuthResponse,
     UserCreate,
     UserResponse,
 )
@@ -58,8 +60,8 @@ def _session_response(item: AuthSession, current_key: str | None) -> AuthSession
     )
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(data: UserCreate, request: Request, db: Session = Depends(get_db)):
+@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+def register(data: UserCreate, request: Request, response: Response, db: Session = Depends(get_db)):
     existing_user = db.scalar(select(User).where(User.email == data.email))
     if existing_user:
         raise HTTPException(status_code=400, detail="Já existe uma conta com este e-mail.")
@@ -89,11 +91,12 @@ def register(data: UserCreate, request: Request, db: Session = Depends(get_db)):
     db.refresh(user)
 
     token = create_access_token(user.id, auth_session.session_key)
-    return {"access_token": token, "token_type": "bearer", "user": user}
+    _set_auth_cookies(response, token)
+    return {"user": user}
 
 
-@router.post("/login", response_model=TokenResponse)
-def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
+@router.post("/login", response_model=AuthResponse)
+def login(data: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == data.email))
     if user is None or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
@@ -103,7 +106,8 @@ def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
     db.refresh(user)
 
     token = create_access_token(user.id, auth_session.session_key)
-    return {"access_token": token, "token_type": "bearer", "user": user}
+    _set_auth_cookies(response, token)
+    return {"user": user}
 
 
 @router.get("/me", response_model=UserResponse)
@@ -168,6 +172,7 @@ def revoke_other_sessions(
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     current_key: str | None = Depends(get_current_session_key),
@@ -184,4 +189,6 @@ def logout(
         if item is not None and item.revoked_at is None:
             item.revoked_at = datetime.now(timezone.utc)
             db.commit()
+
+    _clear_auth_cookies(response)
     return None

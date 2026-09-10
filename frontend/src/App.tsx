@@ -1,5 +1,7 @@
-import type {
-  ReactNode,
+import {
+  useEffect,
+  useState,
+  type ReactNode,
 } from 'react'
 
 import {
@@ -21,21 +23,27 @@ import LibraryPage
 import TodayPage
   from './pages/Today/TodayPage'
 
-import {
-  getAccessToken,
-} from './services/api'
-
 import CalendarPage
   from './pages/Calendar/CalendarPage'
 
-  import ReminderWatcher
-  from './components/ReminderWatcher'
-
 import StudiesPage
-  from './pages/Studies/StudiesPage'  
+  from './pages/Studies/StudiesPage'
 
 import SearchPage
   from './pages/Search/SearchPage'
+
+import ReminderWatcher
+  from './components/ReminderWatcher'
+
+import {
+  apiRequest,
+} from './services/api'
+
+
+type AuthState =
+  | 'checking'
+  | 'authenticated'
+  | 'guest'
 
 
 function ProtectedRoute({
@@ -43,11 +51,57 @@ function ProtectedRoute({
 }: {
   children: ReactNode
 }) {
-  const token =
-    getAccessToken()
+  const [
+    authState,
+    setAuthState,
+  ] =
+    useState<AuthState>(
+      'checking',
+    )
 
+  useEffect(() => {
+    let cancelled = false
 
-  if (!token) {
+    async function checkSession() {
+      try {
+        await apiRequest(
+          '/auth/me',
+        )
+
+        if (!cancelled) {
+          setAuthState(
+            'authenticated',
+          )
+        }
+      } catch {
+        if (!cancelled) {
+          setAuthState(
+            'guest',
+          )
+        }
+      }
+    }
+
+    void checkSession()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (
+    authState === 'checking'
+  ) {
+    return (
+      <main>
+        Carregando...
+      </main>
+    )
+  }
+
+  if (
+    authState === 'guest'
+  ) {
     return (
       <Navigate
         to="/login"
@@ -56,14 +110,13 @@ function ProtectedRoute({
     )
   }
 
-
   return (
-  <>
-    <ReminderWatcher />
+    <>
+      <ReminderWatcher />
 
-    {children}
-  </>
-)
+      {children}
+    </>
+  )
 }
 
 
@@ -78,7 +131,6 @@ function App() {
           }
         />
 
-
         <Route
           path="/"
           element={
@@ -88,7 +140,6 @@ function App() {
           }
         />
 
-
         <Route
           path="/today"
           element={
@@ -97,32 +148,33 @@ function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
-        path="/calendar"
-        element={
-        <ProtectedRoute>
-        <CalendarPage />
-    </ProtectedRoute>
-  }
-/>
+          path="/calendar"
+          element={
+            <ProtectedRoute>
+              <CalendarPage />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-  path="/studies"
-  element={
-    <ProtectedRoute>
-      <StudiesPage />
-    </ProtectedRoute>
-  }
-/>  
-  <Route
-  path="/search"
-  element={
-    <ProtectedRoute>
-      <SearchPage />
-    </ProtectedRoute>
-  }
-/>
+        <Route
+          path="/studies"
+          element={
+            <ProtectedRoute>
+              <StudiesPage />
+            </ProtectedRoute>
+          }
+        />
 
+        <Route
+          path="/search"
+          element={
+            <ProtectedRoute>
+              <SearchPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/agenda/:id"
