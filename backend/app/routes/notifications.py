@@ -309,6 +309,7 @@ def subscribe(
     existing = db.scalar(
         select(PushSubscription).where(PushSubscription.endpoint == payload.endpoint)
     )
+
     if existing is None:
         db.add(
             PushSubscription(
@@ -318,10 +319,17 @@ def subscribe(
                 auth=payload.keys.auth,
             )
         )
+
+    elif existing.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Esta assinatura pertence a outra conta.",
+        )
+
     else:
-        existing.user_id = current_user.id
         existing.p256dh = payload.keys.p256dh
         existing.auth = payload.keys.auth
+
     db.commit()
     return {"subscribed": True}
 
