@@ -33,6 +33,8 @@ class Settings(BaseSettings):
 
     app_env: Literal["development", "test", "production"] = "development"
 
+    cors_origins: str = ""
+
     auth_cookie_name: str = "planner_session"
     csrf_cookie_name: str = "planner_csrf"
     cookie_secure: bool = False
@@ -43,6 +45,14 @@ class Settings(BaseSettings):
     vapid_subject: str = (
         "mailto:planner@example.com"
     )
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [
+            origin.strip().rstrip("/")
+            for origin in self.cors_origins.split(",")
+            if origin.strip()
+        ]
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
@@ -60,6 +70,29 @@ class Settings(BaseSettings):
             raise ValueError(
                 "SameSite=None exige cookie Secure."
             )
+
+        for origin in self.cors_origin_list:
+            if "*" in origin:
+                raise ValueError(
+                    "CORS_ORIGINS n?o aceita wildcard."
+                )
+
+            if not origin.startswith(
+                ("http://", "https://")
+            ):
+                raise ValueError(
+                    "Cada origem CORS precisa come?ar "
+                    "com http:// ou https://."
+                )
+
+            if (
+                self.app_env == "production"
+                and not origin.startswith("https://")
+            ):
+                raise ValueError(
+                    "CORS_ORIGINS deve usar HTTPS "
+                    "em produ??o."
+                )
 
         return self
 

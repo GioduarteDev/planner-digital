@@ -90,12 +90,14 @@ def _rate_limit_ip(
     return "unknown"
 
 
-def _request_ip(request: Request) -> str | None:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",", 1)[0].strip()[:64]
+def _request_ip(
+    request: Request,
+) -> str | None:
     if request.client:
-        return str(request.client.host)[:64]
+        return str(
+            request.client.host
+        )[:64]
+
     return None
 
 
