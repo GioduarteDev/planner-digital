@@ -56,6 +56,26 @@ ALLOWED_MIME_TYPES = {
 }
 
 
+def _detect_image_mime(header: bytes) -> str | None:
+    if len(header) >= 8 and header.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+
+    if len(header) >= 3 and header[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+
+    if len(header) >= 6 and header[:6] in (b"GIF87a", b"GIF89a"):
+        return "image/gif"
+
+    if (
+        len(header) >= 12
+        and header[:4] == b"RIFF"
+        and header[8:12] == b"WEBP"
+    ):
+        return "image/webp"
+
+    return None
+
+
 def get_user_page(
     page_id: int,
     current_user: User,
@@ -176,17 +196,45 @@ async def upload_page_media(
             ),
         )
 
-    if file.content_type not in ALLOWED_MIME_TYPES:
+    declared_mime = (
+        file.content_type or ""
+    ).lower()
+
+    if declared_mime not in ALLOWED_MIME_TYPES:
+        await file.close()
+
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail=(
-                "Formato não permitido. "
+                "Formato n?o permitido. "
                 "Use JPG, PNG, WEBP ou GIF."
             ),
         )
 
+    first_chunk = await file.read(
+        1024 * 1024
+    )
+
+    detected_mime = _detect_image_mime(
+        first_chunk[:32]
+    )
+
+    if (
+        detected_mime is None
+        or detected_mime != declared_mime
+    ):
+        await file.close()
+
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail=(
+                "O conte?do do arquivo n?o "
+                "corresponde a uma imagem v?lida."
+            ),
+        )
+
     extension = ALLOWED_MIME_TYPES[
-        file.content_type
+        detected_mime
     ]
 
     stored_name = (
@@ -202,28 +250,28 @@ async def upload_page_media(
 
     try:
         with destination.open("wb") as output:
-            while True:
+            chunk = first_chunk
+
+            while chunk:
+                total_size += len(chunk)
+
+                if total_size > MAX_FILE_SIZE:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail="Arquivo maior que 10 MB.",
+                    )
+
+                output.write(chunk)
+
                 chunk = await file.read(
                     1024 * 1024
                 )
 
-                if not chunk:
-                    break
+    except Exception:
+        if destination.exists():
+            destination.unlink()
 
-                total_size += len(chunk)
-
-                if total_size > MAX_FILE_SIZE:
-                    if destination.exists():
-                        destination.unlink()
-
-                    raise HTTPException(
-                        status_code=413,
-                        detail=(
-                            "Arquivo maior que 10 MB."
-                        ),
-                    )
-
-                output.write(chunk)
+        raise
 
     finally:
         await file.close()
@@ -260,7 +308,7 @@ async def upload_page_media(
         media_type=media_type,
         original_name=original_name,
         stored_name=stored_name,
-        mime_type=file.content_type,
+        mime_type=detected_mime,
         size_bytes=total_size,
         file_url=file_url,
         z_index=new_z_index,

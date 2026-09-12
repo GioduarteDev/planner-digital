@@ -9,7 +9,7 @@ from fastapi import (
     HTTPException,
     status,
 )
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -81,11 +81,25 @@ MAX_PAGES_PER_AGENDA = 400
 
 
 class PageTemplateCreate(BaseModel):
-    name: str
+    name: str = Field(
+        min_length=1,
+        max_length=150,
+    )
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True
+    )
 
 
 class PageTemplateUpdate(BaseModel):
-    name: str
+    name: str = Field(
+        min_length=1,
+        max_length=150,
+    )
+
+    model_config = ConfigDict(
+        str_strip_whitespace=True
+    )
 
 
 class PageTemplateResponse(BaseModel):

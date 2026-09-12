@@ -1,16 +1,22 @@
 from datetime import datetime, timezone
+import secrets
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_session_key, get_current_user
 from app.models import Agenda, AuthSession, User
+from app.rate_limit import (
+    login_rate_limiter,
+    register_rate_limiter,
+)
 from app.schemas import (
     AuthSessionResponse,
     LoginRequest,
-    TokenResponse,
+    AuthResponse,
     UserCreate,
     UserResponse,
 )
@@ -24,12 +30,79 @@ from app.security import (
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
 
-def _request_ip(request: Request) -> str | None:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",", 1)[0].strip()[:64]
+
+DUMMY_PASSWORD_HASH = hash_password(
+    "planner-invalid-login"
+)
+
+
+def _set_auth_cookies(
+    response: Response,
+    token: str,
+) -> None:
+    csrf_token = secrets.token_urlsafe(32)
+    max_age = settings.jwt_expiration_minutes * 60
+
+    response.set_cookie(
+        key=settings.auth_cookie_name,
+        value=token,
+        max_age=max_age,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        path="/",
+    )
+
+    response.set_cookie(
+        key=settings.csrf_cookie_name,
+        value=csrf_token,
+        max_age=max_age,
+        httponly=False,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        path="/",
+    )
+
+
+def _clear_auth_cookies(
+    response: Response,
+) -> None:
+    response.delete_cookie(
+        key=settings.auth_cookie_name,
+        path="/",
+        secure=settings.cookie_secure,
+        httponly=True,
+        samesite=settings.cookie_samesite,
+    )
+
+    response.delete_cookie(
+        key=settings.csrf_cookie_name,
+        path="/",
+        secure=settings.cookie_secure,
+        httponly=False,
+        samesite=settings.cookie_samesite,
+    )
+
+
+def _rate_limit_ip(
+    request: Request,
+) -> str:
     if request.client:
-        return str(request.client.host)[:64]
+        return str(
+            request.client.host
+        )[:64]
+
+    return "unknown"
+
+
+def _request_ip(
+    request: Request,
+) -> str | None:
+    if request.client:
+        return str(
+            request.client.host
+        )[:64]
+
     return None
 
 
@@ -58,8 +131,11 @@ def _session_response(item: AuthSession, current_key: str | None) -> AuthSession
     )
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(data: UserCreate, request: Request, db: Session = Depends(get_db)):
+@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+def register(data: UserCreate, request: Request, response: Response, db: Session = Depends(get_db)):
+    register_rate_limiter.check(
+        _rate_limit_ip(request)
+    )
     existing_user = db.scalar(select(User).where(User.email == data.email))
     if existing_user:
         raise HTTPException(status_code=400, detail="Já existe uma conta com este e-mail.")
@@ -89,21 +165,45 @@ def register(data: UserCreate, request: Request, db: Session = Depends(get_db)):
     db.refresh(user)
 
     token = create_access_token(user.id, auth_session.session_key)
-    return {"access_token": token, "token_type": "bearer", "user": user}
+    _set_auth_cookies(response, token)
+    return {"user": user}
 
 
-@router.post("/login", response_model=TokenResponse)
-def login(data: LoginRequest, request: Request, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(User.email == data.email))
-    if user is None or not verify_password(data.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
+@router.post("/login", response_model=AuthResponse)
+def login(data: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    login_rate_limiter.check(
+        _rate_limit_ip(request)
+    )
+    user = db.scalar(
+        select(User).where(
+            User.email == data.email
+        )
+    )
+
+    password_hash_to_check = (
+        user.password_hash
+        if user is not None
+        else DUMMY_PASSWORD_HASH
+    )
+
+    password_valid = verify_password(
+        data.password,
+        password_hash_to_check,
+    )
+
+    if user is None or not password_valid:
+        raise HTTPException(
+            status_code=401,
+            detail="E-mail ou senha incorretos.",
+        )
 
     auth_session = _create_session(user, request, db)
     db.commit()
     db.refresh(user)
 
     token = create_access_token(user.id, auth_session.session_key)
-    return {"access_token": token, "token_type": "bearer", "user": user}
+    _set_auth_cookies(response, token)
+    return {"user": user}
 
 
 @router.get("/me", response_model=UserResponse)
@@ -168,6 +268,7 @@ def revoke_other_sessions(
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
+    response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     current_key: str | None = Depends(get_current_session_key),
@@ -184,4 +285,6 @@ def logout(
         if item is not None and item.revoked_at is None:
             item.revoked_at = datetime.now(timezone.utc)
             db.commit()
+
+    _clear_auth_cookies(response)
     return None

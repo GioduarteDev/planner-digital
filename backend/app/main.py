@@ -1,13 +1,12 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
-from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app import models  # noqa: F401
+from app.config import settings
 from app.database import engine
 from app.routes.agendas import router as agendas_router
 from app.routes.auth import router as auth_router
@@ -25,6 +24,7 @@ from app.routes.page_templates import router as page_templates_router
 from app.routes.pages import router as pages_router
 from app.routes.presets import router as presets_router
 from app.routes.profile import router as profile_router
+from app.routes.private_uploads import router as private_uploads_router
 from app.routes.projects import router as projects_router
 from app.routes.reminders import router as reminders_router
 from app.routes.search import router as search_router
@@ -45,26 +45,108 @@ async def lifespan(app: FastAPI):
             await reminder_task
 
 
+is_production = (
+    settings.app_env == "production"
+)
+
+
 app = FastAPI(
     title="Planner Digital API",
     version="1.1.0",
     lifespan=lifespan,
+    docs_url=None if is_production else "/docs",
+    redoc_url=None if is_production else "/redoc",
+    openapi_url=None if is_production else "/openapi.json",
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_common = {
+    "allow_credentials": True,
+    "allow_methods": [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "OPTIONS",
+    ],
+    "allow_headers": [
+        "Accept",
+        "Content-Type",
+        "X-CSRF-Token",
+    ],
+    "expose_headers": [
+        "Retry-After",
+        "Content-Disposition",
+    ],
+}
 
-UPLOADS_DIRECTORY = Path(__file__).resolve().parents[1] / "uploads"
-UPLOADS_DIRECTORY.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOADS_DIRECTORY), name="uploads")
+
+if is_production:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origin_list,
+        **cors_common,
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=(
+            r"^https?://"
+            r"(localhost|127\.0\.0\.1)"
+            r"(:\d+)?$"
+        ),
+        **cors_common,
+    )
+
+
+@app.middleware("http")
+async def add_security_headers(
+    request: Request,
+    call_next,
+):
+    response = await call_next(request)
+
+    response.headers[
+        "X-Content-Type-Options"
+    ] = "nosniff"
+
+    response.headers[
+        "X-Frame-Options"
+    ] = "DENY"
+
+    response.headers[
+        "Referrer-Policy"
+    ] = "no-referrer"
+
+    response.headers[
+        "Permissions-Policy"
+    ] = (
+        "camera=(), "
+        "microphone=(), "
+        "geolocation=()"
+    )
+
+    if is_production:
+        response.headers[
+            "Strict-Transport-Security"
+        ] = (
+            "max-age=31536000; "
+            "includeSubDomains"
+        )
+
+        response.headers[
+            "Content-Security-Policy"
+        ] = (
+            "default-src 'none'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'none'"
+        )
+
+    return response
 
 app.include_router(auth_router)
 app.include_router(profile_router)
+app.include_router(private_uploads_router)
 app.include_router(agendas_router)
 app.include_router(pages_router)
 app.include_router(folders_router)
@@ -98,8 +180,11 @@ def health_check():
     return {"status": "ok"}
 
 
-@app.get("/db-health")
-def database_health_check():
-    with engine.connect() as connection:
-        connection.execute(text("SELECT 1"))
-    return {"database": "ok"}
+if not is_production:
+    @app.get("/db-health")
+    def database_health_check():
+        with engine.connect() as connection:
+            connection.execute(
+                text("SELECT 1")
+            )
+        return {"database": "ok"}

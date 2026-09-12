@@ -1,7 +1,9 @@
 from datetime import date, datetime
-from typing import Any, Literal
+import json
+from typing import Annotated, Any, Literal
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     ConfigDict,
     Field,
@@ -34,6 +36,37 @@ PresetType = Literal[
 ]
 
 
+MAX_JSON_BYTES = 64 * 1024
+
+
+def _validate_bounded_json(
+    value: dict[str, Any],
+) -> dict[str, Any]:
+    try:
+        encoded = json.dumps(
+            value,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "O conte?do precisa ser um JSON v?lido."
+        ) from exc
+
+    if len(encoded) > MAX_JSON_BYTES:
+        raise ValueError(
+            "O conte?do JSON excede o limite de 64 KB."
+        )
+
+    return value
+
+
+BoundedJsonDict = Annotated[
+    dict[str, Any],
+    AfterValidator(_validate_bounded_json),
+]
+
+
 # =========================
 # AGENDAS
 # =========================
@@ -42,7 +75,7 @@ class AgendaCreate(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     cover_color: str = "#f0ece8"
     cover_image_url: str | None = None
-    settings: dict[str, Any] = Field(default_factory=dict)
+    settings: BoundedJsonDict = Field(default_factory=dict)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -51,7 +84,7 @@ class AgendaUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=120)
     cover_color: str | None = None
     cover_image_url: str | None = None
-    settings: dict[str, Any] | None = None
+    settings: BoundedJsonDict | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -89,17 +122,17 @@ class AgendaPinResponse(BaseModel):
 class PageCreate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     paper_type: PaperType = "blank"
-    paper_settings: dict[str, Any] = Field(default_factory=dict)
+    paper_settings: BoundedJsonDict = Field(default_factory=dict)
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class PageUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
-    content: str | None = None
+    content: str | None = Field(default=None, max_length=100000)
     favorite: bool | None = None
     paper_type: PaperType | None = None
-    paper_settings: dict[str, Any] | None = None
+    paper_settings: BoundedJsonDict | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -229,9 +262,7 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
+class AuthResponse(BaseModel):
     user: UserResponse
 
 
@@ -279,7 +310,7 @@ class ProfileUpdate(BaseModel):
 
 
 class SettingsUpdate(BaseModel):
-    settings: dict[str, Any]
+    settings: BoundedJsonDict
 
 
 class ChangePasswordRequest(BaseModel):
@@ -466,27 +497,27 @@ class CanvasElementCreate(BaseModel):
     surface_key: str = Field(default="", max_length=120)
     page_id: int | None = None
     element_type: str = Field(min_length=1, max_length=40)
-    x: float = 40
-    y: float = 40
-    width: float = Field(default=200, gt=0)
-    height: float = Field(default=120, gt=0)
-    rotation: float = 0
-    z_index: int = 0
+    x: float = Field(default=40, ge=-100000, le=100000, allow_inf_nan=False)
+    y: float = Field(default=40, ge=-100000, le=100000, allow_inf_nan=False)
+    width: float = Field(default=200, gt=0, le=20000, allow_inf_nan=False)
+    height: float = Field(default=120, gt=0, le=20000, allow_inf_nan=False)
+    rotation: float = Field(default=0, ge=-36000, le=36000, allow_inf_nan=False)
+    z_index: int = Field(default=0, ge=-100000, le=100000)
     locked: bool = False
-    data: dict[str, Any] = Field(default_factory=dict)
+    data: BoundedJsonDict = Field(default_factory=dict)
 
 
 class CanvasElementUpdate(BaseModel):
     surface_key: str | None = Field(default=None, max_length=120)
     element_type: str | None = Field(default=None, min_length=1, max_length=40)
-    x: float | None = None
-    y: float | None = None
-    width: float | None = Field(default=None, gt=0)
-    height: float | None = Field(default=None, gt=0)
-    rotation: float | None = None
-    z_index: int | None = None
+    x: float | None = Field(default=None, ge=-100000, le=100000, allow_inf_nan=False)
+    y: float | None = Field(default=None, ge=-100000, le=100000, allow_inf_nan=False)
+    width: float | None = Field(default=None, gt=0, le=20000, allow_inf_nan=False)
+    height: float | None = Field(default=None, gt=0, le=20000, allow_inf_nan=False)
+    rotation: float | None = Field(default=None, ge=-36000, le=36000, allow_inf_nan=False)
+    z_index: int | None = Field(default=None, ge=-100000, le=100000)
     locked: bool | None = None
-    data: dict[str, Any] | None = None
+    data: BoundedJsonDict | None = None
 
 
 class CanvasElementResponse(BaseModel):
@@ -558,13 +589,13 @@ class ReminderResponse(BaseModel):
 class UserPresetCreate(BaseModel):
     preset_type: PresetType
     name: str = Field(min_length=1, max_length=120)
-    data: dict[str, Any] = Field(default_factory=dict)
+    data: BoundedJsonDict = Field(default_factory=dict)
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class UserPresetUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
-    data: dict[str, Any] | None = None
+    data: BoundedJsonDict | None = None
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
@@ -582,14 +613,14 @@ class UserPresetResponse(BaseModel):
 class StationeryKitCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: str = Field(default="", max_length=2000)
-    data: dict[str, Any] = Field(default_factory=dict)
+    data: BoundedJsonDict = Field(default_factory=dict)
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class StationeryKitUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     description: str | None = Field(default=None, max_length=2000)
-    data: dict[str, Any] | None = None
+    data: BoundedJsonDict | None = None
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
@@ -642,12 +673,12 @@ class FolderResponse(BaseModel):
 
 
 class FolderReorderRequest(BaseModel):
-    folder_ids: list[int]
+    folder_ids: list[int] = Field(max_length=400)
 
 
 class PageReorderRequest(BaseModel):
     folder_id: int | None = None
-    page_ids: list[int]
+    page_ids: list[int] = Field(max_length=400)
 
 
 # =========================
@@ -656,12 +687,12 @@ class PageReorderRequest(BaseModel):
 
 class PageBlockCreate(BaseModel):
     block_type: BlockType = "text"
-    data: dict[str, Any] = Field(default_factory=dict)
+    data: BoundedJsonDict = Field(default_factory=dict)
 
 
 class PageBlockUpdate(BaseModel):
     block_type: BlockType | None = None
-    data: dict[str, Any] | None = None
+    data: BoundedJsonDict | None = None
 
 
 class PageBlockResponse(BaseModel):
@@ -676,7 +707,7 @@ class PageBlockResponse(BaseModel):
 
 
 class PageBlockReorderRequest(BaseModel):
-    block_ids: list[int]
+    block_ids: list[int] = Field(max_length=2000)
 
 
 # =========================
@@ -684,12 +715,12 @@ class PageBlockReorderRequest(BaseModel):
 # =========================
 
 class PageMediaUpdate(BaseModel):
-    x: int | None = None
-    y: int | None = None
-    width: int | None = None
-    height: int | None = None
-    rotation: int | None = None
-    z_index: int | None = None
+    x: int | None = Field(default=None, ge=-100000, le=100000)
+    y: int | None = Field(default=None, ge=-100000, le=100000)
+    width: int | None = Field(default=None, ge=1, le=20000)
+    height: int | None = Field(default=None, ge=1, le=20000)
+    rotation: int | None = Field(default=None, ge=-36000, le=36000)
+    z_index: int | None = Field(default=None, ge=-100000, le=100000)
     locked: bool | None = None
 
 
