@@ -26,6 +26,54 @@ from app.security import (
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
 
+
+def _set_auth_cookies(
+    response: Response,
+    token: str,
+) -> None:
+    csrf_token = secrets.token_urlsafe(32)
+    max_age = settings.jwt_expiration_minutes * 60
+
+    response.set_cookie(
+        key=settings.auth_cookie_name,
+        value=token,
+        max_age=max_age,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        path="/",
+    )
+
+    response.set_cookie(
+        key=settings.csrf_cookie_name,
+        value=csrf_token,
+        max_age=max_age,
+        httponly=False,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        path="/",
+    )
+
+
+def _clear_auth_cookies(
+    response: Response,
+) -> None:
+    response.delete_cookie(
+        key=settings.auth_cookie_name,
+        path="/",
+        secure=settings.cookie_secure,
+        httponly=True,
+        samesite=settings.cookie_samesite,
+    )
+
+    response.delete_cookie(
+        key=settings.csrf_cookie_name,
+        path="/",
+        secure=settings.cookie_secure,
+        httponly=False,
+        samesite=settings.cookie_samesite,
+    )
+
 def _request_ip(request: Request) -> str | None:
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
