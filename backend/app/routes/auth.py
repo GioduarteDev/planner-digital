@@ -9,6 +9,10 @@ from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_session_key, get_current_user
 from app.models import Agenda, AuthSession, User
+from app.rate_limit import (
+    login_rate_limiter,
+    register_rate_limiter,
+)
 from app.schemas import (
     AuthSessionResponse,
     LoginRequest,
@@ -74,6 +78,18 @@ def _clear_auth_cookies(
         samesite=settings.cookie_samesite,
     )
 
+
+def _rate_limit_ip(
+    request: Request,
+) -> str:
+    if request.client:
+        return str(
+            request.client.host
+        )[:64]
+
+    return "unknown"
+
+
 def _request_ip(request: Request) -> str | None:
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
@@ -110,6 +126,9 @@ def _session_response(item: AuthSession, current_key: str | None) -> AuthSession
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 def register(data: UserCreate, request: Request, response: Response, db: Session = Depends(get_db)):
+    register_rate_limiter.check(
+        _rate_limit_ip(request)
+    )
     existing_user = db.scalar(select(User).where(User.email == data.email))
     if existing_user:
         raise HTTPException(status_code=400, detail="Já existe uma conta com este e-mail.")
@@ -145,6 +164,9 @@ def register(data: UserCreate, request: Request, response: Response, db: Session
 
 @router.post("/login", response_model=AuthResponse)
 def login(data: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    login_rate_limiter.check(
+        _rate_limit_ip(request)
+    )
     user = db.scalar(select(User).where(User.email == data.email))
     if user is None or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
