@@ -38,14 +38,37 @@ def _count(db: Session, model, *conditions) -> int:
     )
 
 
-def _profile_file_bytes(url: str | None) -> int:
-    if not url or not url.startswith("/uploads/"):
+def _profile_file_bytes(
+    url: str | None,
+) -> int:
+    if (
+        not url
+        or not url.startswith("/uploads/")
+    ):
         return 0
-    relative = url.removeprefix("/uploads/")
-    path = UPLOAD_ROOT / relative
+
+    relative = url.removeprefix(
+        "/uploads/"
+    )
+
     try:
-        return path.stat().st_size if path.is_file() else 0
-    except OSError:
+        root = UPLOAD_ROOT.resolve()
+        path = (
+            UPLOAD_ROOT
+            / relative
+        ).resolve()
+
+        path.relative_to(root)
+
+        if not path.is_file():
+            return 0
+
+        return path.stat().st_size
+
+    except (
+        OSError,
+        ValueError,
+    ):
         return 0
 
 
