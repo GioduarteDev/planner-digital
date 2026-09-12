@@ -31,6 +31,11 @@ router = APIRouter(prefix="/auth", tags=["Autenticação"])
 
 
 
+DUMMY_PASSWORD_HASH = hash_password(
+    "planner-invalid-login"
+)
+
+
 def _set_auth_cookies(
     response: Response,
     token: str,
@@ -169,9 +174,28 @@ def login(data: LoginRequest, request: Request, response: Response, db: Session 
     login_rate_limiter.check(
         _rate_limit_ip(request)
     )
-    user = db.scalar(select(User).where(User.email == data.email))
-    if user is None or not verify_password(data.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
+    user = db.scalar(
+        select(User).where(
+            User.email == data.email
+        )
+    )
+
+    password_hash_to_check = (
+        user.password_hash
+        if user is not None
+        else DUMMY_PASSWORD_HASH
+    )
+
+    password_valid = verify_password(
+        data.password,
+        password_hash_to_check,
+    )
+
+    if user is None or not password_valid:
+        raise HTTPException(
+            status_code=401,
+            detail="E-mail ou senha incorretos.",
+        )
 
     auth_session = _create_session(user, request, db)
     db.commit()
