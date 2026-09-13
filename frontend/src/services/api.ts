@@ -1,6 +1,12 @@
+const DEV_API_HOST =
+  typeof window !== 'undefined'
+    ? window.location.hostname
+    : '127.0.0.1'
+
+
 export const API_URL =
   import.meta.env.VITE_API_URL
-  ?? 'http://127.0.0.1:8000'
+  || `http://${DEV_API_HOST}:8000`
 
 
 const USER_KEY =

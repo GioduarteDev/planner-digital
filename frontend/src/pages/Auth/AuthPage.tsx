@@ -26,6 +26,8 @@ type AuthMode =
 type UserFromApi = {
   id: number
   email: string
+  name: string
+  username: string | null
   created_at: string
 }
 
@@ -39,7 +41,6 @@ function AuthPage() {
   const navigate =
     useNavigate()
 
-
   const [
     mode,
     setMode,
@@ -48,33 +49,40 @@ function AuthPage() {
       'login',
     )
 
+  const [
+    name,
+    setName,
+  ] = useState('')
+
+  const [
+    username,
+    setUsername,
+  ] = useState('')
 
   const [
     email,
     setEmail,
-  ] =
-    useState('')
-
+  ] = useState('')
 
   const [
     password,
     setPassword,
-  ] =
-    useState('')
+  ] = useState('')
 
+  const [
+    confirmPassword,
+    setConfirmPassword,
+  ] = useState('')
 
   const [
     error,
     setError,
-  ] =
-    useState('')
-
+  ] = useState('')
 
   const [
     isLoading,
     setIsLoading,
-  ] =
-    useState(false)
+  ] = useState(false)
 
 
   async function handleSubmit(
@@ -84,9 +92,21 @@ function AuthPage() {
 
     setError('')
 
+    const normalizedEmail =
+      email.trim()
+
+    const normalizedName =
+      name.trim()
+
+    const normalizedUsername =
+      username
+        .trim()
+        .replace(/^@+/, '')
+        .toLowerCase()
+
 
     if (
-      email.trim() === ''
+      normalizedEmail === ''
       || password === ''
     ) {
       setError(
@@ -97,15 +117,90 @@ function AuthPage() {
     }
 
 
+    if (password.length < 8) {
+      setError(
+        'A senha precisa ter pelo menos 8 caracteres.',
+      )
+
+      return
+    }
+
+
+    if (mode === 'register') {
+      if (normalizedName === '') {
+        setError(
+          'Digite seu nome.',
+        )
+
+        return
+      }
+
+      if (normalizedUsername === '') {
+        setError(
+          'Escolha um username.',
+        )
+
+        return
+      }
+
+      if (
+        normalizedUsername.length < 3
+      ) {
+        setError(
+          'O username precisa ter pelo menos 3 caracteres.',
+        )
+
+        return
+      }
+
+      if (
+        !/^[a-z0-9._]+$/.test(
+          normalizedUsername,
+        )
+      ) {
+        setError(
+          'O username pode usar letras, n?meros, ponto e underscore.',
+        )
+
+        return
+      }
+
+      if (
+        password !== confirmPassword
+      ) {
+        setError(
+          'As senhas n?o coincidem.',
+        )
+
+        return
+      }
+    }
+
+
     try {
       setIsLoading(true)
-
 
       const endpoint =
         mode === 'login'
           ? '/auth/login'
           : '/auth/register'
 
+      const body =
+        mode === 'login'
+          ? {
+              email:
+                normalizedEmail,
+              password,
+            }
+          : {
+              name:
+                normalizedName,
+              username:
+                normalizedUsername,
+              email:
+                normalizedEmail,
+              password,
+            }
 
       const response =
         await apiRequest<AuthResponse>(
@@ -113,18 +208,16 @@ function AuthPage() {
           {
             method: 'POST',
 
-            body: JSON.stringify({
-              email,
-              password,
-            }),
+            body:
+              JSON.stringify(
+                body,
+              ),
           },
         )
-
 
       saveAuth(
         response.user,
       )
-
 
       navigate(
         '/',
@@ -135,7 +228,6 @@ function AuthPage() {
     } catch (error) {
       console.error(error)
 
-
       if (
         error instanceof Error
       ) {
@@ -144,7 +236,9 @@ function AuthPage() {
         )
       } else {
         setError(
-          'Não foi possível entrar.',
+          mode === 'login'
+            ? 'N?o foi poss?vel entrar.'
+            : 'N?o foi poss?vel criar sua conta.',
         )
       }
     } finally {
@@ -162,6 +256,7 @@ function AuthPage() {
 
     setError('')
     setPassword('')
+    setConfirmPassword('')
   }
 
 
@@ -170,7 +265,7 @@ function AuthPage() {
       <section className="auth-card">
         <div className="auth-title">
           <span>
-            ✦
+            ?
           </span>
 
           <h1>
@@ -178,8 +273,13 @@ function AuthPage() {
           </h1>
 
           <p>
-            Seu espaço para organizar
-            tudo em um só lugar.
+            {mode === 'login'
+              ? (
+                  'Entre no seu espa?o de organiza??o.'
+                )
+              : (
+                  'Crie seu espa?o pessoal para planejar, estudar e organizar seus projetos.'
+                )}
           </p>
         </div>
 
@@ -202,7 +302,6 @@ function AuthPage() {
           >
             Entrar
           </button>
-
 
           <button
             type="button"
@@ -230,18 +329,62 @@ function AuthPage() {
             handleSubmit
           }
         >
+          {mode === 'register' && (
+            <>
+              <label>
+                Nome
+
+                <input
+                  type="text"
+                  value={name}
+                  placeholder="Seu nome"
+                  autoComplete="name"
+                  maxLength={120}
+                  onChange={(event) =>
+                    setName(
+                      event.target.value,
+                    )
+                  }
+                />
+              </label>
+
+
+              <label>
+                Username
+
+                <input
+                  type="text"
+                  value={username}
+                  placeholder="@seuusername"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  minLength={3}
+                  maxLength={50}
+                  onChange={(event) =>
+                    setUsername(
+                      event.target.value,
+                    )
+                  }
+                />
+
+                <span className="auth-field-hint">
+                  Seu identificador dentro do planner.
+                </span>
+              </label>
+            </>
+          )}
+
+
           <label>
             E-mail
 
             <input
               type="email"
-
-              value={
-                email
-              }
-
+              value={email}
               placeholder="voce@email.com"
-
+              autoComplete="email"
+              maxLength={255}
               onChange={(event) =>
                 setEmail(
                   event.target.value,
@@ -256,15 +399,19 @@ function AuthPage() {
 
             <input
               type="password"
-
-              value={
-                password
+              value={password}
+              placeholder={
+                mode === 'register'
+                  ? 'M?nimo de 8 caracteres'
+                  : 'Sua senha'
               }
-
-              placeholder="Sua senha"
-
               minLength={8}
-
+              maxLength={128}
+              autoComplete={
+                mode === 'login'
+                  ? 'current-password'
+                  : 'new-password'
+              }
               onChange={(event) =>
                 setPassword(
                   event.target.value,
@@ -272,6 +419,29 @@ function AuthPage() {
               }
             />
           </label>
+
+
+          {mode === 'register' && (
+            <label>
+              Confirmar senha
+
+              <input
+                type="password"
+                value={
+                  confirmPassword
+                }
+                placeholder="Digite a senha novamente"
+                minLength={8}
+                maxLength={128}
+                autoComplete="new-password"
+                onChange={(event) =>
+                  setConfirmPassword(
+                    event.target.value,
+                  )
+                }
+              />
+            </label>
+          )}
 
 
           {error && (
@@ -284,7 +454,6 @@ function AuthPage() {
           <button
             className="auth-submit"
             type="submit"
-
             disabled={
               isLoading
             }
@@ -293,7 +462,7 @@ function AuthPage() {
               ? 'Carregando...'
               : mode === 'login'
                 ? 'Entrar'
-                : 'Criar conta'}
+                : 'Criar minha conta'}
           </button>
         </form>
       </section>
