@@ -786,9 +786,17 @@ function SortableBlock({
                         },
                       )
                     }}
-                    onKeyDown={(event) => {
+                    onPaste={(event) => {
+                      const pastedText =
+                        event.clipboardData
+                          .getData('text')
+
+                      const pastedItems =
+                        pastedText
+                          .split(/\r?\n/)
+
                       if (
-                        event.key !== 'Enter'
+                        pastedItems.length <= 1
                       ) {
                         return
                       }
@@ -799,10 +807,32 @@ function SortableBlock({
                         ...listItems,
                       ]
 
+                      const start =
+                        event.currentTarget
+                          .selectionStart
+                        ?? item.length
+
+                      const end =
+                        event.currentTarget
+                          .selectionEnd
+                        ?? start
+
+                      pastedItems[0] =
+                        item.slice(0, start)
+                        + pastedItems[0]
+
+                      pastedItems[
+                        pastedItems.length - 1
+                      ] =
+                        pastedItems[
+                          pastedItems.length - 1
+                        ]
+                        + item.slice(end)
+
                       nextItems.splice(
-                        index + 1,
-                        0,
-                        '',
+                        index,
+                        1,
+                        ...pastedItems,
                       )
 
                       onDataChange(
@@ -815,9 +845,14 @@ function SortableBlock({
 
                       window.requestAnimationFrame(
                         () => {
+                          const targetIndex =
+                            index
+                            + pastedItems.length
+                            - 1
+
                           const selector =
                             `input[data-block-list="${block.id}"]`
-                            + `[data-list-index="${index + 1}"]`
+                            + `[data-list-index="${targetIndex}"]`
 
                           document
                             .querySelector<HTMLInputElement>(
@@ -826,6 +861,130 @@ function SortableBlock({
                             ?.focus()
                         },
                       )
+                    }}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === 'Enter'
+                      ) {
+                        event.preventDefault()
+
+                        const nextItems = [
+                          ...listItems,
+                        ]
+
+                        nextItems.splice(
+                          index + 1,
+                          0,
+                          '',
+                        )
+
+                        onDataChange(
+                          block.id,
+                          {
+                            ...block.data,
+                            items: nextItems,
+                          },
+                        )
+
+                        window.requestAnimationFrame(
+                          () => {
+                            const selector =
+                              `input[data-block-list="${block.id}"]`
+                              + `[data-list-index="${index + 1}"]`
+
+                            document
+                              .querySelector<HTMLInputElement>(
+                                selector,
+                              )
+                              ?.focus()
+                          },
+                        )
+
+                        return
+                      }
+
+                      if (
+                        event.key === 'ArrowUp'
+                        && index > 0
+                      ) {
+                        event.preventDefault()
+
+                        const selector =
+                          `input[data-block-list="${block.id}"]`
+                          + `[data-list-index="${index - 1}"]`
+
+                        document
+                          .querySelector<HTMLInputElement>(
+                            selector,
+                          )
+                          ?.focus()
+
+                        return
+                      }
+
+                      if (
+                        event.key === 'ArrowDown'
+                        && index
+                          < listItems.length - 1
+                      ) {
+                        event.preventDefault()
+
+                        const selector =
+                          `input[data-block-list="${block.id}"]`
+                          + `[data-list-index="${index + 1}"]`
+
+                        document
+                          .querySelector<HTMLInputElement>(
+                            selector,
+                          )
+                          ?.focus()
+
+                        return
+                      }
+
+                      if (
+                        event.key === 'Backspace'
+                        && item === ''
+                        && listItems.length > 1
+                      ) {
+                        event.preventDefault()
+
+                        const nextItems = [
+                          ...listItems,
+                        ]
+
+                        nextItems.splice(
+                          index,
+                          1,
+                        )
+
+                        onDataChange(
+                          block.id,
+                          {
+                            ...block.data,
+                            items: nextItems,
+                          },
+                        )
+
+                        const targetIndex =
+                          index > 0
+                            ? index - 1
+                            : 0
+
+                        window.requestAnimationFrame(
+                          () => {
+                            const selector =
+                              `input[data-block-list="${block.id}"]`
+                              + `[data-list-index="${targetIndex}"]`
+
+                            document
+                              .querySelector<HTMLInputElement>(
+                                selector,
+                              )
+                              ?.focus()
+                          },
+                        )
+                      }
                     }}
                     onBlur={() =>
                       onFlush(block.id)

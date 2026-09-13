@@ -589,7 +589,7 @@ function TodayPage() {
 
                     onClick={() =>
                       navigate(
-                        `/agenda/${task.agendaId}`,
+                        `/agenda/${task.agendaId}?page=${task.pageId}`,
                       )
                     }
                   >
@@ -789,7 +789,7 @@ function TodayPage() {
 
                       onClick={() =>
                         navigate(
-                          `/agenda/${page.agendaId}`,
+                          `/agenda/${page.agendaId}?page=${page.pageId}`,
                         )
                       }
                     >

@@ -159,7 +159,7 @@ function AuthPage() {
         )
       ) {
         setError(
-          'O username pode usar letras, n?meros, ponto e underscore.',
+          'O username pode usar letras, números, ponto e underscore.',
         )
 
         return
@@ -169,7 +169,7 @@ function AuthPage() {
         password !== confirmPassword
       ) {
         setError(
-          'As senhas n?o coincidem.',
+          'As senhas não coincidem.',
         )
 
         return
@@ -237,8 +237,8 @@ function AuthPage() {
       } else {
         setError(
           mode === 'login'
-            ? 'N?o foi poss?vel entrar.'
-            : 'N?o foi poss?vel criar sua conta.',
+            ? 'Não foi possível entrar.'
+            : 'Não foi possível criar sua conta.',
         )
       }
     } finally {
@@ -265,7 +265,7 @@ function AuthPage() {
       <section className="auth-card">
         <div className="auth-title">
           <span>
-            ?
+            ✦
           </span>
 
           <h1>
@@ -275,10 +275,10 @@ function AuthPage() {
           <p>
             {mode === 'login'
               ? (
-                  'Entre no seu espa?o de organiza??o.'
+                  'Entre no seu espaço de organização.'
                 )
               : (
-                  'Crie seu espa?o pessoal para planejar, estudar e organizar seus projetos.'
+                  'Crie seu espaço pessoal para planejar, estudar e organizar seus projetos.'
                 )}
           </p>
         </div>
@@ -402,7 +402,7 @@ function AuthPage() {
               value={password}
               placeholder={
                 mode === 'register'
-                  ? 'M?nimo de 8 caracteres'
+                  ? 'Mínimo de 8 caracteres'
                   : 'Sua senha'
               }
               minLength={8}
