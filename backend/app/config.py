@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     def validate_cookie_security(self):
         if self.app_env == "production" and not self.cookie_secure:
             raise ValueError(
-                "COOKIE_SECURE deve ser true em produ??o."
+                "COOKIE_SECURE deve ser true em produção."
             )
 
         if self.cookie_samesite == "none" and not self.cookie_secure:
@@ -74,14 +74,14 @@ class Settings(BaseSettings):
         for origin in self.cors_origin_list:
             if "*" in origin:
                 raise ValueError(
-                    "CORS_ORIGINS n?o aceita wildcard."
+                    "CORS_ORIGINS não aceita wildcard."
                 )
 
             if not origin.startswith(
                 ("http://", "https://")
             ):
                 raise ValueError(
-                    "Cada origem CORS precisa come?ar "
+                    "Cada origem CORS precisa começar "
                     "com http:// ou https://."
                 )
 
@@ -91,7 +91,7 @@ class Settings(BaseSettings):
             ):
                 raise ValueError(
                     "CORS_ORIGINS deve usar HTTPS "
-                    "em produ??o."
+                    "em produção."
                 )
 
         return self

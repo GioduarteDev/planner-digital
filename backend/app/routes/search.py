@@ -10,6 +10,7 @@ from app.models import (
     Category,
     Event,
     Page,
+    PageBlock,
     Project,
     StudySession,
     Subject,
@@ -60,6 +61,56 @@ def search_planner(
                 agenda_id=page.agenda_id,
                 page_id=page.id,
             )
+        )
+
+    # O editor moderno salva boa parte do texto
+    # dentro de PageBlock.data (JSON).
+    # Retornamos a pagina correspondente para manter
+    # compatibilidade com a busca atual do frontend.
+    page_result_ids = {
+        result.id
+        for result in results
+        if result.type == "page"
+    }
+
+    block_pages = db.scalars(
+        select(Page)
+        .join(
+            PageBlock,
+            PageBlock.page_id == Page.id,
+        )
+        .join(
+            Agenda,
+            Page.agenda_id == Agenda.id,
+        )
+        .where(
+            Agenda.user_id == current_user.id,
+            cast(
+                PageBlock.data,
+                Text,
+            ).ilike(pattern),
+        )
+        .distinct()
+        .limit(20)
+    ).all()
+
+    for page in block_pages:
+        if page.id in page_result_ids:
+            continue
+
+        results.append(
+            SearchResult(
+                type="page",
+                id=page.id,
+                title=page.title,
+                subtitle="Conteúdo da página",
+                agenda_id=page.agenda_id,
+                page_id=page.id,
+            )
+        )
+
+        page_result_ids.add(
+            page.id
         )
 
     tasks = db.scalars(

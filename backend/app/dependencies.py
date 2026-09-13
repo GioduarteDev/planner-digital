@@ -21,7 +21,7 @@ def get_token_payload(
     if token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usu?rio n?o autenticado.",
+            detail="Usuário não autenticado.",
         )
 
     if request.method.upper() in {
@@ -47,7 +47,7 @@ def get_token_payload(
         ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Token CSRF inv?lido.",
+                detail="Token CSRF inválido.",
             )
 
     payload = decode_access_token_payload(
@@ -57,7 +57,7 @@ def get_token_payload(
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Sess?o inv?lida ou expirada.",
+            detail="Sessão inválida ou expirada.",
         )
 
     return payload

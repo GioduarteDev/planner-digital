@@ -48,7 +48,7 @@ ALLOWED_CATEGORIES = {
 def _not_found():
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail="Arquivo n?o encontrado.",
+        detail="Arquivo não encontrado.",
     )
 
 
@@ -276,8 +276,8 @@ def get_private_upload(
 
     if mime_type is None:
         # 404 em vez de 403:
-        # n?o revela se arquivo de outro
-        # usu?rio realmente existe.
+        # não revela se arquivo de outro
+        # usuário realmente existe.
         _not_found()
 
     file_path = _safe_file_path(

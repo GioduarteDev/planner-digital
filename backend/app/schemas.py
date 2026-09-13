@@ -50,12 +50,12 @@ def _validate_bounded_json(
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
         raise ValueError(
-            "O conte?do precisa ser um JSON v?lido."
+            "O conteúdo precisa ser um JSON válido."
         ) from exc
 
     if len(encoded) > MAX_JSON_BYTES:
         raise ValueError(
-            "O conte?do JSON excede o limite de 64 KB."
+            "O conteúdo JSON excede o limite de 64 KB."
         )
 
     return value

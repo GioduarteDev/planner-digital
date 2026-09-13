@@ -206,7 +206,7 @@ async def upload_page_media(
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail=(
-                "Formato n?o permitido. "
+                "Formato não permitido. "
                 "Use JPG, PNG, WEBP ou GIF."
             ),
         )
@@ -228,8 +228,8 @@ async def upload_page_media(
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail=(
-                "O conte?do do arquivo n?o "
-                "corresponde a uma imagem v?lida."
+                "O conteúdo do arquivo não "
+                "corresponde a uma imagem válida."
             ),
         )
 
