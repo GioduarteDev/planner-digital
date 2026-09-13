@@ -333,6 +333,28 @@ function getBlockChecked(
   return block.data.checked === true
 }
 
+
+function getBlockListItems(
+  block: PlannerBlock,
+): string[] {
+  const value = block.data.items
+
+  if (Array.isArray(value)) {
+    const items = value.filter(
+      (item): item is string =>
+        typeof item === 'string',
+    )
+
+    return items.length > 0
+      ? items
+      : ['']
+  }
+
+  return [
+    getBlockText(block),
+  ]
+}
+
 type SortablePageRowProps = {
   page: PlannerPage
   activePageId: number | null
@@ -616,6 +638,8 @@ function SortableBlock({
 
   const text = getBlockText(block)
   const checked = getBlockChecked(block)
+  const listItems =
+    getBlockListItems(block)
 
   return (
     <div
@@ -725,28 +749,91 @@ function SortableBlock({
         )}
 
         {block.blockType === 'list' && (
-          <div className="block-list-row">
-            <span aria-hidden="true">
-              •
-            </span>
-            <input
-              className="block-line-input"
-              type="text"
-              value={text}
-              placeholder="Item da lista..."
-              onChange={(event) =>
-                onDataChange(
-                  block.id,
-                  {
-                    ...block.data,
-                    text: event.target.value,
-                  },
-                )
-              }
-              onBlur={() =>
-                onFlush(block.id)
-              }
-            />
+          <div className="block-list-items">
+            {listItems.map(
+              (item, index) => (
+                <div
+                  className="block-list-item"
+                  key={`${block.id}-${index}`}
+                >
+                  <span
+                    className="block-list-bullet"
+                    aria-hidden="true"
+                  >
+                    ?
+                  </span>
+
+                  <input
+                    className="block-line-input"
+                    type="text"
+                    value={item}
+                    data-block-list={block.id}
+                    data-list-index={index}
+                    placeholder="Item da lista..."
+                    onChange={(event) => {
+                      const nextItems = [
+                        ...listItems,
+                      ]
+
+                      nextItems[index] =
+                        event.target.value
+
+                      onDataChange(
+                        block.id,
+                        {
+                          ...block.data,
+                          items: nextItems,
+                        },
+                      )
+                    }}
+                    onKeyDown={(event) => {
+                      if (
+                        event.key !== 'Enter'
+                      ) {
+                        return
+                      }
+
+                      event.preventDefault()
+
+                      const nextItems = [
+                        ...listItems,
+                      ]
+
+                      nextItems.splice(
+                        index + 1,
+                        0,
+                        '',
+                      )
+
+                      onDataChange(
+                        block.id,
+                        {
+                          ...block.data,
+                          items: nextItems,
+                        },
+                      )
+
+                      window.requestAnimationFrame(
+                        () => {
+                          const selector =
+                            `input[data-block-list="${block.id}"]`
+                            + `[data-list-index="${index + 1}"]`
+
+                          document
+                            .querySelector<HTMLInputElement>(
+                              selector,
+                            )
+                            ?.focus()
+                        },
+                      )
+                    }}
+                    onBlur={() =>
+                      onFlush(block.id)
+                    }
+                  />
+                </div>
+              ),
+            )}
           </div>
         )}
       </div>
@@ -2524,6 +2611,12 @@ function AgendaPage() {
   function defaultBlockData(
     blockType: BlockType,
   ): BlockData {
+    if (blockType === 'list') {
+      return {
+        items: [''],
+      }
+    }
+
     if (blockType === 'checkbox') {
       return {
         text: '',
