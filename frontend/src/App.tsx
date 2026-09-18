@@ -32,8 +32,26 @@ import StudiesPage
 import SearchPage
   from './pages/Search/SearchPage'
 
+import ProfilePage
+  from './pages/Profile/ProfilePage'
+
+import OrganizationPage
+  from './pages/Organization/OrganizationPage'
+
+import TasksPage
+  from './pages/Tasks/TasksPage'
+
+import DataPage
+  from './pages/Data/DataPage'
+
+import StationeryPage
+  from './pages/Stationery/StationeryPage'
+
 import ReminderWatcher
   from './components/ReminderWatcher'
+
+import AppShell
+  from './components/AppShell'
 
 import {
   apiRequest,
@@ -54,40 +72,38 @@ function ProtectedRoute({
   const [
     authState,
     setAuthState,
-  ] =
-    useState<AuthState>(
-      'checking',
-    )
+  ] = useState<AuthState>(
+    'checking',
+  )
+
 
   useEffect(() => {
     let cancelled = false
 
-    async function checkSession() {
-      try {
-        await apiRequest(
-          '/auth/me',
-        )
-
+    apiRequest(
+      '/auth/me',
+    )
+      .then(() => {
         if (!cancelled) {
           setAuthState(
             'authenticated',
           )
         }
-      } catch {
+      })
+      .catch(() => {
         if (!cancelled) {
           setAuthState(
             'guest',
           )
         }
-      }
-    }
+      })
 
-    void checkSession()
 
     return () => {
       cancelled = true
     }
   }, [])
+
 
   if (
     authState === 'checking'
@@ -98,6 +114,7 @@ function ProtectedRoute({
       </main>
     )
   }
+
 
   if (
     authState === 'guest'
@@ -110,11 +127,14 @@ function ProtectedRoute({
     )
   }
 
+
   return (
     <>
       <ReminderWatcher />
 
-      {children}
+      <AppShell>
+        {children}
+      </AppShell>
     </>
   )
 }
@@ -131,6 +151,7 @@ function App() {
           }
         />
 
+
         <Route
           path="/"
           element={
@@ -139,6 +160,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+
 
         <Route
           path="/today"
@@ -149,6 +171,7 @@ function App() {
           }
         />
 
+
         <Route
           path="/calendar"
           element={
@@ -157,6 +180,17 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+
+        <Route
+          path="/tasks"
+          element={
+            <ProtectedRoute>
+              <TasksPage />
+            </ProtectedRoute>
+          }
+        />
+
 
         <Route
           path="/studies"
@@ -167,6 +201,17 @@ function App() {
           }
         />
 
+
+        <Route
+          path="/organization"
+          element={
+            <ProtectedRoute>
+              <OrganizationPage />
+            </ProtectedRoute>
+          }
+        />
+
+
         <Route
           path="/search"
           element={
@@ -175,6 +220,37 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+
+        <Route
+          path="/stationery"
+          element={
+            <ProtectedRoute>
+              <StationeryPage />
+            </ProtectedRoute>
+          }
+        />
+
+
+        <Route
+          path="/data"
+          element={
+            <ProtectedRoute>
+              <DataPage />
+            </ProtectedRoute>
+          }
+        />
+
+
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+
 
         <Route
           path="/agenda/:id"
