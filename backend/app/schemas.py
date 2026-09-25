@@ -1,4 +1,5 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
+from datetime import date as DateValue
 import json
 from typing import Annotated, Any, Literal
 
@@ -168,6 +169,7 @@ class TaskCreate(BaseModel):
     due_at: datetime | None = None
     priority: TaskPriority = "medium"
     project_id: int | None = None
+    subject_id: int | None = None
     category_id: int | None = None
     show_in_calendar: bool = True
 
@@ -182,6 +184,7 @@ class TaskUpdate(BaseModel):
     due_at: datetime | None = None
     priority: TaskPriority | None = None
     project_id: int | None = None
+    subject_id: int | None = None
     category_id: int | None = None
     show_in_calendar: bool | None = None
     page_id: int | None = None
@@ -194,6 +197,7 @@ class TaskResponse(BaseModel):
     user_id: int
     page_id: int | None
     project_id: int | None
+    subject_id: int | None
     category_id: int | None
     text: str
     description: str
@@ -207,7 +211,78 @@ class TaskResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+# =========================
+# HÁBITOS
+# =========================
 
+class HabitCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=3000)
+    days_of_week: list[int] = Field(min_length=1, max_length=7)
+    time_of_day: time | None = None
+    color: str = Field(default="#9CA362", max_length=20)
+
+    @field_validator("days_of_week")
+    @classmethod
+    def validate_days_of_week(cls, value: list[int]) -> list[int]:
+        if any(day < 0 or day > 6 for day in value):
+            raise ValueError("Os dias da semana devem estar entre 0 e 6.")
+
+        if len(set(value)) != len(value):
+            raise ValueError("Não repita dias da semana.")
+
+        return sorted(value)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class HabitUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=3000)
+    days_of_week: list[int] | None = Field(default=None, min_length=1, max_length=7)
+    time_of_day: time | None = None
+    color: str | None = Field(default=None, max_length=20)
+    active: bool | None = None
+
+    @field_validator("days_of_week")
+    @classmethod
+    def validate_days_of_week(cls, value: list[int] | None) -> list[int] | None:
+        if value is None:
+            return None
+
+        if any(day < 0 or day > 6 for day in value):
+            raise ValueError("Os dias da semana devem estar entre 0 e 6.")
+
+        if len(set(value)) != len(value):
+            raise ValueError("Não repita dias da semana.")
+
+        return sorted(value)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class HabitResponse(BaseModel):
+    id: int
+    user_id: int
+    name: str
+    description: str
+    days_of_week: list[int]
+    time_of_day: time | None
+    color: str
+    active: bool
+    created_at: datetime
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class HabitCompletionResponse(BaseModel):
+    id: int
+    habit_id: int
+    completion_date: date
+    completed_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 # =========================
 # USUÁRIOS / AUTENTICAÇÃO / PERFIL
 # =========================
@@ -295,6 +370,7 @@ class ProfileUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=120)
     username: str | None = Field(default=None, min_length=3, max_length=50)
     bio: str | None = Field(default=None, max_length=1000)
+    settings: BoundedJsonDict | None = None
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -311,6 +387,60 @@ class ProfileUpdate(BaseModel):
 
 class SettingsUpdate(BaseModel):
     settings: BoundedJsonDict
+
+
+class DailyEntryUpsert(BaseModel):
+    mood: str = Field(default="", max_length=40)
+    quick_note: str = Field(default="", max_length=1000)
+    music_data: BoundedJsonDict = Field(default_factory=dict)
+    reading_data: BoundedJsonDict = Field(default_factory=dict)
+    watching_data: BoundedJsonDict = Field(default_factory=dict)
+    photo_media_id: int | None = Field(default=None, gt=0)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class DailyEntryUpdate(BaseModel):
+    mood: str | None = Field(default=None, max_length=40)
+    quick_note: str | None = Field(default=None, max_length=1000)
+    music_data: BoundedJsonDict | None = None
+    reading_data: BoundedJsonDict | None = None
+    watching_data: BoundedJsonDict | None = None
+    photo_media_id: int | None = Field(default=None, gt=0)
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    @model_validator(mode="after")
+    def reject_null_content(self):
+        required_content = (
+            "mood",
+            "quick_note",
+            "music_data",
+            "reading_data",
+            "watching_data",
+        )
+        if any(
+            field in self.model_fields_set and getattr(self, field) is None
+            for field in required_content
+        ):
+            raise ValueError("Os campos de conteúdo diário não aceitam null.")
+        return self
+
+
+class DailyEntryResponse(BaseModel):
+    id: int
+    user_id: int
+    entry_date: date
+    mood: str
+    quick_note: str
+    music_data: dict[str, Any]
+    reading_data: dict[str, Any]
+    watching_data: dict[str, Any]
+    photo_media_id: int | None
+    created_at: datetime
+    updated_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ChangePasswordRequest(BaseModel):
@@ -330,6 +460,7 @@ class EventCreate(BaseModel):
     all_day: bool = False
     reminder_minutes: int | None = Field(default=None, ge=0, le=10080)
     project_id: int | None = None
+    subject_id: int | None = None
     category_id: int | None = None
     color: str = "#a8b5a2"
 
@@ -342,6 +473,7 @@ class EventUpdate(BaseModel):
     all_day: bool | None = None
     reminder_minutes: int | None = Field(default=None, ge=0, le=10080)
     project_id: int | None = None
+    subject_id: int | None = None
     category_id: int | None = None
     color: str | None = None
 
@@ -350,6 +482,7 @@ class EventResponse(BaseModel):
     id: int
     user_id: int
     project_id: int | None
+    subject_id: int | None
     category_id: int | None
     title: str
     description: str
@@ -409,23 +542,66 @@ class StudySessionResponse(BaseModel):
 
 
 class SubjectCreate(BaseModel):
+    professor: str | None = Field(default=None, max_length=160)
+    semester: str | None = Field(default=None, max_length=80)
     name: str = Field(min_length=1, max_length=100)
     color: str = "#9fb9cc"
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class SubjectUpdate(BaseModel):
+    professor: str | None = Field(default=None, max_length=160)
+    semester: str | None = Field(default=None, max_length=80)
     name: str | None = Field(default=None, min_length=1, max_length=100)
     color: str | None = None
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class SubjectResponse(BaseModel):
+    professor: str | None = Field(default=None, max_length=160)
+    semester: str | None = Field(default=None, max_length=80)
     id: int
     user_id: int
     name: str
     color: str
     created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InboxItemCreate(BaseModel):
+    text: str = Field(min_length=1, max_length=300)
+    note: str = Field(default="", max_length=2000)
+    optional_date: date | None = None
+    optional_time: time | None = None
+    optional_subject_id: int | None = None
+    status: Literal["new", "processed"] = "new"
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class InboxItemUpdate(BaseModel):
+    text: str | None = Field(default=None, min_length=1, max_length=300)
+    note: str | None = Field(default=None, max_length=2000)
+    optional_date: date | None = None
+    optional_time: time | None = None
+    optional_subject_id: int | None = None
+    status: Literal["new", "processed"] | None = None
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class InboxItemResponse(BaseModel):
+    processed_at: datetime | None = None
+    converted_type: str | None = None
+    converted_id: int | None = None
+    id: int
+    user_id: int
+    subject_id: int | None
+    text: str
+    note: str
+    optional_date: date | None
+    optional_time: time | None
+    status: str
+    created_at: datetime
+    updated_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -440,6 +616,7 @@ class ProjectCreate(BaseModel):
     priority: TaskPriority = "medium"
     color: str = "#a8b5a2"
     due_date: date | None = None
+    subject_id: int | None = None
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
@@ -450,12 +627,14 @@ class ProjectUpdate(BaseModel):
     priority: TaskPriority | None = None
     color: str | None = None
     due_date: date | None = None
+    subject_id: int | None = None
     model_config = ConfigDict(str_strip_whitespace=True)
 
 
 class ProjectResponse(BaseModel):
     id: int
     user_id: int
+    subject_id: int | None
     title: str
     description: str
     status: str
@@ -551,15 +730,24 @@ class CanvasElementResponse(BaseModel):
 class ReminderCreate(BaseModel):
     event_id: int | None = None
     task_id: int | None = None
+    habit_id: int | None = None
     minutes_before: int = Field(default=0, ge=0, le=525600)
     channel: Literal["push"] = "push"
     enabled: bool = True
 
     @model_validator(mode="after")
     def validate_target(self):
-        targets = int(self.event_id is not None) + int(self.task_id is not None)
+        targets = (
+            int(self.event_id is not None)
+            + int(self.task_id is not None)
+            + int(self.habit_id is not None)
+        )
+
         if targets != 1:
-            raise ValueError("Informe exatamente um event_id ou task_id.")
+            raise ValueError(
+                "Informe exatamente um event_id, task_id ou habit_id."
+            )
+
         return self
 
 
@@ -573,12 +761,14 @@ class ReminderResponse(BaseModel):
     user_id: int
     event_id: int | None
     task_id: int | None
+    habit_id: int | None
     minutes_before: int
     channel: str
     enabled: bool
     sent_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -646,6 +836,8 @@ class SearchResult(BaseModel):
     subtitle: str = ""
     agenda_id: int | None = None
     page_id: int | None = None
+    target_date: str | None = None
+    target_path: str | None = None
 
 
 # =========================
@@ -755,3 +947,13 @@ class StorageSummaryResponse(BaseModel):
     templates: int
     agendas: int
     pages: int
+
+
+class InboxConvert(BaseModel):
+    target: Literal["task", "event", "study", "project", "note"]
+    date: DateValue | None = None
+    starts_at: datetime | None = None
+    timezone_offset_minutes: int = Field(default=0, ge=-840, le=840)
+    duration_minutes: int | None = Field(default=None, ge=1, le=1440)
+    subject: str | None = Field(default=None, min_length=1, max_length=100)
+    model_config = ConfigDict(str_strip_whitespace=True)

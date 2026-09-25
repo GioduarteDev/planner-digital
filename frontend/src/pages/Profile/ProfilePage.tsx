@@ -9,6 +9,7 @@ import {
   API_URL,
   apiRequest,
   clearAuth,
+  notifyProfileUpdated,
   saveAuth,
 } from '../../services/api'
 
@@ -239,16 +240,6 @@ function ProfilePage() {
             method: 'PATCH',
             body: JSON.stringify({
               bio,
-            }),
-          },
-        )
-
-      const updatedSettings =
-        await apiRequest<UserProfile>(
-          '/profile/settings',
-          {
-            method: 'PATCH',
-            body: JSON.stringify({
               settings: {
                 matcha_profile:
                   matchaProfile,
@@ -256,15 +247,9 @@ function ProfilePage() {
             }),
           },
         )
-
-      const finalProfile = {
-        ...updatedProfile,
-        settings:
-          updatedSettings.settings,
-      }
-
-      setProfile(finalProfile)
-      saveAuth(finalProfile)
+      setProfile(updatedProfile)
+      saveAuth(updatedProfile)
+      notifyProfileUpdated(updatedProfile)
       setMessage(
         'Seu cantinho foi atualizado ✦',
       )
@@ -315,6 +300,7 @@ function ProfilePage() {
       setAccountName(updated.name ?? '')
       setAccountUsername(updated.username ?? '')
       saveAuth(updated)
+      notifyProfileUpdated(updated)
       setMessage('Dados da conta atualizados.')
     } catch (caughtError) {
       setError(
@@ -364,6 +350,7 @@ function ProfilePage() {
 
       setProfile(updated)
       saveAuth(updated)
+      notifyProfileUpdated(updated)
       setMessage(
         endpoint === '/profile/photo'
           ? 'Foto atualizada com sucesso.'
@@ -400,6 +387,7 @@ function ProfilePage() {
 
       setProfile(updated)
       saveAuth(updated)
+      notifyProfileUpdated(updated)
       setMessage('Imagem removida com sucesso.')
     } catch (caughtError) {
       setError(

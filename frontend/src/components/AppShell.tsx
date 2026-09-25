@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
@@ -19,11 +20,13 @@ import {
 
 import {
   API_URL,
+  PROFILE_UPDATED_EVENT,
   apiRequest,
   clearAuth,
   getStoredUser,
 } from '../services/api'
 import './AppShell.css'
+import QuickCapture from './QuickCapture'
 
 
 type ProfileFromApi = {
@@ -52,6 +55,7 @@ const MATCHA_ICON = '/matcha-planner-icon.png'
 
 const navigation = [
   { to: '/', label: 'Biblioteca', end: true },
+  { to: '/inbox', label: 'Inbox' },
   { to: '/today', label: 'Hoje' },
   { to: '/calendar', label: 'Calendário' },
   { to: '/tasks', label: 'Tarefas' },
@@ -111,6 +115,7 @@ function AppShell({
         ? Notification.permission
         : 'unsupported',
     )
+  const shellActionsRef = useRef<HTMLDivElement | null>(null)
 
   const isLibrary =
     location.pathname === '/'
@@ -176,8 +181,51 @@ function AppShell({
 
     void loadShellData()
 
+    function refreshOnReturn() {
+      void loadShellData()
+    }
+
+    function refreshProfile(event: Event) {
+      const updatedProfile =
+        (event as CustomEvent<ProfileFromApi>).detail
+
+      if (updatedProfile && typeof updatedProfile === 'object') {
+        setProfile(updatedProfile)
+      } else {
+        void loadShellData()
+      }
+    }
+
+    function closeMenus(event: MouseEvent) {
+      if (
+        shellActionsRef.current
+        && !shellActionsRef.current.contains(event.target as Node)
+      ) {
+        setProfileOpen(false)
+        setRemindersOpen(false)
+      }
+    }
+
+    function closeMenusOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setProfileOpen(false)
+        setRemindersOpen(false)
+      }
+    }
+
+    window.addEventListener('focus', refreshOnReturn)
+    window.addEventListener(PROFILE_UPDATED_EVENT, refreshProfile)
+    document.addEventListener('visibilitychange', refreshOnReturn)
+    document.addEventListener('mousedown', closeMenus)
+    document.addEventListener('keydown', closeMenusOnEscape)
+
     return () => {
       cancelled = true
+      window.removeEventListener('focus', refreshOnReturn)
+      window.removeEventListener(PROFILE_UPDATED_EVENT, refreshProfile)
+      document.removeEventListener('visibilitychange', refreshOnReturn)
+      document.removeEventListener('mousedown', closeMenus)
+      document.removeEventListener('keydown', closeMenusOnEscape)
     }
   }, [location.pathname])
 
@@ -207,10 +255,23 @@ function AppShell({
       return
     }
 
-    const permission =
-      await Notification.requestPermission()
+    try {
+      const permission =
+        await Notification.requestPermission()
 
-    setNotificationPermission(permission)
+      setNotificationPermission(permission)
+    } catch (error) {
+      console.error('Não foi possível ativar as notificações:', error)
+      setNotificationPermission('denied')
+    }
+  }
+
+  function getReminderDate(event: EventFromApi) {
+    const date = new Date(event.starts_at)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
   }
 
   async function handleLogout() {
@@ -276,7 +337,8 @@ function AppShell({
             ))}
           </nav>
 
-          <div className="app-shell-actions">
+          <div className="app-shell-actions" ref={shellActionsRef}>
+            <QuickCapture />
             <div className="app-shell-popover-wrap">
               <button
                 type="button"
@@ -287,6 +349,7 @@ function AppShell({
                 }
                 aria-label="Lembretes"
                 aria-expanded={remindersOpen}
+                aria-haspopup="dialog"
                 title="Lembretes"
                 onClick={() => {
                   setRemindersOpen(
@@ -311,7 +374,7 @@ function AppShell({
               </button>
 
               {remindersOpen && (
-                <div className="app-shell-popover app-shell-reminders-popover">
+                <div className="app-shell-popover app-shell-reminders-popover" role="dialog" aria-label="Lembretes futuros">
                   <div className="app-shell-popover-heading">
                     <div>
                       <span>Lembretes</span>
@@ -351,7 +414,7 @@ function AppShell({
                               type="button"
                               onClick={() => {
                                 setRemindersOpen(false)
-                                navigate('/calendar')
+                                navigate(`/calendar?date=${getReminderDate(event)}`)
                               }}
                             >
                               <span>●</span>
@@ -375,6 +438,11 @@ function AppShell({
                               </div>
                             </button>
                           ))}
+                        {upcomingReminders.length > 4 && (
+                          <span className="app-shell-reminder-more">
+                            +{upcomingReminders.length - 4} lembrete(s) no calendário
+                          </span>
+                        )}
                       </div>
                     )}
 
@@ -421,6 +489,7 @@ function AppShell({
                 }
                 aria-label={`Perfil de ${displayName}`}
                 aria-expanded={profileOpen}
+                aria-haspopup="dialog"
                 onClick={() => {
                   setProfileOpen(
                     (current) => !current,
@@ -443,7 +512,7 @@ function AppShell({
               </button>
 
               {profileOpen && (
-                <div className="app-shell-popover app-shell-profile-popover">
+                <div className="app-shell-popover app-shell-profile-popover" role="dialog" aria-label={`Perfil de ${displayName}`}>
                   <div className="app-shell-profile-summary">
                     {profilePhoto
                       ? (

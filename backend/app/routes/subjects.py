@@ -35,7 +35,7 @@ def create_subject(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    subject = Subject(user_id=current_user.id, name=data.name, color=data.color)
+    subject = Subject(user_id=current_user.id, **data.model_dump())
     db.add(subject)
     try:
         db.commit()

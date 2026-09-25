@@ -11,6 +11,7 @@ from app.models import (
     Event,
     Page,
     PageBlock,
+    PageMedia,
     Project,
     StudySession,
     Subject,
@@ -28,7 +29,11 @@ def search_planner(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    pattern = f"%{q.strip().lower()}%"
+    normalized_query = q.strip()
+    if not normalized_query:
+        return []
+
+    pattern = f"%{normalized_query}%"
     results: list[SearchResult] = []
 
     agendas = db.scalars(
@@ -57,7 +62,7 @@ def search_planner(
                 type="page",
                 id=page.id,
                 title=page.title,
-                subtitle="Página",
+                subtitle=f"Página · {page.agenda.title}",
                 agenda_id=page.agenda_id,
                 page_id=page.id,
             )
@@ -103,7 +108,7 @@ def search_planner(
                 type="page",
                 id=page.id,
                 title=page.title,
-                subtitle="Conteúdo da página",
+                subtitle=f"Conteúdo · {page.agenda.title}",
                 agenda_id=page.agenda_id,
                 page_id=page.id,
             )
@@ -137,7 +142,7 @@ def search_planner(
                 type="task",
                 id=task.id,
                 title=task.text,
-                subtitle="Tarefa",
+                subtitle=f"Tarefa · {page.agenda.title}" if page else "Tarefa",
                 agenda_id=page.agenda_id if page else None,
                 page_id=task.page_id,
             )
@@ -150,7 +155,15 @@ def search_planner(
         ).limit(10)
     ).all()
     for event in events:
-        results.append(SearchResult(type="event", id=event.id, title=event.title, subtitle="Evento"))
+        results.append(
+            SearchResult(
+                type="event",
+                id=event.id,
+                title=event.title,
+                subtitle="Evento",
+                target_date=event.starts_at.date().isoformat() if event.starts_at else None,
+            )
+        )
 
     studies = db.scalars(
         select(StudySession).where(
@@ -199,6 +212,48 @@ def search_planner(
     for subject in subjects:
         results.append(SearchResult(type="subject", id=subject.id, title=subject.name, subtitle="Matéria"))
 
+    media_items = db.scalars(
+        select(MediaLibraryItem).where(
+            MediaLibraryItem.user_id == current_user.id,
+            or_(
+                MediaLibraryItem.name.ilike(pattern),
+                MediaLibraryItem.kit_name.ilike(pattern),
+                cast(MediaLibraryItem.metadata_json, Text).ilike(pattern),
+            ),
+        ).limit(20)
+    ).all()
+    for media in media_items:
+        results.append(
+            SearchResult(
+                type="media",
+                id=media.id,
+                title=media.name,
+                subtitle=f"Mídia · {media.kit_name or media.media_type}",
+            )
+        )
+
+    page_media_items = db.scalars(
+        select(PageMedia)
+        .join(Page, PageMedia.page_id == Page.id)
+        .join(Agenda, Page.agenda_id == Agenda.id)
+        .where(
+            Agenda.user_id == current_user.id,
+            PageMedia.original_name.ilike(pattern),
+        )
+        .limit(20)
+    ).all()
+    for media in page_media_items:
+        results.append(
+            SearchResult(
+                type="media",
+                id=media.id,
+                title=media.original_name,
+                subtitle=f"Mídia · {media.page.title} · {media.page.agenda.title}",
+                agenda_id=media.page.agenda_id,
+                page_id=media.page_id,
+            )
+        )
+
     # Texto de post-its, caixas de texto, checklists e outros elementos fica em JSON.
     elements = db.scalars(
         select(CanvasElement).where(
@@ -230,6 +285,20 @@ def search_planner(
                 subtitle=f"Elemento · {element.surface_type}",
                 agenda_id=page.agenda_id if page else None,
                 page_id=element.page_id,
+                target_path=(
+                    {
+                        "profile": "/profile",
+                        "today": "/today",
+                        "calendar": "/calendar",
+                        "tasks": "/tasks",
+                        "studies": "/studies",
+                        "organization": "/organization",
+                        "stationery": "/stationery",
+                        "library": "/",
+                    }.get(element.surface_type, "/")
+                    if page is None
+                    else None
+                ),
             )
         )
 

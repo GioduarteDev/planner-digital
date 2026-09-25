@@ -2,6 +2,7 @@
   display: flex;
   min-height: 100vh;
   flex-direction: column;
+  overflow-x: hidden;
   background: #f7f1e8;
 }
 
@@ -269,6 +270,11 @@
   cursor: pointer;
 }
 
+.app-shell-popover button:focus-visible {
+  outline: 3px solid #98c1e7;
+  outline-offset: 2px;
+}
+
 .app-shell-reminder-list {
   display: grid;
   gap: 7px;
@@ -319,6 +325,14 @@
   margin-top: 3px;
   color: #8b8177;
   font-size: 10px;
+}
+
+.app-shell-reminder-more {
+  display: block;
+  padding: 5px 10px;
+  color: #8b8177;
+  font-size: 10px;
+  text-align: center;
 }
 
 .app-shell-empty-popover {
@@ -669,6 +683,10 @@
   }
 }
 
+@media (max-width: 900px) {
+  .app-shell-nav { justify-content: flex-start; }
+}
+
 /* =========================================================
    Matcha Planner — footer editorial V4
    Mantém #BF93D0 e #D1EFBD, mas com escala mais refinada.
@@ -783,4 +801,62 @@
   .app-shell-footer-credits {
     min-height: 0;
   }
+}
+/* =========================================================
+   FOOTER — TESTE LARANJA + ROSA
+   ========================================================= */
+
+.app-shell-footer {
+  background: #F4C09F;
+  color: #4A3133;
+}
+
+.app-shell-footer-intro {
+  background: rgba(255, 244, 234, 0.32);
+  border-color: rgba(92, 51, 45, 0.14);
+}
+
+.app-shell-footer-kicker {
+  color: #653C3C;
+}
+
+.app-shell-footer-intro h2 {
+  color: #493033;
+}
+
+.app-shell-footer-intro p {
+  color: #624347;
+}
+
+.app-shell-footer-credits {
+  background: #DFA6B2;
+  color: #49343C;
+  box-shadow: 0 14px 32px rgba(93, 49, 48, 0.13);
+}
+
+.app-shell-footer-credits .app-shell-footer-kicker {
+  color: #704653;
+}
+
+.app-shell-footer-credits p {
+  color: #5E424B;
+}
+
+.app-shell-footer-links a {
+  background: #FFF4EA;
+  border-color: rgba(93, 57, 52, 0.12);
+  color: #593B3E;
+}
+
+.app-shell-footer-links a:hover {
+  background: #F9D5C1;
+}
+
+.app-shell-footer-links a:focus-visible {
+  outline-color: #FFF4EA;
+}
+
+.app-shell-footer-bottom {
+  border-top-color: rgba(91, 52, 48, 0.18);
+  color: #5D3D40;
 }

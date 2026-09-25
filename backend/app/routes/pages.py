@@ -19,6 +19,7 @@ from app.database import get_db
 from app.dependencies import (
     get_current_user,
 )
+from app.page_tabs import prune_page_tab_target
 
 from app.models import (
     Agenda,
@@ -723,6 +724,11 @@ def delete_page(
         for item in canvas_items
         if item.asset_stored_name
     ]
+
+    page.agenda.settings = prune_page_tab_target(
+        page.agenda.settings or {},
+        f"page:{page.id}",
+    )
 
     db.delete(page)
     db.commit()

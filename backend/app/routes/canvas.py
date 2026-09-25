@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models import CanvasElement, MediaLibraryItem, User
+from app.models import CanvasElement, MediaLibraryItem, Task, User
 from app.routes.helpers import get_user_page_or_404
 from app.schemas import CanvasElementCreate, CanvasElementResponse, CanvasElementUpdate
 
@@ -17,6 +17,37 @@ router = APIRouter(prefix="/canvas", tags=["Canvas"])
 LIBRARY_DIRECTORY = Path(__file__).resolve().parents[2] / "uploads" / "media_library"
 CANVAS_MEDIA_DIRECTORY = Path(__file__).resolve().parents[2] / "uploads" / "canvas_media"
 CANVAS_MEDIA_DIRECTORY.mkdir(parents=True, exist_ok=True)
+
+TASK_RECEIPT_TYPES = {"task_receipt", "widget:task-receipt"}
+
+
+def validate_task_receipt_data(
+    element_type: str,
+    data: dict,
+    current_user: User,
+    db: Session,
+) -> None:
+    if element_type not in TASK_RECEIPT_TYPES:
+        return
+    raw_ids = data.get("task_ids", data.get("taskIds", []))
+    if not isinstance(raw_ids, list) or len(raw_ids) > 400 or any(
+        not isinstance(task_id, int) or isinstance(task_id, bool) or task_id <= 0
+        for task_id in raw_ids
+    ):
+        raise HTTPException(status_code=400, detail="Referências de tarefas inválidas.")
+    task_ids = set(raw_ids)
+    if not task_ids:
+        return
+    owned_ids = set(
+        db.scalars(
+            select(Task.id).where(
+                Task.user_id == current_user.id,
+                Task.id.in_(task_ids),
+            )
+        ).all()
+    )
+    if owned_ids != task_ids:
+        raise HTTPException(status_code=404, detail="Uma ou mais tarefas não foram encontradas.")
 
 
 def get_user_element_or_404(
@@ -155,6 +186,7 @@ def create_element(
     current_user: User = Depends(get_current_user),
 ):
     page_id, surface_key = normalize_surface(data, current_user, db)
+    validate_task_receipt_data(data.element_type, data.data, current_user, db)
     highest_z = db.scalar(
         same_surface_query(
             user_id=current_user.id,
@@ -175,7 +207,11 @@ def create_element(
         width=data.width,
         height=data.height,
         rotation=data.rotation,
-        z_index=(highest_z + 1 if highest_z is not None else data.z_index),
+        z_index=(
+            data.z_index
+            if "z_index" in data.model_fields_set
+            else highest_z + 1 if highest_z is not None else 0
+        ),
         locked=data.locked,
         data=data.data,
     )
@@ -197,6 +233,7 @@ def create_element_from_library(
     current_user: User = Depends(get_current_user),
 ):
     page_id, surface_key = normalize_surface(data, current_user, db)
+    validate_task_receipt_data(data.element_type, data.data, current_user, db)
     item = get_user_library_item_or_404(item_id, current_user, db)
     source = LIBRARY_DIRECTORY / item.stored_name
     stored_name, destination = copy_canvas_asset(source)
@@ -226,7 +263,11 @@ def create_element_from_library(
         width=data.width,
         height=data.height,
         rotation=data.rotation,
-        z_index=(highest_z + 1 if highest_z is not None else data.z_index),
+        z_index=(
+            data.z_index
+            if "z_index" in data.model_fields_set
+            else highest_z + 1 if highest_z is not None else 0
+        ),
         locked=data.locked,
         data={**data.data, "source_library_item_id": item.id},
     )
@@ -253,6 +294,14 @@ def update_element(
 ):
     element = get_user_element_or_404(element_id, current_user, db)
     updates = data.model_dump(exclude_unset=True)
+    if any(
+        field in updates and updates[field] is None
+        for field in ("surface_key", "element_type", "data")
+    ):
+        raise HTTPException(status_code=400, detail="O campo não pode ser nulo.")
+    effective_type = updates.get("element_type", element.element_type)
+    effective_data = updates.get("data", element.data or {})
+    validate_task_receipt_data(effective_type, effective_data, current_user, db)
     if element.surface_type == "profile" and "surface_key" in updates:
         updates["surface_key"] = "profile"
     for field, value in updates.items():

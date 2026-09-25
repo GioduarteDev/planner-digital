@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_session_key, get_current_user
+from app.json_utils import deep_merge_json
 from app.models import (
     Agenda,
     AuthSession,
@@ -210,6 +211,8 @@ def update_profile(
 ):
     updates = data.model_dump(exclude_unset=True)
 
+    profile_settings = updates.pop("settings", None)
+
     if "username" in updates and updates["username"] is not None:
         username = updates["username"]
         existing = db.scalar(
@@ -224,6 +227,12 @@ def update_profile(
     for field, value in updates.items():
         setattr(current_user, field, value)
 
+    if profile_settings is not None:
+        current_user.settings = deep_merge_json(
+            current_user.settings or {},
+            profile_settings,
+        )
+
     db.commit()
     db.refresh(current_user)
     return current_user
@@ -235,9 +244,7 @@ def update_settings(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    current = dict(current_user.settings or {})
-    current.update(data.settings)
-    current_user.settings = current
+    current_user.settings = deep_merge_json(current_user.settings or {}, data.settings)
     db.commit()
     db.refresh(current_user)
     return current_user

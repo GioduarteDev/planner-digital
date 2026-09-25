@@ -16,6 +16,7 @@ from app.database import get_db
 from app.dependencies import (
     get_current_user,
 )
+from app.page_tabs import prune_page_tab_target
 
 from app.models import (
     Agenda,
@@ -221,6 +222,11 @@ def delete_folder(
         current_user,
     )
 
+    folder.agenda.settings = prune_page_tab_target(
+        folder.agenda.settings or {},
+        f"section:{folder.id}",
+    )
+
     db.delete(folder)
     db.commit()
 
@@ -311,4 +317,4 @@ def reorder_folders(
             Folder.position,
             Folder.id,
         )
-    ).all()   
+    ).all()

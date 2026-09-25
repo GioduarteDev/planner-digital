@@ -13,8 +13,6 @@ import {
   Bell,
   BookOpen,
   CalendarDays,
-  ChevronDown,
-  Clock3,
   Database,
   Flower2,
   Folder,
@@ -37,10 +35,14 @@ import {
 import AgendaCard from '../../components/AgendaCard/AgendaCard'
 import {
   API_URL,
+  PROFILE_UPDATED_EVENT,
   apiRequest,
   clearAuth,
+  saveAuth,
 } from '../../services/api'
 import './LibraryPage.css'
+import './LibraryRoom.css'
+import RoomScene from './RoomScene'
 
 
 const MAX_AGENDAS = 6
@@ -49,34 +51,30 @@ const MAX_COVER_FILE_SIZE = 10 * 1024 * 1024
 const COVER_PALETTE = [
   { name: 'Latte', value: '#F7F1E8' },
   { name: 'Wisteria', value: '#E6E3F7' },
-  { name: 'Milk Shake', value: '#FCEDED' },
-  { name: 'Seafoam', value: '#E7F5F9' },
-  { name: 'Rainy Day', value: '#B3DFE8' },
-  { name: 'Attic Window', value: '#98C1E7' },
-  { name: 'Matcha', value: '#9CA362' },
-  { name: 'Clover', value: '#5BA881' },
-  { name: 'Butter Yellow', value: '#FCD57D' },
-  { name: 'Apricot Jam', value: '#F0A351' },
   { name: 'Ballet Slipper', value: '#FDD0D0' },
-  { name: 'Cherry', value: '#C62A29' },
+  { name: 'Azure Sky', value: '#B5D8FF' },
+  { name: 'Green Beryl', value: '#D0DDC4' },
+  { name: 'Matcha', value: '#9CA362' },
+  { name: 'Sun Drenched', value: '#FCEABC' },
+  { name: 'Pêssego', value: '#EDCBB9' },
 ]
 
 const BOOK_ACCENTS = [
-  '#5BA881',
-  '#98C1E7',
-  '#9CA362',
-  '#F0A351',
-  '#B3DFE8',
-  '#C62A29',
+  '#A4B89D',
+  '#B4BED7',
+  '#B8A9C8',
+  '#CDA8B8',
+  '#CEC39C',
+  '#A4BDC8',
 ]
 
 const BOOK_MARKERS = [
-  '#FCD57D',
-  '#FDD0D0',
-  '#E6E3F7',
-  '#E7F5F9',
-  '#F0A351',
-  '#B3DFE8',
+  '#E9D9AD',
+  '#E4BCCC',
+  '#D7CBE8',
+  '#D3E3DF',
+  '#E1BFA9',
+  '#BDCEE5',
 ]
 
 
@@ -123,6 +121,7 @@ type ProfileFromApi = {
   name: string
   username: string | null
   profile_photo_url: string | null
+  profile_cover_url: string | null
 }
 
 
@@ -340,8 +339,22 @@ function LibraryPage() {
 
     void loadHeaderData()
 
+    function refreshProfile(event: Event) {
+      const updatedProfile =
+        (event as CustomEvent<ProfileFromApi>).detail
+
+      if (updatedProfile && typeof updatedProfile === 'object') {
+        setProfile(updatedProfile)
+      } else {
+        void loadHeaderData()
+      }
+    }
+
+    window.addEventListener(PROFILE_UPDATED_EVENT, refreshProfile)
+
     return () => {
       cancelled = true
+      window.removeEventListener(PROFILE_UPDATED_EVENT, refreshProfile)
     }
   }, [])
 
@@ -535,7 +548,7 @@ function LibraryPage() {
     setModalMode('create')
     setEditingAgendaId(null)
     setDraftTitle('')
-    setDraftColor('#E6E3F7')
+    setDraftColor(['#D0DDC4', '#E6E3F7', '#FDD0D0', '#FCEABC', '#B5D8FF', '#EDCBB9'][agendas.length])
     setDraftCoverImageUrl(null)
     setDraftCoverFile(null)
     setDraftCoverPreview(null)
@@ -645,6 +658,53 @@ function LibraryPage() {
       previewUrl,
     )
     setDraftCoverImageUrl(null)
+  }
+
+  async function handleSelectRoomImage(
+    file: File | undefined,
+  ) {
+    if (!file) {
+      return
+    }
+
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+    ]
+
+    if (!allowedTypes.includes(file.type)) {
+      alert('Use uma imagem JPG, PNG, WEBP ou GIF.')
+      return
+    }
+
+    if (file.size > MAX_COVER_FILE_SIZE) {
+      alert('A imagem pode ter no máximo 10 MB.')
+      return
+    }
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const updatedProfile = await apiRequest<ProfileFromApi>(
+        '/profile/cover',
+        {
+          method: 'POST',
+          body: formData,
+        },
+      )
+
+      setProfile(updatedProfile)
+      saveAuth(updatedProfile)
+    } catch (error) {
+      console.error(error)
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível atualizar a imagem do seu cantinho.',
+      )
+    }
   }
 
 
@@ -759,6 +819,21 @@ function LibraryPage() {
             ),
           ],
         )
+
+        if (!Number.isInteger(createdAgenda.id)) {
+          throw new Error(
+            'A agenda foi criada, mas a API não retornou um ID válido.',
+          )
+        }
+
+        clearDraftPreview()
+        setModalMode(null)
+        setEditingAgendaId(null)
+        setDraftCoverFile(null)
+        setDraftCoverPreview(null)
+        setDraftCoverImageUrl(null)
+        navigate(`/agenda/${createdAgenda.id}`)
+        return
       }
 
       if (
@@ -1028,12 +1103,21 @@ function LibraryPage() {
     || profile?.email?.trim()
     || 'Você'
 
+  const today = new Date()
+  const recentAgenda = [...agendas].sort((a, b) =>
+    new Date(b.updatedAt ?? b.createdAt).getTime() - new Date(a.updatedAt ?? a.createdAt).getTime())[0]
+
   const profileInitial =
     profileName.charAt(0).toUpperCase()
 
   const profilePhoto =
     profile?.profile_photo_url
       ? getMediaUrl(profile.profile_photo_url)
+      : null
+
+  const roomImage =
+    profile?.profile_cover_url
+      ? getMediaUrl(profile.profile_cover_url)
       : null
 
 
@@ -1050,6 +1134,19 @@ function LibraryPage() {
 
   return (
     <div className="library-page">
+      {roomImage && (
+        <div className="library-ambient-background" aria-hidden="true">
+          <div
+            className="library-ambient-back"
+            style={{ backgroundImage: `url("${roomImage}")` }}
+          />
+          <div
+            className="library-ambient-front"
+            style={{ backgroundImage: `url("${roomImage}")` }}
+          />
+          <div className="library-ambient-wash" />
+        </div>
+      )}
       <header className="library-topbar">
         <div className="library-topbar-inner">
           <button
@@ -1091,12 +1188,6 @@ function LibraryPage() {
               Matcha Planner
             </span>
 
-            <span className="library-brand-divider" />
-
-            <span className="library-brand-tagline">
-              pequenos planos,<br />
-              grandes histórias ♡
-            </span>
           </button>
 
           <div
@@ -1258,16 +1349,9 @@ function LibraryPage() {
                   setIsReminderOpen(false)
                 }}
               >
-                <span>Olá, {profileName.split(' ')[0]}! 🌿</span>
+                <span>Olá, {profileName.split(' ')[0]}!</span>
                 <small>Que bom ter você aqui!</small>
               </button>
-
-              <ChevronDown
-                className="library-profile-chevron"
-                size={17}
-                strokeWidth={1.8}
-                aria-hidden="true"
-              />
 
               {isProfileOpen && (
                 <div className="library-popover library-profile-popover">
@@ -1415,128 +1499,33 @@ function LibraryPage() {
         </>
       )}
 
-      <section className="library-main">
-        <div className="library-intro-row">
-          <div className="library-intro-copy">
-            <span className="library-intro-kicker">
-              SUA ESTANTE DIGITAL
-            </span>
-
-            <h1>
-              Sua biblioteca
-              <Heart
-                size={33}
-                strokeWidth={1.5}
-                aria-hidden="true"
-              />
-            </h1>
-
-            <p>
-              Aqui vivem seus planos, ideias e grandes sonhos.<br />
-              Escolha uma agenda e continue a sua história.
-            </p>
+      <div className="library-room-status"><span><Flower2 size={13} /> seu pequeno universo digital</span><span>{today.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short' })}</span></div>
+      <div className="library-desktop">
+        <aside className="room-sidebar room-sidebar-left" aria-label="Seu dia e sua coleção">
+          <div className="room-widget-title">um dia de cada vez <Sun size={13} /></div>
+          <section className="room-date"><span>HOJE</span><strong>{today.getDate().toString().padStart(2, '0')}</strong><span>{today.toLocaleDateString('pt-BR', { month: 'long' })}</span><small>{today.toLocaleDateString('pt-BR', { weekday: 'long' })}</small></section>
+          <div className="room-quote"><Flower2 size={25} strokeWidth={1} /><p>há dias que são feitos para começar devagar.</p><span>um lembrete gentil</span></div>
+          <section className="room-collection"><span className="room-label">SUA COLEÇÃO</span><div><strong>{agendas.length.toString().padStart(2, '0')}</strong><span>/ 06 agendas</span></div><div className="room-collection-meter" aria-hidden="true">{Array.from({ length: 6 }, (_, i) => <i key={i} className={i < agendas.length ? 'filled' : ''} />)}</div></section>
+          <section className="room-recent"><span className="room-label">ATUALIZADA RECENTEMENTE</span>{recentAgenda ? <button onClick={() => handleOpenAgenda(recentAgenda.id)}><BookOpen size={16} /><span>{recentAgenda.title}</span></button> : <p>Sua coleção começa aqui.</p>}</section>
+          <div className="room-sidebar-foot"><Leaf size={12} /> espaço para florescer</div>
+        </aside>
+        <main className="library-main">
+          <div className="room-paper-meta"><span>MATCHA PLANNER / COLEÇÃO PESSOAL</span><span>VOL. 01</span></div>
+          <div className="library-intro-row">
+            <div className="library-intro-copy"><h1>Sua biblioteca</h1><p>{agendas.length} de {MAX_AGENDAS} agendas · Matcha Planner</p></div>
+            <span className="room-heading-count" aria-label={`${agendas.length} de ${MAX_AGENDAS} agendas`}><strong>{agendas.length}</strong><span>/ {MAX_AGENDAS}</span></span>
           </div>
-
-          <div className="library-intro-note" aria-hidden="true">
-            <Sparkles size={21} strokeWidth={1.4} />
-            <span>
-              Boas ideias<br />
-              sempre encontram<br />
-              um lar aqui. ♡
-            </span>
+          <div className="library-controls-row">
+            <label className="library-search-wrap"><Search size={16} aria-hidden="true" /><input className="library-search" type="search" placeholder="Buscar agendas..." aria-label="Pesquisar na biblioteca" value={searchTerm} onChange={event => setSearchTerm(event.target.value)} /></label>
+            <button className="new-agenda-button" type="button" onClick={openCreateModal} disabled={agendas.length >= MAX_AGENDAS}><Plus size={15} />Nova agenda</button>
           </div>
-        </div>
-
-        <div className="library-controls-row">
-          <label className="library-search-wrap">
-            <Search
-              size={21}
-              strokeWidth={1.8}
-              aria-hidden="true"
-            />
-            <input
-              className="library-search"
-              type="search"
-              placeholder="Buscar agendas, temas ou palavras-chave..."
-              aria-label="Pesquisar na biblioteca"
-              value={searchTerm}
-              onChange={(event) =>
-                setSearchTerm(
-                  event.target.value,
-                )
-              }
-            />
-          </label>
-
-          <div className="library-filter-and-create">
-            <div
-              className="library-filters"
-              role="group"
-              aria-label="Filtrar agendas"
-            >
-              <button
-                type="button"
-                className={activeFilter === 'all' ? 'active' : ''}
-                onClick={() => setActiveFilter('all')}
-              >
-                <Library size={16} aria-hidden="true" />
-                Todas
-              </button>
-
-              <button
-                type="button"
-                className={activeFilter === 'favorites' ? 'active' : ''}
-                onClick={() => setActiveFilter('favorites')}
-              >
-                <Heart size={16} aria-hidden="true" />
-                Favoritas
-              </button>
-
-              <button
-                type="button"
-                className={activeFilter === 'recent' ? 'active' : ''}
-                onClick={() => setActiveFilter('recent')}
-              >
-                <Clock3 size={16} aria-hidden="true" />
-                Recentes
-              </button>
-            </div>
-
-            <button
-              className="new-agenda-button"
-              type="button"
-              onClick={openCreateModal}
-              disabled={agendas.length >= MAX_AGENDAS}
-            >
-              <Plus size={18} strokeWidth={2} aria-hidden="true" />
-              Nova agenda
-            </button>
+          <div className="library-filters" role="group" aria-label="Filtrar agendas">
+            <button type="button" aria-pressed={activeFilter === 'all'} className={activeFilter === 'all' ? 'active' : ''} onClick={() => setActiveFilter('all')}>Todas</button>
+            <button type="button" aria-pressed={activeFilter === 'favorites'} className={activeFilter === 'favorites' ? 'active' : ''} onClick={() => setActiveFilter('favorites')}>Favoritas</button>
+            <button type="button" aria-pressed={activeFilter === 'recent'} className={activeFilter === 'recent' ? 'active' : ''} onClick={() => setActiveFilter('recent')}>Recentes</button>
           </div>
-        </div>
-
-        <div className="library-collection-heading">
-          <div>
-            <span>MINHA COLEÇÃO</span>
-            <h2>Agendas e diários</h2>
-          </div>
-
-          <p>
-            {visibleAgendas.length} de {MAX_AGENDAS}
-          </p>
-        </div>
-
+          <button className="room-favorite-tab" onClick={() => setActiveFilter('favorites')} aria-label="Ver favoritas"><Heart size={13} /> favoritas</button>
         <section className="library-shelf" aria-label="Sua coleção de agendas">
-          <div className="library-shelf-decoration library-shelf-decoration-left" aria-hidden="true">
-            <Leaf size={44} strokeWidth={1.1} />
-            <Leaf size={31} strokeWidth={1.1} />
-            <Flower2 size={28} strokeWidth={1.1} />
-          </div>
-
-          <div className="library-shelf-decoration library-shelf-decoration-right" aria-hidden="true">
-            <Flower2 size={31} strokeWidth={1.1} />
-            <Leaf size={39} strokeWidth={1.1} />
-          </div>
-
           {isLoading ? (
             <div className="library-state-card">
               <span className="library-loader" />
@@ -1566,7 +1555,7 @@ function LibraryPage() {
               )}
             </div>
           ) : (
-            <div className="agenda-grid">
+            <div className={`agenda-grid${visibleAgendas.length === 1 ? ' is-single' : ''}`}>
               {visibleAgendas.map((agenda) => (
                 <AgendaCard
                   key={agenda.id}
@@ -1583,6 +1572,7 @@ function LibraryPage() {
                   updatedAt={agenda.updatedAt ?? agenda.createdAt}
                   onOpen={() => handleOpenAgenda(agenda.id)}
                   onEditCover={() => openEditModal(agenda)}
+                  onRename={() => openEditModal(agenda)}
                   onToggleFavorite={() =>
                     void handleToggleFavorite(agenda)
                   }
@@ -1595,19 +1585,42 @@ function LibraryPage() {
                   }
                 />
               ))}
+              {agendas.length === 1 && visibleAgendas.length === 1 && activeFilter === 'all' && !searchTerm.trim() && <div className="room-collection-note"><span className="room-note-tape" /><Flower2 size={23} strokeWidth={1.2} /><h2>Comece sua coleção</h2><p>Um lugar para os planos de hoje<br />e as ideias de amanhã.</p><button onClick={openCreateModal}><Plus size={14} /> Mais uma história</button><span className="room-note-sign">com carinho, matcha</span></div>}
             </div>
           )}
-
-          <div className="library-shelf-board" aria-hidden="true" />
         </section>
-
-        <div className="library-quiet-note">
-          <Leaf size={17} strokeWidth={1.5} aria-hidden="true" />
-          <span>
-            cada agenda guarda um pedacinho da sua história
-          </span>
-        </div>
-      </section>
+        <div className="room-paper-footer"><span>PLANOS · IDEIAS · MEMÓRIAS</span><span>{visibleAgendas.length.toString().padStart(2, '0')} / 06 <Leaf size={12} /></span></div>
+        </main>
+        <aside className="room-sidebar room-sidebar-right" aria-label="Seu cantinho pessoal">
+          <div className="room-widget-title">seu cantinho <Heart size={12} /></div>
+          <button className="room-profile" onClick={() => navigate('/profile')}><span className="room-avatar">{profilePhoto ? <img src={profilePhoto} alt="" /> : profileInitial}</span><strong>{profileName.split(' ')[0]}</strong><span>que bom ter você aqui.</span></button>
+          <figure className="room-polaroid">
+            <RoomScene imageUrl={roomImage} />
+            <label className="room-polaroid-edit">
+              <span>{roomImage ? 'Trocar imagem' : 'Escolher imagem'}</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={(event) => {
+                  void handleSelectRoomImage(event.target.files?.[0])
+                  event.target.value = ''
+                }}
+              />
+            </label>
+            <figcaption>um respiro entre os planos</figcaption>
+          </figure>
+          <section className="room-continue"><span className="room-label">CONTINUE SEUS PLANOS</span>{recentAgenda ? <><strong>{recentAgenda.title}</strong><button onClick={() => handleOpenAgenda(recentAgenda.id)}><BookOpen size={14} /> Abrir agenda</button></> : <p>Seu próximo capítulo começa com uma agenda.</p>}</section>
+          <button className="room-reminder" onClick={() => navigate('/calendar')}><Bell size={16} /><span><strong>{upcomingReminders.length ? `${upcomingReminders.length} lembrete${upcomingReminders.length === 1 ? '' : 's'}` : 'Tudo tranquilo'}</strong><small>{upcomingReminders.length ? 'no seu calendário' : 'nenhum lembrete por agora'}</small></span></button>
+        </aside>
+      </div>
+      <nav className="room-dock" aria-label="Atalhos principais">
+        <button onClick={() => navigate('/today')}><Sun /><span>Hoje</span></button>
+        <button aria-current="page" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}><Library /><span>Biblioteca</span></button>
+        <button onClick={() => navigate('/calendar')}><CalendarDays /><span>Calendário</span></button>
+        <button onClick={() => navigate('/tasks')}><ListChecks /><span>Tarefas</span></button>
+        <button onClick={() => recentAgenda ? handleOpenAgenda(recentAgenda.id) : openCreateModal()}><BookOpen /><span>Agenda</span></button>
+        <button onClick={() => navigate('/stationery')}><Palette /><span>Papelaria</span></button>
+      </nav>
 
       {modalMode !== null && (
         <div

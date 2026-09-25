@@ -425,3 +425,82 @@
       1fr;
   }
 }
+
+/* Handheld console visual language */
+.studies-page {
+  --game-ink: #25204f;
+  --game-purple: #6e4ce6;
+  --game-pink: #ff6f91;
+  --game-mint: #55d6be;
+  --game-yellow: #ffd84d;
+  --game-orange: #ff914d;
+  min-height: 100vh;
+  padding: 22px clamp(14px, 4vw, 48px) 64px;
+  background: #dfe8ff;
+  color: var(--game-ink);
+  background-image: radial-gradient(circle at 12% 12%, rgba(255, 216, 77, .75) 0 8px, transparent 9px), radial-gradient(circle at 87% 22%, rgba(255, 111, 145, .55) 0 12px, transparent 13px), linear-gradient(135deg, #dce8ff, #f5ddff 55%, #d9fff1);
+}
+.studies-topbar { width: min(1120px, 100%); margin: 0 auto 18px; padding: 10px; border: 3px solid var(--game-ink); border-radius: 24px; background: #fefbf0; box-shadow: 7px 7px 0 var(--game-purple); }
+.studies-topbar h1 { color: var(--game-purple); font-size: clamp(24px, 4vw, 42px); font-weight: 900; letter-spacing: -.05em; text-transform: uppercase; }
+.studies-topbar button, .save-study-button { border: 3px solid var(--game-ink); border-radius: 999px; background: var(--game-yellow); color: var(--game-ink); font-weight: 900; box-shadow: 3px 3px 0 var(--game-ink); }
+.study-stats, .study-highlight-grid, .study-dashboard, .studies-layout, .study-mission-board { width: min(1120px, 100%); margin-right: auto; margin-left: auto; }
+.study-stats { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.study-stats article, .study-highlight-card, .study-dashboard-card, .study-form-card, .study-history, .study-mission-board { border: 3px solid var(--game-ink); border-radius: 20px; background: #fefbf0; box-shadow: 5px 5px 0 rgba(37, 32, 79, .16); }
+.study-stats article { position: relative; overflow: hidden; padding: 18px; }
+.study-stats article:nth-child(1) { background: #fff0a8; }
+.study-stats article:nth-child(2) { background: #c9f8ea; }
+.study-stats article:nth-child(3) { background: #ffd0dd; }
+.study-stats article:nth-child(4) { background: #d8ccff; }
+.study-stats article::after { position: absolute; right: 12px; bottom: 8px; content: '✦'; color: var(--game-purple); font-size: 25px; }
+.study-stats span, .study-highlight-card span, .dashboard-card-header span { color: #5f5989; font-size: 11px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.study-stats strong { color: var(--game-ink); font-size: 30px; }
+.study-highlight-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.study-highlight-card { padding: 20px; }
+.study-highlight-card strong { color: var(--game-purple); font-size: 27px; }
+.study-dashboard { gap: 14px; }
+.study-dashboard-card { padding: 20px; }
+.dashboard-card-header h2, .study-form-card h2, .study-history h2 { color: var(--game-ink); font-size: 22px; font-weight: 900; letter-spacing: -.03em; }
+.subject-bar-track, .week-bar-area { border: 2px solid var(--game-ink); background: #edf0ff; }
+.subject-bar, .week-bar { background: var(--game-purple); }
+.week-bar:nth-child(odd) { background: var(--game-pink); }
+.study-mission-board { margin-bottom: 24px; padding: 20px; }
+.study-mission-board .dashboard-card-header { margin-bottom: 16px; }
+.study-level-badge { display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border: 2px solid var(--game-ink); border-radius: 999px; background: var(--game-orange); color: white; font-weight: 900; }
+.study-missions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.study-mission { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; padding: 12px; border: 2px solid #b7b2d7; border-radius: 14px; background: #f2f0ff; }
+.study-mission.completed { border-color: var(--game-mint); background: #dffbf3; }
+.study-mission-icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 12px; background: var(--game-pink); color: white; font-size: 11px; font-weight: 900; }
+.study-mission.completed .study-mission-icon { background: var(--game-mint); color: var(--game-ink); }
+.study-mission strong, .study-mission small { display: block; }
+.study-mission small { margin-top: 3px; color: #77719a; font-size: 11px; }
+.study-mission b { color: var(--game-purple); font-size: 9px; }
+.study-goal-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 16px; }
+.study-goal-grid div { display: grid; gap: 5px; }
+.study-goal-grid span { color: #6a6492; font-size: 10px; font-weight: 900; }
+.study-goal-grid strong { font-size: 14px; }
+.study-goal-grid i { height: 12px; overflow: hidden; border: 2px solid var(--game-ink); border-radius: 999px; background: #e4e5f5; }
+.study-goal-grid em { display: block; height: 100%; background: var(--game-mint); }
+.study-form-card, .study-history { padding: 20px; }
+.study-form-card input, .study-form-card textarea { border: 2px solid #b7b2d7; border-radius: 10px; background: #fff; }
+.study-form-card input:focus, .study-form-card textarea:focus { border-color: var(--game-purple); box-shadow: 3px 3px 0 var(--game-yellow); outline: none; }
+.study-card { border: 2px solid #b7b2d7; border-radius: 14px; background: #f3f1ff; }
+.study-card:nth-child(even) { background: #e9fff8; }
+.study-card-title strong { color: var(--game-purple); }
+.study-card-title span { border: 1px solid var(--game-purple); background: #ddd5ff; color: var(--game-ink); }
+.study-card-actions button { border: 2px solid var(--game-ink); border-radius: 999px; background: var(--game-yellow); color: var(--game-ink); padding: 6px 10px; font-weight: 800; }
+.study-card-actions button:last-child { background: #ffd0dd; color: #a43e64; }
+
+@media (max-width: 900px) {
+  .study-stats { grid-template-columns: repeat(2, 1fr); }
+  .study-missions { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .studies-page { padding: 12px 10px 42px; }
+  .studies-topbar { flex-wrap: wrap; justify-content: center; }
+  .studies-topbar h1 { order: -1; width: 100%; text-align: center; }
+  .study-stats, .study-highlight-grid, .study-goal-grid { grid-template-columns: 1fr; }
+  .study-dashboard { gap: 12px; }
+  .study-dashboard-card { overflow: hidden; }
+  .week-chart { gap: 3px; }
+  .week-label { font-size: 10px; }
+}

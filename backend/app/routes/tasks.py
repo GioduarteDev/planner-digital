@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import date
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models import Category, Page, Project, Task, User
+from app.models import Category, Page, Project, Subject, Task, User
 from app.routes.helpers import get_user_page_or_404
 from app.schemas import TaskCreate, TaskResponse, TaskUpdate
 
@@ -22,6 +24,7 @@ def validate_links(
     user_id: int,
     db: Session,
     project_id: int | None = None,
+    subject_id: int | None = None,
     category_id: int | None = None,
 ) -> None:
     if project_id is not None:
@@ -30,6 +33,12 @@ def validate_links(
         )
         if project is None:
             raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    if subject_id is not None:
+        subject = db.scalar(
+            select(Subject).where(Subject.id == subject_id, Subject.user_id == user_id)
+        )
+        if subject is None:
+            raise HTTPException(status_code=404, detail="Matéria não encontrada.")
     if category_id is not None:
         category = db.scalar(
             select(Category).where(Category.id == category_id, Category.user_id == user_id)
@@ -53,6 +62,7 @@ def build_task(
         due_at=data.due_at,
         priority=data.priority,
         project_id=data.project_id,
+        subject_id=data.subject_id,
         category_id=data.category_id,
         show_in_calendar=data.show_in_calendar,
     )
@@ -60,14 +70,22 @@ def build_task(
 
 @router.get("/tasks", response_model=list[TaskResponse])
 def list_all_tasks(
+    due_from: date | None = Query(default=None),
+    due_to: date | None = Query(default=None),
+    done: bool | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return db.scalars(
-        select(Task)
-        .where(Task.user_id == current_user.id)
-        .order_by(Task.created_at, Task.id)
-    ).all()
+    if due_from is not None and due_to is not None and due_to < due_from:
+        raise HTTPException(status_code=400, detail="A data final não pode ser anterior à inicial.")
+    query = select(Task).where(Task.user_id == current_user.id)
+    if due_from is not None:
+        query = query.where(Task.due_date >= due_from)
+    if due_to is not None:
+        query = query.where(Task.due_date <= due_to)
+    if done is not None:
+        query = query.where(Task.done == done)
+    return db.scalars(query.order_by(Task.due_date, Task.created_at, Task.id)).all()
 
 
 @router.get("/pages/{page_id}/tasks", response_model=list[TaskResponse])
@@ -106,6 +124,7 @@ def create_independent_task(
         user_id=current_user.id,
         db=db,
         project_id=data.project_id,
+        subject_id=data.subject_id,
         category_id=data.category_id,
     )
     task = build_task(data, current_user, None)
@@ -131,6 +150,7 @@ def create_task(
         user_id=current_user.id,
         db=db,
         project_id=data.project_id,
+        subject_id=data.subject_id,
         category_id=data.category_id,
     )
     task = build_task(data, current_user, page_id)
@@ -160,6 +180,7 @@ def update_task(
         user_id=current_user.id,
         db=db,
         project_id=updates.get("project_id") if "project_id" in updates else None,
+        subject_id=updates.get("subject_id") if "subject_id" in updates else None,
         category_id=updates.get("category_id") if "category_id" in updates else None,
     )
 

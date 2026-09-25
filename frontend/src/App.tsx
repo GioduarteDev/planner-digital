@@ -58,6 +58,8 @@ import {
 } from './services/api'
 
 
+import InboxPage from './pages/Inbox/InboxPage'
+
 type AuthState =
   | 'checking'
   | 'authenticated'
@@ -144,10 +146,18 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
         <Route
           path="/login"
           element={
-            <AuthPage />
+            <AuthPage key="login" />
+          }
+        />
+
+        <Route
+          path="/register"
+          element={
+            <AuthPage key="register" />
           }
         />
 

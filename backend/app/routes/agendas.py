@@ -18,6 +18,8 @@ from app.database import get_db
 from app.dependencies import (
     get_current_user,
 )
+from app.json_utils import deep_merge_json
+from app.page_tabs import validate_page_tabs
 
 from app.models import (
     Agenda,
@@ -183,6 +185,8 @@ def create_agenda(
         )
 
     db.add(agenda)
+    db.flush()
+    validate_page_tabs(agenda.settings or {}, agenda.id, db)
     db.commit()
     db.refresh(agenda)
 
@@ -227,6 +231,14 @@ def update_agenda(
             exclude_unset=True
         )
     )
+
+    if "settings" in update_data:
+        merged_settings = deep_merge_json(
+            agenda.settings or {},
+            update_data["settings"],
+        )
+        validate_page_tabs(merged_settings, agenda.id, db)
+        update_data["settings"] = merged_settings
 
     for (
         field,

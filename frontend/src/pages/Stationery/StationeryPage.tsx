@@ -6,6 +6,8 @@ import {
 import {
   apiRequest,
 } from '../../services/api'
+import StickerPicker from './StickerPicker'
+import { normalizeSticker, type ReusableSticker } from './stickerTypes'
 
 import './StationeryPage.css'
 
@@ -38,6 +40,16 @@ type StationeryKit = {
   data: Record<string, unknown>
   created_at: string
   updated_at: string
+}
+
+type StickerFromApi = {
+  id: number
+  name: string
+  media_type: string
+  file_url: string
+  kit_name?: string | null
+  mime_type?: string
+  created_at?: string
 }
 
 
@@ -124,6 +136,10 @@ function StationeryPage() {
     setKits,
   ] =
     useState<StationeryKit[]>([])
+
+  const [stickers, setStickers] = useState<ReusableSticker[]>([])
+  const [stickersLoading, setStickersLoading] = useState(true)
+  const [selectedStickerId, setSelectedStickerId] = useState<number | null>(null)
 
 
   const [
@@ -322,6 +338,7 @@ function StationeryPage() {
         const [
           presetData,
           kitData,
+          stickerData,
         ] =
           await Promise.all([
             apiRequest<Preset[]>(
@@ -333,6 +350,8 @@ function StationeryPage() {
             >(
               '/stationery-kits',
             ),
+
+            apiRequest<StickerFromApi[]>('/library/media?media_type=sticker'),
           ])
 
 
@@ -348,6 +367,7 @@ function StationeryPage() {
         setKits(
           kitData,
         )
+        setStickers(stickerData.map(normalizeSticker))
       } catch (loadError) {
         if (cancelled) {
           return
@@ -376,6 +396,7 @@ function StationeryPage() {
           setIsLoading(
             false,
           )
+          setStickersLoading(false)
         }
       }
     }
@@ -2009,6 +2030,26 @@ function StationeryPage() {
                 ),
               )}
             </div>
+          </section>
+
+
+          <section className="stationery-sticker-library-section">
+            <div className="stationery-section-heading">
+              <div>
+                <span>Biblioteca reutilizável</span>
+                <h2>Meus stickers</h2>
+              </div>
+              <strong>{stickers.length}</strong>
+            </div>
+            <p className="stationery-sticker-source-note">
+              Cada item fica disponível com o mesmo ID para Calendário, Editor e futuras superfícies decorativas.
+            </p>
+            <StickerPicker
+              stickers={stickers}
+              loading={stickersLoading}
+              selectedId={selectedStickerId}
+              onSelect={sticker => setSelectedStickerId(sticker.id)}
+            />
           </section>
 
 

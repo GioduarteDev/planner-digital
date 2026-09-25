@@ -18,6 +18,22 @@ const LEGACY_TOKEN_KEY =
 const CSRF_COOKIE_NAME =
   'planner_csrf'
 
+export const PROFILE_UPDATED_EVENT =
+  'planner:profile-updated'
+
+
+export function notifyProfileUpdated(
+  profile: unknown,
+) {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent(PROFILE_UPDATED_EVENT, {
+        detail: profile,
+      }),
+    )
+  }
+}
+
 
 export function getStoredUser() {
   const raw =
@@ -189,9 +205,21 @@ export async function apiRequest<T>(
       const error =
         await response.json()
 
-      errorMessage =
-        error.detail
-        ?? errorMessage
+      const detail = error.detail
+
+      if (typeof detail === 'string') {
+        errorMessage = detail
+      } else if (Array.isArray(detail)) {
+        errorMessage = detail
+          .map((item: unknown) => {
+            if (typeof item === 'string') return item
+            if (item && typeof item === 'object' && 'msg' in item) {
+              return String(item.msg)
+            }
+            return 'Verifique os dados informados.'
+          })
+          .join(' ')
+      }
     } catch {
       // mant?m mensagem padr?o
     }

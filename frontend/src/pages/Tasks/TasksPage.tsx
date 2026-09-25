@@ -10,6 +10,7 @@ import {
 } from '../../services/api'
 
 import './TasksPage.css'
+import SubjectPicker from '../../components/SubjectPicker'
 
 
 type TaskPriority =
@@ -19,6 +20,7 @@ type TaskPriority =
 
 
 type Task = {
+  subject_id: number | null
   id: number
   user_id: number
   page_id: number | null
@@ -92,6 +94,7 @@ function formatDate(
 
 
 function TasksPage() {
+  const [subjectId, setSubjectId] = useState<number | null>(null)
   const [
     tasks,
     setTasks,
@@ -274,6 +277,18 @@ function TasksPage() {
       ],
     )
 
+  const completedCount =
+    tasks.filter(
+      (task) => task.done,
+    ).length
+
+  const completionPercent =
+    tasks.length === 0
+      ? 0
+      : Math.round(
+          completedCount / tasks.length * 100,
+        )
+
 
   function clearMessages() {
     setError('')
@@ -282,6 +297,7 @@ function TasksPage() {
 
 
   function resetForm() {
+    setSubjectId(null)
     setEditingTaskId(null)
     setText('')
     setDescription('')
@@ -296,6 +312,7 @@ function TasksPage() {
   function startEdit(
     task: Task,
   ) {
+    setSubjectId(task.subject_id ?? null)
     clearMessages()
 
     setEditingTaskId(
@@ -374,6 +391,7 @@ function TasksPage() {
 
           priority,
 
+          subject_id: subjectId,
           project_id:
             projectId
               ? Number(projectId)
@@ -455,20 +473,8 @@ function TasksPage() {
     const nextDone =
       !task.done
 
-    setTasks(
-      (current) =>
-        current.map(
-          (item) =>
-            item.id === task.id
-              ? {
-                  ...item,
-                  done: nextDone,
-                }
-              : item,
-        ),
-    )
-
     try {
+      clearMessages()
       const updated =
         await apiRequest<Task>(
           `/tasks/${task.id}`,
@@ -492,16 +498,6 @@ function TasksPage() {
           ),
       )
     } catch (err) {
-      setTasks(
-        (current) =>
-          current.map(
-            (item) =>
-              item.id === task.id
-                ? task
-                : item,
-          ),
-      )
-
       setError(
         err instanceof Error
           ? err.message
@@ -517,21 +513,8 @@ function TasksPage() {
     const nextValue =
       !task.show_in_calendar
 
-    setTasks(
-      (current) =>
-        current.map(
-          (item) =>
-            item.id === task.id
-              ? {
-                  ...item,
-                  show_in_calendar:
-                    nextValue,
-                }
-              : item,
-        ),
-    )
-
     try {
+      clearMessages()
       const updated =
         await apiRequest<Task>(
           `/tasks/${task.id}`,
@@ -555,16 +538,6 @@ function TasksPage() {
           ),
       )
     } catch (err) {
-      setTasks(
-        (current) =>
-          current.map(
-            (item) =>
-              item.id === task.id
-                ? task
-                : item,
-          ),
-      )
-
       setError(
         err instanceof Error
           ? err.message
@@ -682,6 +655,24 @@ function TasksPage() {
         </div>
       </header>
 
+      <div className="tasks-receipt-banner">
+        <div>
+          <span className="tasks-receipt-kicker">LISTA Nº {String(tasks.length).padStart(2, '0')}</span>
+          <strong>CHECKOUT DO DIA</strong>
+        </div>
+        <div className="tasks-receipt-stamp" aria-label={`${completionPercent}% das tarefas concluídas`}>
+          <strong>{completionPercent}%</strong>
+          <span>feito</span>
+        </div>
+      </div>
+
+      <div className="tasks-summary-strip" aria-label="Resumo das tarefas">
+        <span><b>{String(tasks.length).padStart(2, '0')}</b> itens</span>
+        <span><b>{String(tasks.length - completedCount).padStart(2, '0')}</b> abertos</span>
+        <span><b>{String(completedCount).padStart(2, '0')}</b> pagos</span>
+        <span className="tasks-progress-bar"><i style={{ width: `${completionPercent}%` }} /></span>
+      </div>
+
 
       {message && (
         <div className="tasks-message success">
@@ -734,6 +725,7 @@ function TasksPage() {
 
 
         <div className="tasks-form-grid">
+          <SubjectPicker value={subjectId} onChange={setSubjectId} />
           <label className="tasks-full">
             Tarefa
 
@@ -1001,7 +993,7 @@ function TasksPage() {
       ) : (
         <div className="tasks-list">
           {filteredTasks.map(
-            (task) => {
+            (task, index) => {
               const project =
                 getProject(
                   task.project_id,
@@ -1021,6 +1013,9 @@ function TasksPage() {
                       : 'task-card'
                   }
                 >
+                  <div className="task-item-number" aria-hidden="true">
+                    {String(index + 1).padStart(2, '0')}
+                  </div>
                   <button
                     type="button"
                     className={
@@ -1073,6 +1068,9 @@ function TasksPage() {
 
 
                     <div className="task-meta">
+                      <span className="task-status-label">
+                        {task.done ? 'STATUS: PAGO' : 'STATUS: ABERTO'}
+                      </span>
                       <span>
                         Data: {
                           formatDate(
@@ -1177,6 +1175,12 @@ function TasksPage() {
           )}
         </div>
       )}
+
+      <footer className="tasks-receipt-total">
+        <span>TOTAL DO DIA</span>
+        <strong>{completedCount} / {tasks.length || 0}</strong>
+        <small>tarefas concluídas</small>
+      </footer>
     </section>
   )
 }

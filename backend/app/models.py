@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from sqlalchemy import (
     Boolean,
@@ -9,9 +9,11 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Integer,
+    Index,
     JSON,
     String,
     Text,
+    Time,
     UniqueConstraint,
     func,
 )
@@ -52,6 +54,9 @@ class User(Base):
     tasks: Mapped[list[Task]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+    habits: Mapped[list[Habit]] = relationship(
+    back_populates="user", cascade="all, delete-orphan"
+    )
     study_sessions: Mapped[list[StudySession]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
@@ -77,6 +82,12 @@ class User(Base):
         back_populates="user", cascade="all, delete-orphan"
     )
     auth_sessions: Mapped[list[AuthSession]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    daily_entries: Mapped[list[DailyEntry]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
+    inbox_items: Mapped[list[InboxItem]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
@@ -290,6 +301,9 @@ class Project(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
+    subject_id: Mapped[int | None] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     title: Mapped[str] = mapped_column(String(160), nullable=False)
     description: Mapped[str] = mapped_column(Text, default="", server_default="")
     status: Mapped[str] = mapped_column(String(30), default="active", server_default="active")
@@ -302,6 +316,7 @@ class Project(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="projects")
+    subject: Mapped[Subject | None] = relationship(back_populates="projects")
     tasks: Mapped[list[Task]] = relationship(back_populates="project")
     events: Mapped[list[Event]] = relationship(back_populates="project")
     study_sessions: Mapped[list[StudySession]] = relationship(back_populates="project")
@@ -336,16 +351,52 @@ class Subject(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
+    professor: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    semester: Mapped[str | None] = mapped_column(String(80), nullable=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     color: Mapped[str] = mapped_column(String(20), default="#9fb9cc", server_default="#9fb9cc")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="subjects")
     study_sessions: Mapped[list[StudySession]] = relationship(back_populates="subject_ref")
+    tasks: Mapped[list[Task]] = relationship(back_populates="subject")
+    events: Mapped[list[Event]] = relationship(back_populates="subject")
+    projects: Mapped[list[Project]] = relationship(back_populates="subject")
+    inbox_items: Mapped[list[InboxItem]] = relationship(back_populates="subject")
+
+
+class InboxItem(Base):
+    __tablename__ = "inbox_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    subject_id: Mapped[int | None] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    converted_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    converted_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    text: Mapped[str] = mapped_column(String(300), nullable=False)
+    note: Mapped[str] = mapped_column(Text, default="", server_default="")
+    optional_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    optional_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="new", server_default="new")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[User] = relationship(back_populates="inbox_items")
+    subject: Mapped[Subject | None] = relationship(back_populates="inbox_items")
 
 
 class Task(Base):
     __tablename__ = "tasks"
+    __table_args__ = (
+        Index("ix_tasks_user_due_date", "user_id", "due_date"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(
@@ -356,6 +407,9 @@ class Task(Base):
     )
     project_id: Mapped[int | None] = mapped_column(
         ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    subject_id: Mapped[int | None] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True, index=True
     )
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True
@@ -377,6 +431,7 @@ class Task(Base):
     user: Mapped[User] = relationship(back_populates="tasks")
     page: Mapped[Page | None] = relationship(back_populates="tasks")
     project: Mapped[Project | None] = relationship(back_populates="tasks")
+    subject: Mapped[Subject | None] = relationship(back_populates="tasks")
     category: Mapped[Category | None] = relationship(back_populates="tasks")
     reminders: Mapped[list[Reminder]] = relationship(
         back_populates="task", cascade="all, delete-orphan", passive_deletes=True
@@ -385,6 +440,9 @@ class Task(Base):
 
 class Event(Base):
     __tablename__ = "events"
+    __table_args__ = (
+        Index("ix_events_user_starts_at", "user_id", "starts_at"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(
@@ -392,6 +450,9 @@ class Event(Base):
     )
     project_id: Mapped[int | None] = mapped_column(
         ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    subject_id: Mapped[int | None] = mapped_column(
+        ForeignKey("subjects.id", ondelete="SET NULL"), nullable=True, index=True
     )
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"), nullable=True, index=True
@@ -413,6 +474,7 @@ class Event(Base):
 
     user: Mapped[User] = relationship(back_populates="events")
     project: Mapped[Project | None] = relationship(back_populates="events")
+    subject: Mapped[Subject | None] = relationship(back_populates="events")
     category: Mapped[Category | None] = relationship(back_populates="events")
     reminders: Mapped[list[Reminder]] = relationship(
         back_populates="event", cascade="all, delete-orphan", passive_deletes=True
@@ -495,6 +557,147 @@ class CanvasElement(Base):
     page: Mapped[Page | None] = relationship(back_populates="canvas_elements")
 
 
+class DailyEntry(Base):
+    __tablename__ = "daily_entries"
+    __table_args__ = (
+        UniqueConstraint("user_id", "entry_date", name="uq_daily_entries_user_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    entry_date: Mapped[date] = mapped_column(Date, nullable=False)
+    mood: Mapped[str] = mapped_column(String(40), default="", server_default="")
+    quick_note: Mapped[str] = mapped_column(Text, default="", server_default="")
+    music_data: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    reading_data: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    watching_data: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    photo_media_id: Mapped[int | None] = mapped_column(
+        ForeignKey("media_library_items.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    user: Mapped[User] = relationship(back_populates="daily_entries")
+
+class Habit(Base):
+    __tablename__ = "habits"
+    __table_args__ = (
+        Index("ix_habits_user_active", "user_id", "active"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    name: Mapped[str] = mapped_column(
+        String(200),
+        nullable=False,
+    )
+
+    description: Mapped[str] = mapped_column(
+        Text,
+        default="",
+        server_default="",
+    )
+
+    # 0 = segunda-feira ... 6 = domingo
+    days_of_week: Mapped[list[int]] = mapped_column(
+        JSON,
+        default=list,
+        nullable=False,
+    )
+
+    time_of_day: Mapped[time | None] = mapped_column(
+        Time,
+        nullable=True,
+    )
+
+    color: Mapped[str] = mapped_column(
+        String(20),
+        default="#9CA362",
+        server_default="#9CA362",
+    )
+
+    active: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        server_default="true",
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+    user: Mapped[User] = relationship(
+        back_populates="habits",
+    )
+
+    completions: Mapped[list[HabitCompletion]] = relationship(
+        back_populates="habit",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    reminders: Mapped[list[Reminder]] = relationship(
+        back_populates="habit",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+class HabitCompletion(Base):
+    __tablename__ = "habit_completions"
+    __table_args__ = (
+        UniqueConstraint(
+            "habit_id",
+            "completion_date",
+            name="uq_habit_completions_habit_date",
+        ),
+        Index(
+            "ix_habit_completions_habit_date",
+            "habit_id",
+            "completion_date",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    habit_id: Mapped[int] = mapped_column(
+        ForeignKey("habits.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    completion_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+    )
+
+    completed_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    habit: Mapped[Habit] = relationship(
+        back_populates="completions",
+    )
 class UserPreset(Base):
     __tablename__ = "user_presets"
 
@@ -546,6 +749,11 @@ class Reminder(Base):
     task_id: Mapped[int | None] = mapped_column(
         ForeignKey("tasks.id", ondelete="CASCADE"), nullable=True, index=True
     )
+    habit_id: Mapped[int | None] = mapped_column(
+    ForeignKey("habits.id", ondelete="CASCADE"),
+    nullable=True,
+    index=True,
+)
     minutes_before: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     channel: Mapped[str] = mapped_column(String(20), default="push", server_default="push")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
@@ -562,6 +770,8 @@ class Reminder(Base):
     user: Mapped[User] = relationship(back_populates="reminders")
     event: Mapped[Event | None] = relationship(back_populates="reminders")
     task: Mapped[Task | None] = relationship(back_populates="reminders")
+    habit: Mapped[Habit | None] = relationship(back_populates="reminders")
+
 
 
 class PushSubscription(Base):

@@ -22,12 +22,19 @@ type SearchResult = {
     | 'task'
     | 'event'
     | 'study'
+    | 'project'
+    | 'category'
+    | 'subject'
+    | 'canvas_element'
+    | 'media'
 
   id: number
   title: string
   subtitle: string
   agenda_id: number | null
   page_id: number | null
+  target_date: string | null
+  target_path: string | null
 }
 
 
@@ -37,6 +44,11 @@ const TYPE_LABELS = {
   task: 'Tarefa',
   event: 'Evento',
   study: 'Estudo',
+  project: 'Projeto',
+  category: 'Categoria',
+  subject: 'Matéria',
+  canvas_element: 'Elemento da página',
+  media: 'Mídia',
 }
 
 
@@ -46,6 +58,11 @@ const TYPE_ICONS = {
   task: '✓',
   event: '📅',
   study: '📚',
+  project: '◈',
+  category: '▣',
+  subject: '✎',
+  canvas_element: '▤',
+  media: '▧',
 }
 
 
@@ -61,7 +78,7 @@ function SearchPage() {
     useSearchParams()
 
 
-  const initialQuery =
+  const urlQuery =
     searchParams.get('q') ?? ''
 
 
@@ -70,7 +87,7 @@ function SearchPage() {
     setQuery,
   ] =
     useState(
-      initialQuery,
+      urlQuery,
     )
 
 
@@ -250,13 +267,13 @@ function SearchPage() {
 
 
     if (
-      (
-        result.type === 'page'
-        || result.type === 'task'
-      )
-      && result.agenda_id
-      && result.page_id
+      result.type === 'page'
+      || result.type === 'canvas_element'
     ) {
+      if (!result.agenda_id || !result.page_id) {
+        return
+      }
+
       navigate(
         `/agenda/${result.agenda_id}?page=${result.page_id}`,
       )
@@ -266,12 +283,21 @@ function SearchPage() {
 
 
     if (
+      result.type === 'task'
+    ) {
+      navigate('/tasks')
+      return
+    }
+
+
+    if (
       result.type === 'event'
     ) {
-      navigate(
-        '/calendar',
-      )
+      const queryString = result.target_date
+        ? `?date=${encodeURIComponent(result.target_date)}`
+        : ''
 
+      navigate(`/calendar${queryString}`)
       return
     }
 
@@ -279,10 +305,41 @@ function SearchPage() {
     if (
       result.type === 'study'
     ) {
-      navigate(
-        '/studies',
-      )
+      navigate('/studies')
+      return
     }
+
+
+    if (
+      result.type === 'media'
+    ) {
+      if (result.agenda_id && result.page_id) {
+        navigate(
+          `/agenda/${result.agenda_id}?page=${result.page_id}`,
+        )
+        return
+      }
+
+      navigate('/stationery')
+      return
+    }
+
+
+    if (
+      result.type === 'project'
+      || result.type === 'category'
+      || result.type === 'subject'
+    ) {
+      navigate('/organization')
+      return
+    }
+
+
+    if (result.target_path) {
+      navigate(result.target_path)
+    }
+
+
   }
 
 
@@ -470,6 +527,11 @@ function SearchPage() {
                 'task',
                 'event',
                 'study',
+                'project',
+                'category',
+                'subject',
+                'canvas_element',
+                'media',
               ] as SearchResult[
                 'type'
               ][]

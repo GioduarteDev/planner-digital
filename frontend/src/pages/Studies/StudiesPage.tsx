@@ -13,9 +13,11 @@ import {
 } from '../../services/api'
 
 import './StudiesPage.css'
+import SubjectPicker from '../../components/SubjectPicker'
 
 
 type StudyFromApi = {
+  subject_id: number | null
   id: number
   user_id: number
   subject: string
@@ -28,6 +30,7 @@ type StudyFromApi = {
 
 
 type StudySession = {
+  subject_id: number | null
   id: number
   subject: string
   topic: string
@@ -109,6 +112,7 @@ function formatDuration(
 
 
 function StudiesPage() {
+  const [subjectId, setSubjectId] = useState<number | null>(null)
   const navigate =
     useNavigate()
 
@@ -222,6 +226,7 @@ function StudiesPage() {
             ) => ({
               id:
                 session.id,
+              subject_id: session.subject_id,
 
               subject:
                 session.subject,
@@ -274,6 +279,7 @@ function StudiesPage() {
 
 
   function resetForm() {
+    setSubjectId(null)
     setEditingId(
       null,
     )
@@ -351,6 +357,7 @@ function StudiesPage() {
         JSON.stringify({
           subject:
             subject.trim(),
+          subject_id: subjectId,
 
           topic:
             topic.trim(),
@@ -397,6 +404,7 @@ function StudiesPage() {
                   ? {
                       id:
                         updated.id,
+              subject_id: updated.subject_id,
 
                       subject:
                         updated.subject,
@@ -438,6 +446,7 @@ function StudiesPage() {
             {
               id:
                 created.id,
+              subject_id: created.subject_id,
 
               subject:
                 created.subject,
@@ -486,6 +495,7 @@ function StudiesPage() {
   function startEditing(
     session: StudySession,
   ) {
+    setSubjectId(session.subject_id ?? null)
     setEditingId(
       session.id,
     )
@@ -980,6 +990,37 @@ function StudiesPage() {
       ],
     )
 
+  const dailyGoalMinutes = 60
+  const dailyGoalPercent = Math.min(
+    100,
+    Math.round(todayMinutes / dailyGoalMinutes * 100),
+  )
+  const weeklyGoalMinutes = 300
+  const weeklyGoalPercent = Math.min(
+    100,
+    Math.round(weekMinutes / weeklyGoalMinutes * 100),
+  )
+  const missions = [
+    {
+      icon: 'XP',
+      title: 'Primeiro checkpoint',
+      detail: 'Registre uma sessão de estudo',
+      done: sessions.length > 0,
+    },
+    {
+      icon: '60',
+      title: 'Combo de foco',
+      detail: 'Alcance 60 min no dia',
+      done: todayMinutes >= dailyGoalMinutes,
+    },
+    {
+      icon: '5D',
+      title: 'Modo campanha',
+      detail: 'Estude em 5 dias na semana',
+      done: lastSevenDays.filter((day) => day.minutes > 0).length >= 5,
+    },
+  ]
+
 
   return (
     <main className="studies-page">
@@ -1127,6 +1168,32 @@ function StudiesPage() {
             </>
           )}
         </article>
+      </section>
+
+      <section className="study-mission-board" aria-label="Missões de estudo">
+        <div className="dashboard-card-header">
+          <div>
+            <span>MISSÃO ATUAL</span>
+            <h2>Quadro de recompensas</h2>
+          </div>
+          <span className="study-level-badge">LVL {Math.max(1, Math.floor(totalMinutes / 180) + 1)}</span>
+        </div>
+        <div className="study-missions">
+          {missions.map((mission) => (
+            <article key={mission.title} className={mission.done ? 'study-mission completed' : 'study-mission'}>
+              <span className="study-mission-icon">{mission.done ? '✓' : mission.icon}</span>
+              <div>
+                <strong>{mission.title}</strong>
+                <small>{mission.detail}</small>
+              </div>
+              <b>{mission.done ? 'CLEAR' : 'OPEN'}</b>
+            </article>
+          ))}
+        </div>
+        <div className="study-goal-grid">
+          <div><span>XP DE HOJE</span><strong>{todayMinutes} / {dailyGoalMinutes} min</strong><i><em style={{ width: `${dailyGoalPercent}%` }} /></i></div>
+          <div><span>XP DA SEMANA</span><strong>{weekMinutes} / {weeklyGoalMinutes} min</strong><i><em style={{ width: `${weeklyGoalPercent}%` }} /></i></div>
+        </div>
       </section>
 
 
@@ -1283,6 +1350,7 @@ function StudiesPage() {
 
       <section className="studies-layout">
         <div className="study-form-card">
+          <SubjectPicker value={subjectId} onChange={(id, name) => { setSubjectId(id); if (id !== null) setSubject(name) }} />
           <h2>
             {editingId
               !== null
@@ -1299,6 +1367,7 @@ function StudiesPage() {
               value={
                 subject
               }
+              readOnly={subjectId !== null}
               placeholder="Python"
               maxLength={
                 100

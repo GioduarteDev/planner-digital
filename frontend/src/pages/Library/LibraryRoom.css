@@ -1,0 +1,109 @@
+/* The library is a paper object inside a pastel personal desktop. */
+.library-page { font-family: Arial, sans-serif; --ink: #55536b; --ink-soft: #79768a; --line: #d6cfd0; --paper-strong: #fffaf0; min-height: 100svh; padding: 18px 24px 30px; background-color: #F7F1E8; background-image: url('./room-wallpaper.svg'); background-size: 760px; }
+.library-page:has(.library-ambient-background) { isolation: isolate; }
+.library-ambient-background { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: #eee9ef; pointer-events: none; }
+.library-ambient-back, .library-ambient-front { position: absolute; inset: -5%; background-position: center; background-repeat: no-repeat; }
+.library-ambient-back { background-size: cover; filter: blur(30px); opacity: .34; transform: scale(1.1); }
+.library-ambient-front { inset: 0; background-size: contain; filter: blur(6px); opacity: .25; }
+.library-ambient-wash { position: absolute; inset: 0; background: rgba(247, 241, 232, .62); }
+.library-desktop, .library-room-status, .room-dock { position: relative; z-index: 1; }
+.library-topbar { position: relative; top: auto; width: min(100%, 1160px); margin: auto; border: 1px solid #a9a8c4; border-radius: 9px; background: #E6E3F7; box-shadow: 0 3px 0 #a9a2b933, inset 0 0 0 3px #e0e3f3; }
+.library-topbar-inner { min-height: 46px; padding: 5px 13px; gap: 12px; }
+.library-brand img { width: 29px; height: 29px; }
+.library-brand-name { color: #55566e; font-size: 20px; }
+.library-menu-button, .library-icon-button, .library-profile-button { width: 29px; height: 29px; border: 1px solid #b0aec6; border-radius: 6px; background: #f5edf3; color: #6e6882; }
+.library-profile-copy span { font-size: 11px; }
+.library-profile-copy small { display: none; }
+.library-room-status { display: flex; justify-content: space-between; width: min(100%, 1130px); margin: 15px auto 27px; color: #74738c; font-size: 10px; letter-spacing: .05em; }
+.library-room-status span { display: flex; gap: 7px; align-items: center; }
+.library-desktop { display: grid; grid-template-columns: 186px minmax(0, 760px) 186px; align-items: start; justify-content: center; gap: 26px; width: min(100%, 1220px); margin: auto; }
+.library-main { width: 100%; min-width: 0; min-height: 590px; margin: 0; padding: 18px 30px 16px; border: 1px solid #b6b2a8; border-radius: 3px 10px 7px 3px; background: #F7F1E8; box-shadow: inset 5px 0 0 #ece7dd, inset 7px 0 0 #dcd7cb, 4px 5px 0 #f4eee5, 5px 6px 0 #b8b3b233, 0 15px 30px #77708914; }
+.library-main::before { content: ''; position: absolute; top: -11px; left: 43%; width: 86px; height: 23px; background: #e4bed29e; transform: rotate(-4deg); border-inline: 1px dashed #ceacc4; }
+.room-paper-meta, .room-paper-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #8b8882; font-size: 8px; letter-spacing: .12em; }
+.room-paper-meta { padding-bottom: 12px; border-bottom: 1px solid #c5c4b7; }
+.library-intro-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 20px 0 17px; }
+.library-intro-copy h1 { font-size: clamp(27px, 3vw, 43px); font-weight: 400; text-transform: uppercase; letter-spacing: -.045em; color: #656b64; }
+.library-intro-copy p { margin: 8px 0 0; font: 10px/1.4 Arial, sans-serif; color: #8c887e; }
+.room-heading-count { display: flex; align-items: baseline; gap: 5px; flex-shrink: 0; color: #7a816d; }
+.room-heading-count strong { font: 29px Georgia, serif; font-weight: 400; }
+.room-heading-count span { font-size: 11px; }
+.library-controls-row { display: flex; justify-content: space-between; gap: 18px; margin: 0; padding: 0 0 12px; border: 0; }
+.library-search-wrap { width: min(65%, 290px); min-height: 33px; padding: 0 10px; gap: 7px; background: #fffcf5; border-color: #d9d5ca; }
+.library-search-wrap .library-search { font-size: 11px; min-width: 0; }
+.library-page .new-agenda-button { width: auto; min-height: 32px; padding: 0 10px; border: 1px solid #c7c9b8; background: #D0DDC4; color: #646e54; box-shadow: none; font-size: 10px; white-space: nowrap; }
+.library-filters { gap: 20px; width: 100%; border-bottom: 1px solid #cccbbd; overflow: visible; }
+.library-filters button { min-height: 35px; padding: 0 1px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: #8b877e; font-size: 11px; font-weight: 400; }
+.library-filters button.active { border-color: #8c9a71; background: transparent; color: #626e52; box-shadow: none; }
+.library-shelf { min-height: 348px; padding: 28px 0 32px; }
+.agenda-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 30px 15px; justify-items: center; align-items: start; }
+.agenda-grid.is-single { grid-template-columns: 168px minmax(0, 210px); justify-content: center; align-items: center; gap: 35px; padding-top: 17px; }
+.room-collection-note { position: relative; width: 100%; padding: 22px 13px 15px; background: #FCEDED; border: 1px solid #e1cfd7; box-shadow: 2px 4px 6px #77708912; text-align: center; transform: rotate(3deg); color: #867383; }
+.room-note-tape { position: absolute; width: 63px; height: 20px; top: -11px; left: calc(50% - 31px); background: #bac8e6b3; transform: rotate(-8deg); }
+.room-collection-note h2 { font: 19px/1.25 Georgia, serif; margin: 9px 0; }
+.room-collection-note p { font-size: 10px; line-height: 1.8; }
+.room-collection-note button { display: inline-flex; align-items: center; gap: 4px; border: 0; border-bottom: 1px solid #ba9fb2; padding: 5px 0; background: transparent; color: #766278; cursor: pointer; font-size: 10px; }
+.room-note-sign { display: block; margin-top: 17px; font: italic 12px Georgia, serif; }
+.room-paper-footer { padding-top: 12px; border-top: 1px solid #cccbbd; }
+.room-paper-footer > span:last-child { display: flex; gap: 9px; align-items: center; }
+.room-favorite-tab { position: absolute; right: -22px; top: 193px; z-index: 4; display: flex; align-items: center; gap: 6px; writing-mode: vertical-rl; border: 1px solid #c3b5c8; border-radius: 0 4px 4px 0; padding: 12px 5px; background: #e5dcec; color: #82728c; font-size: 9px !important; cursor: pointer; }
+.room-sidebar { margin-top: 25px; background: #f8f6fb; border: 1px solid #a9b5d0; box-shadow: 3px 4px 0 #a3a8c324; color: #73718a; }
+.room-widget-title { display: flex; align-items: center; justify-content: space-between; padding: 9px 11px; background: #B5D8FF; color: #525c7f; font: italic 12px Georgia, serif; border-bottom: 1px solid #a9b5d0; }
+.room-date { display: grid; justify-items: center; margin: 13px; padding: 12px; background: #E6E3F7; border: 1px solid #c4cde6; }
+.room-date > span:first-child { font-size: 8px; letter-spacing: .24em; }
+.room-date strong { font: 60px/1.05 Georgia, serif; color: #838bad; }
+.room-date > span:nth-child(3) { font: italic 17px Georgia, serif; }
+.room-date small { margin-top: 8px; font-size: 9px; }
+.room-quote { margin: 0 13px; padding: 18px 8px; text-align: center; background: #efe1ec; }
+.room-quote p { font: italic 16px/1.5 Georgia, serif; margin: 8px 0 10px; }
+.room-quote span { font-size: 8px; letter-spacing: .05em; }
+.room-collection, .room-recent { margin: 0 13px; padding: 17px 0; border-bottom: 1px solid #dcd8e7; }
+.room-label { display: block; font-size: 8px; letter-spacing: .1em; }
+.room-collection > div { display: flex; align-items: baseline; gap: 7px; margin-top: 9px; }
+.room-collection strong { font: 27px Georgia, serif; }
+.room-collection div span { font-size: 10px; }
+.room-collection-meter i { height: 5px; flex: 1; background: #e0deeb; border: 1px solid #d0ccdf; }
+.room-collection-meter i.filled { background: #a7b4d7; }
+.room-recent button { display: flex; align-items: center; gap: 7px; width: 100%; margin-top: 10px; padding: 0; border: 0; background: transparent; color: #716f84; text-align: left; cursor: pointer; font-size: 11px; }
+.room-recent button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-sidebar-foot { display: flex; justify-content: center; gap: 5px; padding: 12px 5px; font-size: 8px; }
+.room-sidebar-right { background: #faf6f8; }
+.room-profile { display: grid; justify-items: center; gap: 6px; width: 100%; padding: 16px 10px 12px; border: 0; background: transparent; color: inherit; cursor: pointer; }
+.room-avatar { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: #e4c9dd; color: #89728e; border: 3px solid #fff9f7; font: 22px Georgia, serif; overflow: hidden; }
+.room-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.room-profile strong { font: 17px Georgia, serif; }
+.room-profile > span:last-child { font-size: 9px; }
+.room-polaroid { position: relative; margin: 8px -8px 17px 12px; padding: 7px 7px 12px; background: #fffcf5; border: 1px solid #ddd3d9; box-shadow: 2px 4px 8px #8d819d20; transform: rotate(5deg); }
+.room-polaroid::before { content: ''; position: absolute; top: -7px; left: 35%; width: 57px; height: 18px; background: #d7c1e49c; transform: rotate(-10deg); }
+.room-polaroid svg, .room-scene-image { display: block; width: 100%; }
+.room-scene-image { aspect-ratio: 240 / 220; overflow: hidden; background: #eee8f0; }
+.room-scene-image img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.room-polaroid-edit { position: absolute; right: 8px; bottom: 39px; z-index: 1; padding: 4px 6px; background: rgba(255, 252, 245, .9); color: #71647b; cursor: pointer; font-size: 8px; opacity: 0; transition: opacity .18s ease; }
+.room-polaroid:hover .room-polaroid-edit, .room-polaroid:focus-within .room-polaroid-edit { opacity: 1; }
+.room-polaroid-edit input { display: none; }
+.room-polaroid figcaption { margin-top: 9px; text-align: center; font: italic 11px Georgia, serif; }
+.room-continue { display: grid; gap: 10px; margin: 0 13px; padding: 13px 0; }
+.room-continue strong { font: 16px Georgia, serif; overflow-wrap: anywhere; }
+.room-continue button { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 8px; border: 1px solid #c3cbe0; background: #e0e6f5; color: #6d7493; cursor: pointer; font-size: 10px; }
+.room-continue p, .room-recent p { font-size: 11px; line-height: 1.6; }
+.room-reminder { display: flex; align-items: center; gap: 8px; width: 100%; padding: 13px; border: 0; border-top: 1px solid #ded5e4; background: #eee3ee; color: #857389; text-align: left; cursor: pointer; }
+.room-reminder strong, .room-reminder small { display: block; font-size: 10px; }
+.room-reminder small { margin-top: 4px; font-size: 8px; }
+.room-dock { display: flex; justify-content: center; gap: 6px; width: fit-content; max-width: 100%; margin: 32px auto 0; padding: 7px 12px; border: 1px solid #aba4ba; border-radius: 15px; background: #E6E3F7; box-shadow: inset 0 0 0 3px #eee5f266, 0 5px 15px #80728c20; }
+.room-dock button { display: grid; justify-items: center; gap: 4px; width: 61px; padding: 7px 4px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: #70647c; cursor: pointer; transition: transform .18s; }
+.room-dock button svg { width: 20px; height: 20px; stroke-width: 1.5; }
+.room-dock button span { font-size: 8px; }
+.room-dock button[aria-current], .room-dock button:hover { background: #f6f0f7; border-color: #bcb0ca; transform: translateY(-2px); }
+.library-page .agenda-book-menu-wrap { top: 18px; right: 11px; bottom: auto; }
+.library-page .agenda-book-menu-button { opacity: 0; background: #fffaf0ed; box-shadow: 0 2px 5px #73637424; }
+.library-page .agenda-book-card:hover .agenda-book-menu-button, .library-page .agenda-book-card:focus-within .agenda-book-menu-button, .library-page .agenda-book-menu-button[aria-expanded='true'] { opacity: 1; }
+.library-page .agenda-book-info { padding-right: 0; }
+.library-page .agenda-book-cover { overflow: visible; }
+.library-page .agenda-book:hover { transform: translateY(-5px) rotate(-2deg); }
+.library-page .agenda-book-card:focus-within { z-index: 10; }
+.library-page .agenda-book-favorite-badge { left: 6px; right: auto; }
+@media (max-width: 1150px) { .library-desktop { grid-template-columns: 155px minmax(0, 1fr) 155px; gap: 20px; } .library-main { padding-inline: 23px; } .agenda-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .agenda-grid.is-single { gap: 18px; grid-template-columns: 168px minmax(0, 185px); } }
+@media (max-width: 950px) { .library-desktop { grid-template-columns: 150px minmax(0, 1fr); } .room-sidebar-right { display: none; } .library-main { min-height: 580px; } }
+@media (max-width: 680px) { .library-page { padding: 12px 15px 24px; } .library-desktop { display: block; } .room-sidebar-left { display: none; } .library-room-status { font-size: 8px; gap: 8px; margin: 13px 0 24px; } .library-topbar-inner { padding-inline: 8px; gap: 7px; } .library-brand { gap: 5px; padding: 0; } .library-brand-name { font-size: 17px; } .library-brand img { width: 24px; height: 24px; } .library-topbar-actions { gap: 5px; } .library-main { min-height: 550px; padding: 17px 20px; } .room-heading-flower { width: 26px; } .room-paper-meta { font-size: 6px; } .library-intro-copy h1 { font-size: 30px; } .library-intro-copy p { font-size: 9px; } .library-controls-row { gap: 8px; } .library-search-wrap { width: 60%; } .library-page .new-agenda-button { padding-inline: 7px; font-size: 9px; } .library-shelf { padding: 24px 0; min-height: 332px; } .agenda-grid { gap: 25px 8px; } .agenda-grid.is-single { grid-template-columns: 1fr; gap: 25px; padding-top: 0; } .room-collection-note { width: 215px; } .room-favorite-tab { right: -13px; padding-inline: 3px; font-size: 8px !important; } .room-dock { gap: 1px; padding: 7px 6px; margin-top: 25px; } .room-dock button { width: 47px; } .library-page .agenda-book-card, .library-page .agenda-book-scene { width: 138px; } .library-page .agenda-book { width: 127px; height: 185px; } .library-page .agenda-book-scene { height: 195px; } .library-page .agenda-grid.is-single .agenda-book-card, .library-page .agenda-grid.is-single .agenda-book-scene { width: 168px; } .library-page .agenda-grid.is-single .agenda-book { width: 154px; height: 214px; } .library-page .agenda-grid.is-single .agenda-book-scene { height: 226px; } .library-page .agenda-book-menu { width: 175px; right: -10px; } .library-page .agenda-book-title-button { font-size: 14px; } }
+@media (hover: none) { .library-page .agenda-book-menu-button { opacity: 1; } }
+@media (hover: none) { .room-polaroid-edit { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .room-dock button { transition: none; } .library-page .agenda-book:hover { transform: none; } }

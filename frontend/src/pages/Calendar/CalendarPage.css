@@ -69,11 +69,22 @@
 }
 
 .calendar-days {
+  position: relative;
   border-top:
     1px solid #eee;
   border-left:
     1px solid #eee;
 }
+
+.calendar-creative-layer { position: absolute; inset: 0; z-index: 5; pointer-events: none; }
+.calendar-creative-note, .calendar-creative-sticker { position: absolute; pointer-events: auto; touch-action: none; cursor: grab; }
+.calendar-creative-note { display: flex; align-items: flex-start; gap: 3px; width: min(18%, 130px); min-width: 74px; padding: 7px 6px; border: 2px dashed #c69522; border-radius: 3px; background: #fff0a9ef; color: #4d3d1e; font: 12px/1.25 Georgia, serif; transform: rotate(-2deg); box-shadow: 2px 3px 0 #d8bd5c66; }
+.calendar-creative-note span { min-width: 0; flex: 1; cursor: text; outline: none; }
+.calendar-creative-note button, .calendar-creative-sticker button { display: grid; width: 18px; height: 18px; place-items: center; padding: 0; border: 0; border-radius: 50%; background: #332d61; color: white; cursor: pointer; font-size: 13px; line-height: 1; }
+.calendar-creative-sticker img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; filter: drop-shadow(2px 3px 2px #5e567044); }
+.calendar-creative-sticker button { position: absolute; top: -8px; right: -8px; opacity: 0; }
+.calendar-creative-sticker button:first-of-type { right: 13px; background: #6d5ad5; }
+.calendar-creative-sticker:hover button, .calendar-creative-sticker:focus-within button { opacity: 1; }
 
 .calendar-day {
   min-height: 120px;
@@ -102,8 +113,7 @@
   background: #f1eeeb;
 }
 
-.calendar-day.today
-.day-number {
+.calendar-day.today .day-number {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -139,6 +149,19 @@
 .calendar-sidebar h2 {
   margin-top: 0;
 }
+
+.calendar-creative-panel { margin-bottom: 20px; padding: 14px; border: 1px solid #ded7d0; border-radius: 14px; background: #fffaf0; }
+.creative-panel-heading, .creative-note-create, .creative-sticker-picker { display: flex; align-items: center; gap: 8px; }
+.creative-panel-heading { justify-content: space-between; margin-bottom: 10px; }
+.creative-panel-heading span, .creative-sticker-picker > span { color: #8a6b57; font-size: 9px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+.creative-panel-heading h3 { margin: 3px 0 0; font-size: 16px; }
+.creative-panel-heading small { color: #8b8278; font-size: 10px; }
+.creative-note-create input { min-width: 0; flex: 1; padding: 9px; border: 1px solid #d9cdbd; border-radius: 8px; font: inherit; }
+.creative-note-create button { padding: 9px 10px; border: 0; border-radius: 8px; background: #332d61; color: white; cursor: pointer; font-size: 11px; font-weight: 700; }
+.creative-sticker-picker { flex-wrap: wrap; margin-top: 11px; }
+.creative-sticker-picker small { color: #8b8278; font-size: 11px; }
+.creative-sticker-picker button { width: 38px; height: 38px; padding: 4px; border: 1px solid #d9cdbd; border-radius: 8px; background: white; cursor: pointer; }
+.creative-sticker-picker img { width: 100%; height: 100%; object-fit: contain; }
 
 .event-form {
   display: flex;
@@ -238,6 +261,18 @@
   .calendar-day {
     min-height: 90px;
   }
+
+  .calendar-creative-note { width: 24%; }
+}
+
+@media (max-width: 520px) {
+  .calendar-page { padding: 12px 10px; }
+  .calendar-main, .calendar-sidebar { padding: 12px; border-radius: 14px; }
+  .calendar-day { min-height: 74px; padding: 5px; }
+  .calendar-weekday { padding: 6px 2px; font-size: 11px; }
+  .day-event { padding: 3px; font-size: 9px; }
+  .calendar-creative-note { width: 31%; min-width: 54px; padding: 4px; font-size: 9px; }
+  .calendar-creative-note button { width: 14px; height: 14px; font-size: 10px; }
 }
 .editing-banner {
   margin: 0;

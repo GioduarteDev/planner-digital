@@ -1,0 +1,33 @@
+.is-template-base .template-inline-field { pointer-events: auto; touch-action: auto; user-select: text; }
+.template-inline-field { width: 100%; min-width: 0; padding: 0; border: 0; outline: none; border-radius: 0; color: inherit; background: transparent; font: inherit; letter-spacing: inherit; resize: none; }
+.template-inline-field::placeholder { color: currentColor; opacity: .4; }
+.template-inline-field:focus { background: #fffefa66; box-shadow: inset 0 -1px #a8b69b; }
+.tpl-box-writing { position: absolute; inset: 3.4cqw 1.5cqw 1cqw; pointer-events: none; font: 1.6cqw/1.65 Arial, sans-serif; }
+.tpl-box-writing textarea { height: 100%; }
+.tpl-box>b { right: 2cqw; }
+.tpl-block-actions { position: absolute; right: .3cqw; top: -.8cqw; display: flex; gap: 3px; pointer-events: auto; opacity: 0; }
+.tpl-box:hover .tpl-block-actions, .tpl-block-actions:focus-within { opacity: 1; }
+.tpl-block-actions button { display: grid; place-items: center; padding: 4px; border: 1px solid #d8d0bf; background: #fffaf0; color: #6c7461; border-radius: 4px; cursor: pointer; }
+.tpl-box:has(.template-inline-field:focus) .tpl-block-actions { display: none; }
+.tpl-removed-block { visibility: hidden; pointer-events: none; }
+.tpl-date-controls { position: absolute; top: .2cqw; right: 5%; display: flex; gap: 1cqw; width: 34%; font: 1.4cqw Arial, sans-serif; }
+.tpl-date-controls input:last-child { max-width: 6cqw; }
+.tpl-date-controls input[type=date] { max-width: none; }
+.tpl-week-day-content { position: absolute; inset: 2.2cqw 1cqw .4cqw 7cqw; font: 1.5cqw/1.6 Arial, sans-serif; }
+.tpl-clean-planning article { position: relative; }
+.tpl-project-calendar { grid-template-rows: repeat(7, 1fr); }
+.tpl-project-journal>strong { min-width: 0; }
+.tpl-project-journal .template-inline-field { max-width: 100%; }
+.template-inline-field { cursor: text; }
+.free-canvas-element:not(.is-selected) > .canvas-move-handle { visibility: hidden; }
+.tpl-inline-habits { display: grid; gap: .6cqw; pointer-events: auto; }
+.tpl-inline-habits > label { display: grid; grid-template-columns: minmax(0, 1fr) repeat(7, 1.4cqw); align-items: center; gap: .4cqw; }
+.tpl-inline-habits input[type=checkbox] { width: 1.2cqw; height: 1.2cqw; accent-color: #9ca362; margin: 0; pointer-events: auto; }
+.planner-sheet.is-writing .tpl-block-actions { display: none; }
+.planner-sheet.is-writing .free-canvas-element { border-color: transparent; box-shadow: none; }
+.editor-workspace-v6 .planner-sheet.is-writing :is(.template-inline-field, .canvas-inline-text):focus-visible { outline: none; }
+.template-add-section { border: 1px solid #d1d6c6; padding: 5px 9px; border-radius: 5px; background: #f9f7ef; color: #67725d; font: 11px Arial, sans-serif; cursor: pointer; }
+.template-section-menu { position: relative; width: fit-content; z-index: 30; }
+.template-section-picker { position: absolute; top: 100%; left: 0; width: 270px; display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 9px; border: 1px solid #d1d6c6; border-radius: 6px; background: #fffdf5; box-shadow: 0 5px 16px #63574322; }
+.template-section-picker button { padding: 9px 6px; border: 0; background: #f1f2e9; color: #637058; border-radius: 4px; font-size: 11px; text-align: left; cursor: pointer; }
+.planner-section h3 > input { width: 100%; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; }

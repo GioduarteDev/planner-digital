@@ -26,6 +26,7 @@ type AgendaCardProps = {
   updatedAt?: string | null
   onOpen: () => void
   onEditCover?: () => void
+  onRename?: () => void
   onToggleFavorite?: () => void
   onDuplicate: () => void
   onDelete: () => void
@@ -66,6 +67,7 @@ function AgendaCard({
   updatedAt = null,
   onOpen,
   onEditCover,
+  onRename,
   onToggleFavorite,
   onDuplicate,
   onDelete,
@@ -176,17 +178,7 @@ function AgendaCard({
                   : 'none',
             }}
           >
-            {!coverImageUrl && (
-              <span
-                className="agenda-book-cover-detail"
-                aria-hidden="true"
-              >
-                <span className="agenda-book-pressed-line" />
-                <span className="agenda-book-pressed-flower">
-                  ✿
-                </span>
-              </span>
-            )}
+            {!coverImageUrl && <span className="agenda-book-cover-grain" aria-hidden="true" />}
 
             <span
               className="agenda-book-bookmark"
@@ -264,6 +256,10 @@ function AgendaCard({
                   />
                   Editar capa
                 </button>
+              )}
+
+              {onRename && (
+                <button type="button" role="menuitem" onClick={() => closeAndRun(onRename)}><Pencil size={15} aria-hidden="true" />Renomear</button>
               )}
 
               {onToggleFavorite && (

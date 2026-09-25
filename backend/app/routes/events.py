@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models import Category, Event, Project, User
+from app.models import Category, Event, Project, Subject, User
 from app.schemas import EventCreate, EventResponse, EventUpdate
 
 router = APIRouter(prefix="/events", tags=["Eventos"])
@@ -21,6 +23,7 @@ def validate_links(
     user_id: int,
     db: Session,
     project_id: int | None,
+    subject_id: int | None,
     category_id: int | None,
 ) -> None:
     if project_id is not None:
@@ -29,6 +32,12 @@ def validate_links(
         )
         if project is None:
             raise HTTPException(status_code=404, detail="Projeto não encontrado.")
+    if subject_id is not None:
+        subject = db.scalar(
+            select(Subject).where(Subject.id == subject_id, Subject.user_id == user_id)
+        )
+        if subject is None:
+            raise HTTPException(status_code=404, detail="Matéria não encontrada.")
     if category_id is not None:
         category = db.scalar(
             select(Category).where(Category.id == category_id, Category.user_id == user_id)
@@ -39,14 +48,19 @@ def validate_links(
 
 @router.get("", response_model=list[EventResponse])
 def list_events(
+    start: datetime | None = Query(default=None),
+    end: datetime | None = Query(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return db.scalars(
-        select(Event)
-        .where(Event.user_id == current_user.id)
-        .order_by(Event.starts_at, Event.id)
-    ).all()
+    if start is not None and end is not None and end < start:
+        raise HTTPException(status_code=400, detail="O fim não pode ser anterior ao início.")
+    query = select(Event).where(Event.user_id == current_user.id)
+    if start is not None:
+        query = query.where(or_(Event.ends_at.is_(None), Event.ends_at >= start))
+    if end is not None:
+        query = query.where(Event.starts_at <= end)
+    return db.scalars(query.order_by(Event.starts_at, Event.id)).all()
 
 
 @router.get("/{event_id}", response_model=EventResponse)
@@ -74,6 +88,7 @@ def create_event(
         user_id=current_user.id,
         db=db,
         project_id=data.project_id,
+        subject_id=data.subject_id,
         category_id=data.category_id,
     )
 
@@ -86,6 +101,7 @@ def create_event(
         all_day=data.all_day,
         reminder_minutes=data.reminder_minutes,
         project_id=data.project_id,
+        subject_id=data.subject_id,
         category_id=data.category_id,
         color=data.color,
     )
@@ -116,6 +132,7 @@ def update_event(
         user_id=current_user.id,
         db=db,
         project_id=updates.get("project_id") if "project_id" in updates else None,
+        subject_id=updates.get("subject_id") if "subject_id" in updates else None,
         category_id=updates.get("category_id") if "category_id" in updates else None,
     )
 

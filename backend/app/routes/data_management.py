@@ -10,6 +10,7 @@ from app.models import (
     Agenda,
     CanvasElement,
     Category,
+    DailyEntry,
     Event,
     Folder,
     MediaLibraryItem,
@@ -148,7 +149,7 @@ def export_user_data(
         return result
 
     return {
-        "version": 1,
+        "version": 2,
         "user": row_dict(
             current_user,
             ["id", "email", "name", "username", "bio", "profile_photo_url", "profile_cover_url", "settings", "created_at"],
@@ -204,6 +205,10 @@ def export_user_data(
         "study_sessions": [
             row_dict(s, ["id", "project_id", "subject_id", "subject", "topic", "study_date", "duration_minutes", "notes", "created_at"])
             for s in db.scalars(select(StudySession).where(StudySession.user_id == current_user.id)).all()
+        ],
+        "daily_entries": [
+            row_dict(e, ["id", "entry_date", "mood", "quick_note", "music_data", "reading_data", "watching_data", "photo_media_id", "created_at", "updated_at"])
+            for e in db.scalars(select(DailyEntry).where(DailyEntry.user_id == current_user.id)).all()
         ],
         "canvas_elements": [
             row_dict(e, ["id", "page_id", "surface_type", "surface_key", "element_type", "asset_original_name", "asset_mime_type", "asset_size_bytes", "asset_url", "x", "y", "width", "height", "rotation", "z_index", "locked", "data", "created_at"])

@@ -1,3 +1,4 @@
+from copy import deepcopy
 from pathlib import Path
 from shutil import copy2
 from uuid import uuid4
@@ -20,6 +21,7 @@ from app.models import (
     User,
 )
 from app.routes.helpers import get_user_agenda_or_404, get_user_page_or_404
+from app.page_tabs import remap_page_tabs
 from app.schemas import AgendaResponse, PageResponse
 
 router = APIRouter(tags=["Duplicação"])
@@ -30,6 +32,21 @@ PAGE_MEDIA_DIRECTORY = Path(__file__).resolve().parents[2] / "uploads" / "page_m
 CANVAS_MEDIA_DIRECTORY = Path(__file__).resolve().parents[2] / "uploads" / "canvas_media"
 PAGE_MEDIA_DIRECTORY.mkdir(parents=True, exist_ok=True)
 CANVAS_MEDIA_DIRECTORY.mkdir(parents=True, exist_ok=True)
+
+
+def _remap_task_receipt_data(
+    element_type: str,
+    data: dict,
+    task_map: dict[int, int],
+) -> dict:
+    copied = deepcopy(data)
+    if element_type not in {"task_receipt", "widget:task-receipt"}:
+        return copied
+    for key in ("task_ids", "taskIds"):
+        raw_ids = copied.get(key)
+        if isinstance(raw_ids, list):
+            copied[key] = [task_map.get(task_id, task_id) for task_id in raw_ids]
+    return copied
 
 
 def _copy_media_row(source: PageMedia, new_page_id: int) -> tuple[PageMedia, Path]:
@@ -81,10 +98,55 @@ def _copy_page_children(
             PageBlock(
                 page_id=new_page.id,
                 block_type=block.block_type,
-                data=dict(block.data or {}),
+                data=deepcopy(block.data or {}),
                 position=block.position,
             )
         )
+
+    task_map: dict[int, int] = {}
+    tasks = db.scalars(
+        select(Task)
+        .where(
+            Task.user_id == current_user.id,
+            Task.page_id == source_page.id,
+        )
+        .order_by(Task.id)
+    ).all()
+    for task in tasks:
+        new_task = Task(
+            user_id=current_user.id,
+            page_id=new_page.id,
+            project_id=task.project_id,
+            category_id=task.category_id,
+            text=task.text,
+            description=task.description,
+            done=task.done,
+            due_date=task.due_date,
+            due_at=task.due_at,
+            priority=task.priority,
+            show_in_calendar=task.show_in_calendar,
+        )
+        db.add(new_task)
+        db.flush()
+        task_map[task.id] = new_task.id
+
+        reminders = db.scalars(
+            select(Reminder).where(
+                Reminder.user_id == current_user.id,
+                Reminder.task_id == task.id,
+            )
+        ).all()
+        for reminder in reminders:
+            db.add(
+                Reminder(
+                    user_id=current_user.id,
+                    task_id=new_task.id,
+                    event_id=None,
+                    minutes_before=reminder.minutes_before,
+                    channel=reminder.channel,
+                    enabled=reminder.enabled,
+                )
+            )
 
     elements = db.scalars(
         select(CanvasElement)
@@ -130,7 +192,11 @@ def _copy_page_children(
                 rotation=element.rotation,
                 z_index=element.z_index,
                 locked=element.locked,
-                data=dict(element.data or {}),
+                data=_remap_task_receipt_data(
+                    element.element_type,
+                    element.data or {},
+                    task_map,
+                ),
             )
         )
 
@@ -143,50 +209,6 @@ def _copy_page_children(
         new_media, created_path = _copy_media_row(source_media, new_page.id)
         created_files.append(created_path)
         db.add(new_media)
-
-    tasks = db.scalars(
-        select(Task)
-        .where(
-            Task.user_id == current_user.id,
-            Task.page_id == source_page.id,
-        )
-        .order_by(Task.id)
-    ).all()
-    for task in tasks:
-        new_task = Task(
-            user_id=current_user.id,
-            page_id=new_page.id,
-            project_id=task.project_id,
-            category_id=task.category_id,
-            text=task.text,
-            description=task.description,
-            done=task.done,
-            due_date=task.due_date,
-            due_at=task.due_at,
-            priority=task.priority,
-            show_in_calendar=task.show_in_calendar,
-        )
-        db.add(new_task)
-        db.flush()
-
-        reminders = db.scalars(
-            select(Reminder).where(
-                Reminder.user_id == current_user.id,
-                Reminder.task_id == task.id,
-            )
-        ).all()
-        for reminder in reminders:
-            db.add(
-                Reminder(
-                    user_id=current_user.id,
-                    task_id=new_task.id,
-                    event_id=None,
-                    minutes_before=reminder.minutes_before,
-                    channel=reminder.channel,
-                    enabled=reminder.enabled,
-                )
-            )
-
 
 @router.post(
     "/pages/{page_id}/duplicate",
@@ -221,7 +243,7 @@ def duplicate_page(
         content=source.content,
         favorite=False,
         paper_type=source.paper_type,
-        paper_settings=dict(source.paper_settings or {}),
+        paper_settings=deepcopy(source.paper_settings or {}),
     )
 
     created_files: list[Path] = []
@@ -273,7 +295,7 @@ def duplicate_agenda(
         title=f"{source.title} (cópia)"[:120],
         cover_color=source.cover_color,
         cover_image_url=source.cover_image_url,
-        settings=dict(source.settings or {}),
+        settings={},
     )
 
     created_files: list[Path] = []
@@ -302,6 +324,7 @@ def duplicate_agenda(
             .where(Page.agenda_id == source.id)
             .order_by(Page.position, Page.id)
         ).all()
+        page_map: dict[int, int] = {}
         for source_page in source_pages:
             new_page = Page(
                 agenda_id=new_agenda.id,
@@ -311,10 +334,11 @@ def duplicate_agenda(
                 content=source_page.content,
                 favorite=source_page.favorite,
                 paper_type=source_page.paper_type,
-                paper_settings=dict(source_page.paper_settings or {}),
+                paper_settings=deepcopy(source_page.paper_settings or {}),
             )
             db.add(new_page)
             db.flush()
+            page_map[source_page.id] = new_page.id
             _copy_page_children(
                 source_page=source_page,
                 new_page=new_page,
@@ -322,6 +346,12 @@ def duplicate_agenda(
                 db=db,
                 created_files=created_files,
             )
+
+        new_agenda.settings = remap_page_tabs(
+            source.settings or {},
+            page_map,
+            folder_map,
+        )
 
         db.commit()
         db.refresh(new_agenda)

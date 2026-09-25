@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models import Project, Task, User
+from app.models import Project, Subject, Task, User
 from app.schemas import ProjectCreate, ProjectResponse, ProjectUpdate
 
 router = APIRouter(prefix="/projects", tags=["Projetos"])
@@ -34,6 +34,12 @@ def create_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if data.subject_id is not None:
+        subject = db.scalar(
+            select(Subject).where(Subject.id == data.subject_id, Subject.user_id == current_user.id)
+        )
+        if subject is None:
+            raise HTTPException(status_code=404, detail="Matéria não encontrada.")
     project = Project(user_id=current_user.id, **data.model_dump())
     db.add(project)
     db.commit()
@@ -63,7 +69,14 @@ def update_project(
     project = get_user_project(project_id, current_user.id, db)
     if project is None:
         raise HTTPException(status_code=404, detail="Projeto não encontrado.")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    updates = data.model_dump(exclude_unset=True)
+    if "subject_id" in updates and updates["subject_id"] is not None:
+        subject = db.scalar(
+            select(Subject).where(Subject.id == updates["subject_id"], Subject.user_id == current_user.id)
+        )
+        if subject is None:
+            raise HTTPException(status_code=404, detail="Matéria não encontrada.")
+    for field, value in updates.items():
         setattr(project, field, value)
     db.commit()
     db.refresh(project)

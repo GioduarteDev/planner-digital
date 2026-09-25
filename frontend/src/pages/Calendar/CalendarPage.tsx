@@ -2,21 +2,27 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type PointerEvent as ReactPointerEvent,
 } from 'react'
 
 import {
   useNavigate,
+  useSearchParams,
 } from 'react-router-dom'
 
 import {
   apiRequest,
+  API_URL,
 } from '../../services/api'
 
 import './CalendarPage.css'
+import SubjectPicker from '../../components/SubjectPicker'
 
 
 type EventFromApi = {
+  subject_id: number | null
   id: number
   user_id: number
   title: string
@@ -51,6 +57,7 @@ type TaskFromApi = {
 
 
 type CalendarEvent = {
+  subject_id: number | null
   id: number
   title: string
   description: string
@@ -70,6 +77,41 @@ type CalendarTask = {
     | 'low'
     | 'medium'
     | 'high'
+}
+
+type CreativeText = {
+  id: string
+  text: string
+  x: number
+  y: number
+}
+
+type CreativeSticker = {
+  id: string
+  mediaId: number
+  fileUrl: string
+  x: number
+  y: number
+  width: number
+  height: number
+  zIndex: number
+}
+
+type MonthCreative = {
+  texts: CreativeText[]
+  stickers: CreativeSticker[]
+}
+
+type CreativeSettings = Record<string, MonthCreative>
+
+type ProfileSettingsResponse = {
+  settings?: Record<string, unknown>
+}
+
+type StickerMedia = {
+  id: number
+  file_url: string
+  name: string
 }
 
 
@@ -140,6 +182,54 @@ function formatDateKey(
 }
 
 
+function isDateKey(
+  value: string | null,
+) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false
+  }
+
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+
+  return date.getFullYear() === year
+    && date.getMonth() === month - 1
+    && date.getDate() === day
+}
+
+
+function dateFromKey(
+  value: string,
+) {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
+
+function getEventDateKey(
+  event: CalendarEvent,
+) {
+  if (event.allDay) {
+    return event.startsAt.slice(0, 10)
+  }
+
+  return formatDateKey(new Date(event.startsAt))
+}
+
+function getMonthKey(year: number, month: number) {
+  return `${year}-${String(month + 1).padStart(2, '0')}`
+}
+
+function mediaUrl(fileUrl: string) {
+  if (/^(https?:|data:|blob:)/.test(fileUrl)) return fileUrl
+  return `${API_URL}${fileUrl}`
+}
+
+function emptyMonthCreative(): MonthCreative {
+  return { texts: [], stickers: [] }
+}
+
+
 function convertVapidKey(
   base64String: string,
 ): ArrayBuffer {
@@ -194,8 +284,11 @@ function convertVapidKey(
 
 
 function CalendarPage() {
+  const [subjectId, setSubjectId] = useState<number | null>(null)
   const navigate =
     useNavigate()
+  const [searchParams] =
+    useSearchParams()
 
 
   const today =
@@ -204,14 +297,22 @@ function CalendarPage() {
       [],
     )
 
+  const requestedDate =
+    searchParams.get('date')
+
+  const initialDate =
+    isDateKey(requestedDate)
+      ? dateFromKey(requestedDate as string)
+      : today
+
 
   const [
     currentDate,
     setCurrentDate,
   ] = useState(
     new Date(
-      today.getFullYear(),
-      today.getMonth(),
+      initialDate.getFullYear(),
+      initialDate.getMonth(),
       1,
     ),
   )
@@ -234,14 +335,23 @@ function CalendarPage() {
       CalendarTask[]
     >([])
 
+  const [creativeByMonth, setCreativeByMonth] =
+    useState<CreativeSettings>({})
+  const [stickerMedia, setStickerMedia] =
+    useState<StickerMedia[]>([])
+  const [creativeText, setCreativeText] =
+    useState('')
+  const [isSavingCreative, setIsSavingCreative] =
+    useState(false)
+  const creativeDragRef =
+    useRef<{ kind: 'text' | 'sticker'; id: string; startX: number; startY: number; x: number; y: number } | null>(null)
+
 
   const [
     selectedDate,
     setSelectedDate,
   ] = useState(
-    formatDateKey(
-      today,
-    ),
+    formatDateKey(initialDate),
   )
 
 
@@ -425,6 +535,8 @@ function CalendarPage() {
         const [
           eventsData,
           tasksData,
+          profileData,
+          stickersData,
         ] =
           await Promise.all([
             apiRequest<
@@ -438,6 +550,9 @@ function CalendarPage() {
             >(
               '/tasks',
             ),
+
+            apiRequest<ProfileSettingsResponse>('/profile'),
+            apiRequest<StickerMedia[]>('/library/media?media_type=sticker'),
           ])
 
 
@@ -453,6 +568,7 @@ function CalendarPage() {
             ): CalendarEvent => ({
               id:
                 event.id,
+              subject_id: event.subject_id,
 
               title:
                 event.title,
@@ -519,6 +635,14 @@ function CalendarPage() {
         setTasks(
           calendarTasks,
         )
+
+        const storedCreative =
+          profileData.settings?.calendar_creative
+
+        if (storedCreative && typeof storedCreative === 'object') {
+          setCreativeByMonth(storedCreative as CreativeSettings)
+        }
+        setStickerMedia(stickersData)
       } catch (error) {
         if (cancelled) {
           return
@@ -865,6 +989,86 @@ function CalendarPage() {
       },
     )
 
+  const monthKey = getMonthKey(year, month)
+  const currentCreative = creativeByMonth[monthKey] ?? emptyMonthCreative()
+
+  async function persistCreative(next: MonthCreative) {
+    const nextCreative = { ...creativeByMonth, [monthKey]: next }
+    setCreativeByMonth(nextCreative)
+    setIsSavingCreative(true)
+    try {
+      await apiRequest('/profile/settings', {
+        method: 'PATCH',
+        body: JSON.stringify({ settings: { calendar_creative: nextCreative } }),
+      })
+    } catch (error) {
+      console.error(error)
+      alert(error instanceof Error ? error.message : 'Não foi possível salvar a decoração.')
+    } finally {
+      setIsSavingCreative(false)
+    }
+  }
+
+  function addCreativeText() {
+    const value = creativeText.trim()
+    if (!value) return
+    const day = Number(selectedDate.slice(-2))
+    const index = firstDay + day - 1
+    void persistCreative({
+      ...currentCreative,
+      texts: [...currentCreative.texts, { id: crypto.randomUUID(), text: value, x: ((index % 7) / 7) * 100 + 1, y: (Math.floor(index / 7) / 6) * 100 + 8 }],
+    })
+    setCreativeText('')
+  }
+
+  function addSticker(media: StickerMedia) {
+    void persistCreative({
+      ...currentCreative,
+      stickers: [...currentCreative.stickers, { id: crypto.randomUUID(), mediaId: media.id, fileUrl: media.file_url, x: 12, y: 12, width: 52, height: 52, zIndex: currentCreative.stickers.length + 1 }],
+    })
+  }
+
+  function removeCreativeText(id: string) {
+    void persistCreative({ ...currentCreative, texts: currentCreative.texts.filter(item => item.id !== id) })
+  }
+
+  function removeSticker(id: string) {
+    void persistCreative({ ...currentCreative, stickers: currentCreative.stickers.filter(item => item.id !== id) })
+  }
+
+  function startCreativeDrag(kind: 'text' | 'sticker', id: string, event: ReactPointerEvent<HTMLElement>) {
+    event.stopPropagation()
+    const item = kind === 'text'
+      ? currentCreative.texts.find(candidate => candidate.id === id)
+      : currentCreative.stickers.find(candidate => candidate.id === id)
+    if (!item) return
+    creativeDragRef.current = { kind, id, startX: event.clientX, startY: event.clientY, x: item.x, y: item.y }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  function moveCreative(event: ReactPointerEvent<HTMLElement>) {
+    const drag = creativeDragRef.current
+    if (!drag) return
+    const layer = event.currentTarget
+    const rect = layer.getBoundingClientRect()
+    const x = Math.max(0, Math.min(94, drag.x + ((event.clientX - drag.startX) / rect.width) * 100))
+    const y = Math.max(0, Math.min(94, drag.y + ((event.clientY - drag.startY) / rect.height) * 100))
+    drag.x = x
+    drag.y = y
+    setCreativeByMonth(current => ({ ...current, [monthKey]: { ...current[monthKey] ?? emptyMonthCreative(), ...(drag.kind === 'text' ? { texts: currentCreative.texts.map(item => item.id === drag.id ? { ...item, x, y } : item) } : { stickers: currentCreative.stickers.map(item => item.id === drag.id ? { ...item, x, y } : item) }) } }))
+  }
+
+  function finishCreativeDrag(event: ReactPointerEvent<HTMLElement>) {
+    const drag = creativeDragRef.current
+    if (!drag) return
+    creativeDragRef.current = null
+    const next = drag.kind === 'text'
+      ? { ...currentCreative, texts: currentCreative.texts.map(item => item.id === drag.id ? { ...item, x: drag.x, y: drag.y } : item) }
+      : { ...currentCreative, stickers: currentCreative.stickers.map(item => item.id === drag.id ? { ...item, x: drag.x, y: drag.y } : item) }
+    void persistCreative(next)
+    event.stopPropagation()
+  }
+
 
   function resetEventForm() {
     setEditingEventId(
@@ -872,6 +1076,7 @@ function CalendarPage() {
     )
 
     setTitle('')
+    setSubjectId(null)
     setDescription('')
     setTime('09:00')
     setAllDay(false)
@@ -880,12 +1085,19 @@ function CalendarPage() {
 
 
   function previousMonth() {
-    setCurrentDate(
+    const nextMonthDate =
       new Date(
         year,
         month - 1,
         1,
-      ),
+      )
+
+    setCurrentDate(
+      nextMonthDate,
+    )
+
+    setSelectedDate(
+      formatDateKey(nextMonthDate),
     )
 
     resetEventForm()
@@ -893,12 +1105,19 @@ function CalendarPage() {
 
 
   function nextMonth() {
-    setCurrentDate(
+    const nextMonthDate =
       new Date(
         year,
         month + 1,
         1,
-      ),
+      )
+
+    setCurrentDate(
+      nextMonthDate,
+    )
+
+    setSelectedDate(
+      formatDateKey(nextMonthDate),
     )
 
     resetEventForm()
@@ -961,15 +1180,8 @@ function CalendarPage() {
 
     return events.filter(
       (event) => {
-        const eventDate =
-          new Date(
-            event.startsAt,
-          )
-
         return (
-          formatDateKey(
-            eventDate,
-          )
+          getEventDateKey(event)
           === dateKey
         )
       },
@@ -1021,7 +1233,7 @@ function CalendarPage() {
 
       const localDateTime =
         allDay
-          ? `${selectedDate}T00:00`
+          ? `${selectedDate}T12:00`
           : `${selectedDate}T${time}`
 
 
@@ -1041,6 +1253,7 @@ function CalendarPage() {
 
           starts_at:
             startsAt,
+          subject_id: subjectId,
 
           ends_at:
             null,
@@ -1086,6 +1299,7 @@ function CalendarPage() {
                   ? {
                       id:
                         updated.id,
+              subject_id: updated.subject_id,
 
                       title:
                         updated.title,
@@ -1132,6 +1346,7 @@ function CalendarPage() {
             {
               id:
                 created.id,
+              subject_id: created.subject_id,
 
               title:
                 created.title,
@@ -1185,6 +1400,7 @@ function CalendarPage() {
   function startEditingEvent(
     event: CalendarEvent,
   ) {
+    setSubjectId(event.subject_id ?? null)
     const eventDate =
       new Date(
         event.startsAt,
@@ -1434,15 +1650,8 @@ function CalendarPage() {
   const selectedEvents =
     events.filter(
       (event) => {
-        const date =
-          new Date(
-            event.startsAt,
-          )
-
         return (
-          formatDateKey(
-            date,
-          )
+          getEventDateKey(event)
           === selectedDate
         )
       },
@@ -1762,6 +1971,46 @@ function CalendarPage() {
                 )
               },
             )}
+            <div
+              className="calendar-creative-layer"
+              onPointerMove={moveCreative}
+              onPointerUp={finishCreativeDrag}
+              onPointerCancel={finishCreativeDrag}
+            >
+              {currentCreative.texts.map(item => (
+                <div
+                  key={item.id}
+                  className="calendar-creative-note"
+                  style={{ left: `${item.x}%`, top: `${item.y}%` }}
+                  onPointerDown={event => startCreativeDrag('text', item.id, event)}
+                >
+                  <span
+                    contentEditable
+                    suppressContentEditableWarning
+                    onBlur={event => {
+                      const text = event.currentTarget.textContent?.trim() ?? ''
+                      if (!text) removeCreativeText(item.id)
+                      else if (text !== item.text) void persistCreative({ ...currentCreative, texts: currentCreative.texts.map(candidate => candidate.id === item.id ? { ...candidate, text } : candidate) })
+                    }}
+                    onPointerDown={event => event.stopPropagation()}
+                  >{item.text}</span>
+                  <button type="button" aria-label="Excluir anotação" onClick={event => { event.stopPropagation(); removeCreativeText(item.id) }}>×</button>
+                </div>
+              ))}
+              {currentCreative.stickers.map(item => (
+                <div
+                  key={item.id}
+                  className="calendar-creative-sticker"
+                  style={{ left: `${item.x}%`, top: `${item.y}%`, width: `${item.width}px`, height: `${item.height}px`, zIndex: item.zIndex }}
+                  onPointerDown={event => startCreativeDrag('sticker', item.id, event)}
+                >
+                  <img src={mediaUrl(item.fileUrl)} alt="" />
+                  <button type="button" aria-label="Reduzir sticker" onClick={event => { event.stopPropagation(); void persistCreative({ ...currentCreative, stickers: currentCreative.stickers.map(candidate => candidate.id === item.id ? { ...candidate, width: Math.max(28, candidate.width - 12), height: Math.max(28, candidate.height - 12) } : candidate) }) }}>−</button>
+                  <button type="button" aria-label="Aumentar sticker" onClick={event => { event.stopPropagation(); void persistCreative({ ...currentCreative, stickers: currentCreative.stickers.map(candidate => candidate.id === item.id ? { ...candidate, width: Math.min(120, candidate.width + 12), height: Math.min(120, candidate.height + 12) } : candidate) }) }}>+</button>
+                  <button type="button" aria-label="Excluir sticker" onClick={event => { event.stopPropagation(); removeSticker(item.id) }}>×</button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -1785,8 +2034,28 @@ function CalendarPage() {
             )}
           </h2>
 
+          <section className="calendar-creative-panel" aria-label="Decoração do mês">
+            <div className="creative-panel-heading">
+              <div>
+                <span>PLANNER LIVRE</span>
+                <h3>Decorar {MONTH_NAMES[month]}</h3>
+              </div>
+              <small>{isSavingCreative ? 'Salvando...' : `${currentCreative.texts.length + currentCreative.stickers.length} elementos`}</small>
+            </div>
+            <div className="creative-note-create">
+              <input value={creativeText} placeholder="Escreva uma nota..." onChange={event => setCreativeText(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') addCreativeText() }} />
+              <button type="button" onClick={addCreativeText}>Adicionar</button>
+            </div>
+            <div className="creative-sticker-picker">
+              <span>Adesivos salvos</span>
+              {stickerMedia.length === 0 && <small>Nenhum sticker na biblioteca ainda.</small>}
+              {stickerMedia.map(media => <button type="button" key={media.id} title={`Adicionar ${media.name}`} onClick={() => addSticker(media)}><img src={mediaUrl(media.file_url)} alt={media.name} /></button>)}
+            </div>
+          </section>
+
 
           <div className="event-form">
+            <SubjectPicker value={subjectId} onChange={setSubjectId} />
             <h3>
               {editingEventId
                 !== null

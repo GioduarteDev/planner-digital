@@ -9,6 +9,8 @@ import {
 } from '../../services/api'
 
 import './OrganizationPage.css'
+import SubjectPicker from '../../components/SubjectPicker'
+import AcademicCenter from './AcademicCenter'
 
 
 type ProjectStatus =
@@ -22,12 +24,14 @@ type ProjectPriority =
   | 'high'
 
 type OrganizationSection =
+  | 'academic'
   | 'projects'
   | 'categories'
   | 'subjects'
 
 
 type Project = {
+  subject_id: number | null
   id: number
   user_id: number
   title: string
@@ -51,6 +55,8 @@ type Category = {
 
 
 type Subject = {
+  professor?: string | null
+  semester?: string | null
   id: number
   user_id: number
   name: string
@@ -108,11 +114,14 @@ function projectPriorityLabel(
 
 
 function OrganizationPage() {
+  const [projectSubjectId, setProjectSubjectId] = useState<number | null>(null)
+  const [professor, setProfessor] = useState('')
+  const [semester, setSemester] = useState('')
   const [
     activeSection,
     setActiveSection,
   ] = useState<OrganizationSection>(
-    'projects',
+    'academic',
   )
 
   const [
@@ -298,6 +307,7 @@ function OrganizationPage() {
 
 
   function resetProjectForm() {
+    setProjectSubjectId(null)
     setProjectTitle('')
     setProjectDescription('')
     setProjectStatus('active')
@@ -317,6 +327,8 @@ function OrganizationPage() {
 
   function resetSubjectForm() {
     setSubjectName('')
+    setProfessor('')
+    setSemester('')
     setSubjectColor('#9fb9cc')
     setEditingSubjectId(null)
   }
@@ -359,6 +371,7 @@ function OrganizationPage() {
           color:
             projectColor,
 
+          subject_id: projectSubjectId,
           due_date:
             projectDueDate
             || null,
@@ -429,6 +442,7 @@ function OrganizationPage() {
   function startProjectEdit(
     project: Project,
   ) {
+    setProjectSubjectId(project.subject_id ?? null)
     clearMessages()
 
     setEditingProjectId(
@@ -712,6 +726,8 @@ function OrganizationPage() {
 
           color:
             subjectColor,
+          professor: professor.trim() || null,
+          semester: semester.trim() || null,
         })
 
 
@@ -786,6 +802,8 @@ function OrganizationPage() {
   function startSubjectEdit(
     subject: Subject,
   ) {
+    setProfessor(subject.professor || '')
+    setSemester(subject.semester || '')
     clearMessages()
 
     setEditingSubjectId(
@@ -886,6 +904,7 @@ function OrganizationPage() {
 
 
       <div className="organization-tabs">
+        <button type="button" className={activeSection === 'academic' ? 'active' : ''} onClick={() => setActiveSection('academic')}>Central Acadêmica</button>
         <button
           type="button"
           className={
@@ -970,6 +989,7 @@ function OrganizationPage() {
       )}
 
 
+      {activeSection === 'academic' && <AcademicCenter />}
       {activeSection === 'projects' && (
         <div className="organization-section">
           <form
@@ -1009,6 +1029,7 @@ function OrganizationPage() {
 
 
             <div className="organization-form-grid">
+              <SubjectPicker value={projectSubjectId} onChange={setProjectSubjectId} />
               <label className="organization-full">
                 Nome do projeto
 
@@ -1486,6 +1507,8 @@ function OrganizationPage() {
 
 
             <div className="organization-inline-form">
+              <label>Professor<input maxLength={160} value={professor} onChange={e => setProfessor(e.target.value)} /></label>
+              <label>Semestre / período<input maxLength={80} placeholder="Ex.: 2026.2" value={semester} onChange={e => setSemester(e.target.value)} /></label>
               <label>
                 Nome
 

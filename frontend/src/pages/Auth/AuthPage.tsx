@@ -1,474 +1,100 @@
-import {
-  useState,
-} from 'react'
-
-import type {
-  FormEvent,
-} from 'react'
-
-import {
-  useNavigate,
-} from 'react-router-dom'
-
-import {
-  apiRequest,
-  saveAuth,
-} from '../../services/api'
-
+import { useState, type FormEvent } from 'react'
+import { ArrowRight, Leaf, LoaderCircle } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { apiRequest, saveAuth } from '../../services/api'
+import AuthCarousel from './AuthCarousel'
+import AuthField from './AuthField'
+import AuthSidebar from './AuthSidebar'
 import './AuthPage.css'
 
+type AuthMode = 'login' | 'register'
+type UserFromApi = { id: number; email: string; name: string; username: string | null; created_at: string }
+type AuthResponse = { user: UserFromApi }
+type FieldName = 'name' | 'email' | 'password' | 'confirmPassword'
+type FieldErrors = Partial<Record<FieldName | 'form', string>>
 
-type AuthMode =
-  | 'login'
-  | 'register'
-
-
-type UserFromApi = {
-  id: number
-  email: string
-  name: string
-  username: string | null
-  created_at: string
-}
-
-
-type AuthResponse = {
-  user: UserFromApi
-}
-
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function AuthPage() {
-  const navigate =
-    useNavigate()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const mode: AuthMode = location.pathname === '/register' ? 'register' : 'login'
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [errors, setErrors] = useState<FieldErrors>({})
+  const [isLoading, setIsLoading] = useState(false)
 
-  const [
-    mode,
-    setMode,
-  ] =
-    useState<AuthMode>(
-      'login',
-    )
+  function validate() {
+    const next: FieldErrors = {}
+    const normalizedEmail = email.trim()
+    if (mode === 'register' && !name.trim()) next.name = 'Conte como podemos chamar você.'
+    if (!normalizedEmail) next.email = 'Digite seu e-mail.'
+    else if (!emailPattern.test(normalizedEmail)) next.email = 'Digite um e-mail válido.'
+    if (!password) next.password = 'Digite sua senha.'
+    else if (mode === 'register' && password.length < 8) next.password = 'Use pelo menos 8 caracteres.'
+    if (mode === 'register' && !confirmPassword) next.confirmPassword = 'Digite a senha mais uma vez.'
+    else if (mode === 'register' && password !== confirmPassword) next.confirmPassword = 'As senhas não coincidem.'
+    setErrors(next)
+    return Object.keys(next).length === 0
+  }
 
-  const [
-    name,
-    setName,
-  ] = useState('')
-
-  const [
-    username,
-    setUsername,
-  ] = useState('')
-
-  const [
-    email,
-    setEmail,
-  ] = useState('')
-
-  const [
-    password,
-    setPassword,
-  ] = useState('')
-
-  const [
-    confirmPassword,
-    setConfirmPassword,
-  ] = useState('')
-
-  const [
-    error,
-    setError,
-  ] = useState('')
-
-  const [
-    isLoading,
-    setIsLoading,
-  ] = useState(false)
-
-
-  async function handleSubmit(
-    event: FormEvent,
-  ) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-
-    setError('')
-
-    const normalizedEmail =
-      email.trim()
-
-    const normalizedName =
-      name.trim()
-
-    const normalizedUsername =
-      username
-        .trim()
-        .replace(/^@+/, '')
-        .toLowerCase()
-
-
-    if (
-      normalizedEmail === ''
-      || password === ''
-    ) {
-      setError(
-        'Preencha e-mail e senha.',
-      )
-
-      return
-    }
-
-
-    if (password.length < 8) {
-      setError(
-        'A senha precisa ter pelo menos 8 caracteres.',
-      )
-
-      return
-    }
-
-
-    if (mode === 'register') {
-      if (normalizedName === '') {
-        setError(
-          'Digite seu nome.',
-        )
-
-        return
-      }
-
-      if (normalizedUsername === '') {
-        setError(
-          'Escolha um username.',
-        )
-
-        return
-      }
-
-      if (
-        normalizedUsername.length < 3
-      ) {
-        setError(
-          'O username precisa ter pelo menos 3 caracteres.',
-        )
-
-        return
-      }
-
-      if (
-        !/^[a-z0-9._]+$/.test(
-          normalizedUsername,
-        )
-      ) {
-        setError(
-          'O username pode usar letras, números, ponto e underscore.',
-        )
-
-        return
-      }
-
-      if (
-        password !== confirmPassword
-      ) {
-        setError(
-          'As senhas não coincidem.',
-        )
-
-        return
-      }
-    }
-
-
+    if (!validate()) return
     try {
       setIsLoading(true)
-
-      const endpoint =
-        mode === 'login'
-          ? '/auth/login'
-          : '/auth/register'
-
-      const body =
-        mode === 'login'
-          ? {
-              email:
-                normalizedEmail,
-              password,
-            }
-          : {
-              name:
-                normalizedName,
-              username:
-                normalizedUsername,
-              email:
-                normalizedEmail,
-              password,
-            }
-
-      const response =
-        await apiRequest<AuthResponse>(
-          endpoint,
-          {
-            method: 'POST',
-
-            body:
-              JSON.stringify(
-                body,
-              ),
-          },
-        )
-
-      saveAuth(
-        response.user,
-      )
-
-      navigate(
-        '/',
-        {
-          replace: true,
-        },
-      )
+      setErrors({})
+      const response = await apiRequest<AuthResponse>(mode === 'login' ? '/auth/login' : '/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(mode === 'login'
+          ? { email: email.trim(), password }
+          : { name: name.trim(), email: email.trim(), password }),
+      })
+      saveAuth(response.user)
+      navigate('/', { replace: true })
     } catch (error) {
-      console.error(error)
-
-      if (
-        error instanceof Error
-      ) {
-        setError(
-          error.message,
-        )
-      } else {
-        setError(
-          mode === 'login'
-            ? 'Não foi possível entrar.'
-            : 'Não foi possível criar sua conta.',
-        )
-      }
+      setErrors({ form: error instanceof Error ? error.message : mode === 'login' ? 'Não foi possível entrar. Tente novamente.' : 'Não foi possível criar sua conta. Tente novamente.' })
     } finally {
       setIsLoading(false)
     }
   }
 
-
-  function changeMode(
-    newMode: AuthMode,
-  ) {
-    setMode(
-      newMode,
-    )
-
-    setError('')
-    setPassword('')
-    setConfirmPassword('')
-  }
-
-
-  return (
-    <main className="auth-page">
-      <section className="auth-card">
-        <div className="auth-title">
-          <span>
-            ✦
-          </span>
-
-          <h1>
-            Planner Digital
-          </h1>
-
-          <p>
-            {mode === 'login'
-              ? (
-                  'Entre no seu espaço de organização.'
-                )
-              : (
-                  'Crie seu espaço pessoal para planejar, estudar e organizar seus projetos.'
-                )}
+  return <main className="auth-page">
+    <div className="auth-editorial-shell">
+      <AuthSidebar />
+      <AuthCarousel />
+      <section className="auth-panel" aria-labelledby="auth-title">
+        <div className="auth-panel-inner">
+          <div className="auth-botanical" aria-hidden="true"><Leaf /><span /><Leaf /></div>
+          <span className="auth-kicker">SEU ESPAÇO PESSOAL</span>
+          <h1 id="auth-title">{mode === 'login' ? 'Entrar' : 'Criar conta'}</h1>
+          <p className="auth-welcome">
+            {mode === 'login' ? 'Que bom te ver de novo por aqui!' : 'Que bom ter você por aqui!'}
+            <span>{mode === 'login' ? 'Continue planejando uma vida mais sua.' : 'Vamos começar a planejar uma vida mais sua.'}</span>
           </p>
+          <form className="auth-form" onSubmit={handleSubmit} noValidate>
+            {mode === 'register' && <AuthField id="auth-name" label="Nome" icon="name" value={name} error={errors.name} placeholder="Como você gosta de ser chamada?" autoComplete="name" maxLength={120} disabled={isLoading} onChange={event => setName(event.target.value)} />}
+            <AuthField id="auth-email" label="E-mail" icon="email" type="email" value={email} error={errors.email} placeholder="voce@email.com" autoComplete="email" inputMode="email" autoCapitalize="none" spellCheck={false} maxLength={255} disabled={isLoading} onChange={event => setEmail(event.target.value)} />
+            <AuthField id="auth-password" label="Senha" icon="password" type="password" value={password} error={errors.password} placeholder={mode === 'login' ? 'Sua senha' : 'Mínimo de 8 caracteres'} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} maxLength={128} disabled={isLoading} onChange={event => setPassword(event.target.value)} />
+            {mode === 'register' && <AuthField id="auth-confirm-password" label="Confirmar senha" icon="password" type="password" value={confirmPassword} error={errors.confirmPassword} placeholder="Digite a senha novamente" autoComplete="new-password" maxLength={128} disabled={isLoading} onChange={event => setConfirmPassword(event.target.value)} />}
+            {errors.form && <p className="auth-form-error" role="alert">{errors.form}</p>}
+            <button className="auth-submit" type="submit" disabled={isLoading}>
+              <span>{isLoading ? (mode === 'login' ? 'Entrando…' : 'Criando conta…') : (mode === 'login' ? 'Entrar' : 'Criar conta')}</span>
+              {isLoading ? <LoaderCircle className="auth-spinner" aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}
+            </button>
+          </form>
+          <div className="auth-switch">
+            <div aria-hidden="true"><span /><Leaf /><span /></div>
+            <p>{mode === 'login' ? 'Ainda não tem uma conta?' : 'Já tem uma conta?'}</p>
+            <Link to={mode === 'login' ? '/register' : '/login'}>{mode === 'login' ? 'Criar conta' : 'Entrar'} <ArrowRight aria-hidden="true" /></Link>
+          </div>
         </div>
-
-
-        <div className="auth-tabs">
-          <button
-            type="button"
-
-            className={
-              mode === 'login'
-                ? 'active'
-                : ''
-            }
-
-            onClick={() =>
-              changeMode(
-                'login',
-              )
-            }
-          >
-            Entrar
-          </button>
-
-          <button
-            type="button"
-
-            className={
-              mode === 'register'
-                ? 'active'
-                : ''
-            }
-
-            onClick={() =>
-              changeMode(
-                'register',
-              )
-            }
-          >
-            Criar conta
-          </button>
-        </div>
-
-
-        <form
-          className="auth-form"
-          onSubmit={
-            handleSubmit
-          }
-        >
-          {mode === 'register' && (
-            <>
-              <label>
-                Nome
-
-                <input
-                  type="text"
-                  value={name}
-                  placeholder="Seu nome"
-                  autoComplete="name"
-                  maxLength={120}
-                  onChange={(event) =>
-                    setName(
-                      event.target.value,
-                    )
-                  }
-                />
-              </label>
-
-
-              <label>
-                Username
-
-                <input
-                  type="text"
-                  value={username}
-                  placeholder="@seuusername"
-                  autoComplete="username"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  minLength={3}
-                  maxLength={50}
-                  onChange={(event) =>
-                    setUsername(
-                      event.target.value,
-                    )
-                  }
-                />
-
-                <span className="auth-field-hint">
-                  Seu identificador dentro do planner.
-                </span>
-              </label>
-            </>
-          )}
-
-
-          <label>
-            E-mail
-
-            <input
-              type="email"
-              value={email}
-              placeholder="voce@email.com"
-              autoComplete="email"
-              maxLength={255}
-              onChange={(event) =>
-                setEmail(
-                  event.target.value,
-                )
-              }
-            />
-          </label>
-
-
-          <label>
-            Senha
-
-            <input
-              type="password"
-              value={password}
-              placeholder={
-                mode === 'register'
-                  ? 'Mínimo de 8 caracteres'
-                  : 'Sua senha'
-              }
-              minLength={8}
-              maxLength={128}
-              autoComplete={
-                mode === 'login'
-                  ? 'current-password'
-                  : 'new-password'
-              }
-              onChange={(event) =>
-                setPassword(
-                  event.target.value,
-                )
-              }
-            />
-          </label>
-
-
-          {mode === 'register' && (
-            <label>
-              Confirmar senha
-
-              <input
-                type="password"
-                value={
-                  confirmPassword
-                }
-                placeholder="Digite a senha novamente"
-                minLength={8}
-                maxLength={128}
-                autoComplete="new-password"
-                onChange={(event) =>
-                  setConfirmPassword(
-                    event.target.value,
-                  )
-                }
-              />
-            </label>
-          )}
-
-
-          {error && (
-            <p className="auth-error">
-              {error}
-            </p>
-          )}
-
-
-          <button
-            className="auth-submit"
-            type="submit"
-            disabled={
-              isLoading
-            }
-          >
-            {isLoading
-              ? 'Carregando...'
-              : mode === 'login'
-                ? 'Entrar'
-                : 'Criar minha conta'}
-          </button>
-        </form>
+        <footer><span>PRIVADO POR NATUREZA</span><span>FEITO PARA O SEU RITMO</span></footer>
       </section>
-    </main>
-  )
+    </div>
+  </main>
 }
-
 
 export default AuthPage
