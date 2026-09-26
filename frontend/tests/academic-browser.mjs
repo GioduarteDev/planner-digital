@@ -5,6 +5,7 @@ import { readFile, mkdir, writeFile, mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve, extname } from 'node:path'
 import { spawn } from 'node:child_process'
+import { addDays, mondayOf } from '../src/pages/Planning/planningModel.ts'
 
 assert(process.env.ACADEMIC_TEST_API, 'Use the isolated backend test runner')
 const errors = [], httpErrors = []
@@ -44,8 +45,8 @@ try {
   const evaluate = async expression => { const result = await cdp('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails)); return result.result.value }
   const fill = async (selector, value) => evaluate(`(() => { const input=document.querySelector(${JSON.stringify(selector)}); if(!input) throw new Error('Missing field '+${JSON.stringify(selector)}); const proto=input.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:input.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto,'value').set.call(input,${JSON.stringify(value)}); input.dispatchEvent(new Event(input.tagName==='SELECT'?'change':'input',{bubbles:true})); })()`)
   const clickText = async (selector, value) => {
-    await until(() => evaluate(`[...document.querySelectorAll(${JSON.stringify(selector)})].some(e=>e.textContent.trim()===${JSON.stringify(value)} || e.firstChild?.textContent?.trim()===${JSON.stringify(value)} || e.textContent.trim().startsWith(${JSON.stringify(value)}))`), 'Missing button ' + value)
-    await evaluate(`(() => { const el=[...document.querySelectorAll(${JSON.stringify(selector)})].find(e=>e.textContent.trim()===${JSON.stringify(value)} || e.firstChild?.textContent?.trim()===${JSON.stringify(value)} || e.textContent.trim().startsWith(${JSON.stringify(value)})); el.click(); })()`)
+    await until(() => evaluate(`[...document.querySelectorAll(${JSON.stringify(selector)})].some(e=>e.textContent.trim().startsWith(${JSON.stringify(value)}) || e.firstChild?.textContent?.trim()===${JSON.stringify(value)} || e.textContent.trim().startsWith(${JSON.stringify(value)}))`), 'Missing button ' + value)
+    await evaluate(`(() => { const el=[...document.querySelectorAll(${JSON.stringify(selector)})].find(e=>e.textContent.trim().startsWith(${JSON.stringify(value)}) || e.firstChild?.textContent?.trim()===${JSON.stringify(value)} || e.textContent.trim().startsWith(${JSON.stringify(value)})); el.click(); })()`)
   }
   const navigate = async path => { await cdp('Page.navigate', { url: origin + path }); await until(() => evaluate('!!document.querySelector(".quick-capture-button, .library-page, .library-hero")'), `Page missing at ${path}`) }
   const api = (path, method = 'GET', body) => evaluate(`fetch('/__api'+${JSON.stringify(path)},{method:${JSON.stringify(method)},headers:{'Content-Type':'application/json'},${body === undefined ? '' : `body:JSON.stringify(${JSON.stringify(body)})`}}).then(async r=>{if(!r.ok)throw new Error(await r.text());return r.status===204?null:r.json()})`)
@@ -152,6 +153,61 @@ try {
   failInbox = false
   await clickText('.inbox-page button', 'Atualizar')
   await until(() => evaluate('!document.querySelector(".inbox-page [role=alert]")'), 'Inbox did not recover')
+  // Central de Prazos: real dates, source navigation and completion.
+  const deadlineTasks = []
+  for (const [offset, group] of [[-1, 'Atrasados'], [0, 'Hoje'], [1, 'Amanhã'], [3, 'Próximos 7 dias'], [10, 'Depois']]) {
+    const record = await api('/tasks', 'POST', { text: `Prazo UI ${offset}`, due_date: addDays(today, offset), subject_id: a.id, project_id: project.id })
+    deadlineTasks.push({ ...record, group })
+  }
+  await navigate('/deadlines')
+  await until(() => evaluate('document.querySelector(".deadline-list")?.textContent.includes("Prazo UI -1")'), 'Deadline data did not load')
+  for (const record of deadlineTasks) {
+    const group = await evaluate(`[...document.querySelectorAll('.deadline-item')].find(e=>e.textContent.includes(${JSON.stringify(record.text)}))?.closest('.deadline-group').querySelector('h2').textContent`)
+    assert(group.startsWith(record.group), `Wrong group for ${record.text}: ${group}`)
+  }
+  await evaluate(`document.querySelector('[aria-label="Concluir Prazo UI 0"]').click()`)
+  await until(() => evaluate(`!document.querySelector('[aria-label="Concluir Prazo UI 0"]')`), 'Completed task still in deadlines')
+  const finished = (await api('/tasks')).find(t => t.id === deadlineTasks[1].id)
+  assert(finished.done && finished.completed_at)
+  await api(`/tasks/${deadlineTasks[0].id}`, 'PATCH', { due_date: addDays(today, 10) })
+  await clickText('.planning-heading button', 'Atualizar')
+  await until(() => evaluate(`[...document.querySelectorAll('.deadline-item')].find(e=>e.textContent.includes('Prazo UI -1'))?.closest('.deadline-group').querySelector('h2').textContent.startsWith('Depois')`), 'Changed date did not regroup')
+  await evaluate(`[...document.querySelectorAll('.deadline-title')].find(e=>e.textContent==='Prazo UI 1').click()`)
+  await until(() => evaluate('location.pathname==="/tasks" && document.body.textContent.includes("Prazo UI 1")'), 'Deadline link did not open real Tasks')
+  await navigate('/deadlines')
+  await cdp('Page.reload')
+  await until(() => evaluate('document.body.textContent.includes("Prazo UI 10")'), 'Deadline reload failed')
+  assert(!await evaluate(`!!document.querySelector('[aria-label="Concluir Prazo UI 0"]')`))
+  await writeFile('test-results/deadlines-mobile.png', Buffer.from((await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'))
+  assert(await evaluate('document.documentElement.scrollWidth <= innerWidth + 2'), 'Deadlines mobile overflow')
+  // Weekly manual history, navigation autosave, completion refresh and F5.
+  await navigate('/weekly-review')
+  await until(() => evaluate('!!document.querySelector(".weekly-form input")'), 'Weekly form not ready')
+  await fill('.weekly-form label:nth-child(1) input', 'Prioridade UI 1')
+  await fill('.weekly-form label:nth-child(2) input', 'Prioridade UI 2')
+  await fill('.weekly-form label:nth-child(3) input', 'Prioridade UI 3')
+  await fill('.weekly-form textarea', 'Reflexão UI persistente')
+  await fill('.weekly-form label:nth-child(5) input', 'Objetivo UI')
+  await clickText('.weekly-form button', 'Salvar revisão')
+  await until(() => evaluate('document.querySelector(".weekly-save-state")?.textContent.includes("Revisão salva")'), 'Weekly save failed')
+  await clickText('.weekly-navigation button', '← Semana anterior')
+  await until(() => evaluate('!!document.querySelector(".weekly-form input") && document.querySelector(".weekly-form input").value!=="Prioridade UI 1"'), 'Previous week did not load separately')
+  await fill('.weekly-form label:nth-child(1) input', 'Semana anterior UI')
+  await clickText('.weekly-navigation button', 'Semana atual')
+  await until(() => evaluate('document.querySelector(".weekly-form input")?.value==="Prioridade UI 1"'), 'Weekly history did not restore')
+  assert.equal((await api(`/weekly-reviews/${addDays(mondayOf(today), -7)}`)).priorities[0], 'Semana anterior UI')
+  const completedBefore = await evaluate('Number(document.querySelector(".weekly-page .planning-stats strong").textContent)')
+  await api(`/tasks/${deadlineTasks[2].id}`, 'PATCH', { done: true })
+  await clickText('.weekly-page button', 'Atualizar indicadores')
+  await until(() => evaluate(`Number(document.querySelector('.weekly-page .planning-stats strong').textContent)===${completedBefore + 1}`), 'Weekly completion total did not refresh')
+  await cdp('Page.reload')
+  await until(() => evaluate('document.querySelector(".weekly-form textarea")?.value==="Reflexão UI persistente"'), 'Weekly review did not persist after F5')
+  assert.equal(await evaluate('document.querySelector(".weekly-form label:nth-child(5) input").value'), 'Objetivo UI')
+  await writeFile('test-results/weekly-mobile.png', Buffer.from((await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'))
+  assert(await evaluate('document.documentElement.scrollWidth <= innerWidth + 2'), 'Weekly mobile overflow')
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false })
+  await writeFile('test-results/weekly-desktop.png', Buffer.from((await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'))
+
   // Smoke checks of existing pages with the real, isolated API, followed by F5.
   for (const path of ['/today', '/tasks', '/calendar', '/studies', '/search', '/profile', '/inbox', '/']) {
     await navigate(path); await delay(200); await cdp('Page.reload'); await until(() => evaluate('!!document.querySelector(".quick-capture-button, .library-page, .library-hero")'), `F5 failed: ${path}`)

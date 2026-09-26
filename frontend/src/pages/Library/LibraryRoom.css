@@ -1,11 +1,11 @@
 /* The library is a paper object inside a pastel personal desktop. */
 .library-page { font-family: Arial, sans-serif; --ink: #55536b; --ink-soft: #79768a; --line: #d6cfd0; --paper-strong: #fffaf0; min-height: 100svh; padding: 18px 24px 30px; background-color: #F7F1E8; background-image: url('./room-wallpaper.svg'); background-size: 760px; }
 .library-page:has(.library-ambient-background) { isolation: isolate; }
-.library-ambient-background { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: #eee9ef; pointer-events: none; }
-.library-ambient-back, .library-ambient-front { position: absolute; inset: -5%; background-position: center; background-repeat: no-repeat; }
-.library-ambient-back { background-size: cover; filter: blur(30px); opacity: .34; transform: scale(1.1); }
-.library-ambient-front { inset: 0; background-size: contain; filter: blur(6px); opacity: .25; }
-.library-ambient-wash { position: absolute; inset: 0; background: rgba(247, 241, 232, .62); }
+.library-ambient-background { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: #F7F1E8; pointer-events: none; }
+.library-ambient-back, .library-ambient-front { position: absolute; inset: 0; background-position: center; background-repeat: no-repeat; }
+.library-ambient-back { background-size: cover; filter: brightness(1.10) saturate(1.15); opacity: .32; transform: scale(1.01); }
+.library-ambient-front { background-size: contain; filter: brightness(1.08) saturate(1.08); opacity: .96; }
+.library-ambient-wash { position: absolute; inset: 0; background: rgba(255, 250, 240, .01); }
 .library-desktop, .library-room-status, .room-dock { position: relative; z-index: 1; }
 .library-topbar { position: relative; top: auto; width: min(100%, 1160px); margin: auto; border: 1px solid #a9a8c4; border-radius: 9px; background: #E6E3F7; box-shadow: 0 3px 0 #a9a2b933, inset 0 0 0 3px #e0e3f3; }
 .library-topbar-inner { min-height: 46px; padding: 5px 13px; gap: 12px; }
@@ -107,3 +107,28 @@
 @media (hover: none) { .library-page .agenda-book-menu-button { opacity: 1; } }
 @media (hover: none) { .room-polaroid-edit { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .room-dock button { transition: none; } .library-page .agenda-book:hover { transform: none; } }
+
+
+/* draggable library post-it */
+.room-collection-note {
+  --note-x: 0px;
+  --note-y: 0px;
+
+  transform:
+    translate(
+      var(--note-x),
+      var(--note-y)
+    )
+    rotate(3deg);
+
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  z-index: 8;
+  will-change: transform;
+}
+
+.room-collection-note.is-dragging {
+  cursor: grabbing;
+  z-index: 50;
+}

@@ -59,6 +59,8 @@ import {
 
 
 import InboxPage from './pages/Inbox/InboxPage'
+import DeadlinesPage from './pages/Planning/DeadlinesPage'
+import WeeklyReviewPage from './pages/Planning/WeeklyReviewPage'
 
 type AuthState =
   | 'checking'
@@ -146,6 +148,8 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/deadlines" element={<ProtectedRoute><DeadlinesPage /></ProtectedRoute>} />
+        <Route path="/weekly-review" element={<ProtectedRoute><WeeklyReviewPage /></ProtectedRoute>} />
         <Route path="/inbox" element={<ProtectedRoute><InboxPage /></ProtectedRoute>} />
         <Route
           path="/login"

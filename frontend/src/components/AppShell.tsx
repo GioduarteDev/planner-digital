@@ -56,6 +56,8 @@ const MATCHA_ICON = '/matcha-planner-icon.png'
 const navigation = [
   { to: '/', label: 'Biblioteca', end: true },
   { to: '/inbox', label: 'Inbox' },
+  { to: '/deadlines', label: 'Prazos' },
+  { to: '/weekly-review', label: 'Revisão semanal' },
   { to: '/today', label: 'Hoje' },
   { to: '/calendar', label: 'Calendário' },
   { to: '/tasks', label: 'Tarefas' },

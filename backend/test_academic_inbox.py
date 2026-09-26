@@ -41,7 +41,7 @@ def run():
             connection.execute(text("INSERT INTO subjects (user_id, name) VALUES (1, 'Legacy')"))
         command.upgrade(config, "head")
         with engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "a924002"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "a925001"
             assert connection.scalar(text("SELECT name FROM subjects WHERE id=1")) == "Legacy"
         inspector = inspect(engine)
         for table in ("tasks", "events", "study_sessions", "projects", "inbox_items"):
@@ -125,9 +125,28 @@ def run():
                     assert record["subject"] == subjects[0]["name"] and record["duration_minutes"] == 45
                 request("PATCH", f'{path}/{record["id"]}', {"subject_id": subjects[1]["id"]})
         assert request("GET", "/tasks")[0]["done"]
+        completed_task = request("GET", "/tasks")[0]
+        assert completed_task["completed_at"] is not None
+        same = request("PATCH", f'/tasks/{completed_task["id"]}', {"done": True})
+        assert same["completed_at"] == completed_task["completed_at"]
+        request("PATCH", f'/tasks/{completed_task["id"]}', {"done": False})
+        assert request("GET", "/tasks")[0]["completed_at"] is None
+        request("PATCH", f'/tasks/{completed_task["id"]}', {"done": True})
+        assert request("GET", "/weekly-reviews/2026-09-21")["priorities"] == ["", "", ""]
+        review = {"priorities": ["Entregar artigo", "Estudar banco", "Descansar"], "reflection": "Semana produtiva", "goal": "Uma coisa de cada vez"}
+        request("PUT", "/weekly-reviews/2026-09-21", review)
+        request("PUT", "/weekly-reviews/2026-09-14", {"priorities": ["Anterior", "", ""]})
+        assert request("GET", "/weekly-reviews/2026-09-21")["reflection"] == review["reflection"]
+        assert request("GET", "/weekly-reviews/2026-09-14")["priorities"][0] == "Anterior"
+        request("PUT", "/weekly-reviews/2026-09-22", review, 422)
+        request("PUT", "/weekly-reviews/2026-09-21", {"priorities": ["Only one"]}, 422)
+
         # A new client/session sees all committed receipts (reload persistence).
         assert len(request("GET", "/inbox")) == 9
         current[0] = users[1]
+        assert request("GET", "/weekly-reviews/2026-09-21")["reflection"] == ""
+        request("PUT", "/weekly-reviews/2026-09-21", {"priorities": ["B private", "", ""]})
+
         for path in ("/subjects", "/tasks", "/events", "/studies", "/projects", "/inbox"):
             assert request("GET", path) == []
         request("POST", "/inbox", {"text": "Cross user", "optional_subject_id": subjects[0]["id"]}, 404)
@@ -139,6 +158,7 @@ def run():
         request("PATCH", f'/inbox/{own["id"]}', {"optional_subject_id": subjects[0]["id"]}, 404)
         request("DELETE", f'/inbox/{own["id"]}', status=204)
         current[0] = users[0]
+        assert request("GET", "/weekly-reviews/2026-09-21")["reflection"] == review["reflection"]
         request("DELETE", f'/subjects/{subjects[1]["id"]}', status=204)
         assert request("GET", "/tasks")[0]["subject_id"] is None
         assert len(app.openapi()["paths"]) >= 85

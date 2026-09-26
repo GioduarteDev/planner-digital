@@ -13,7 +13,7 @@ router = APIRouter(prefix="/inbox", tags=["Inbox"])
 
 
 def get_user_inbox_item(item_id: int, user_id: int, db: Session) -> InboxItem | None:
-    return db.scalar(select(InboxItem).where(InboxItem.id == item_id, InboxItem.user_id == user_id))
+    return db.scalar(select(InboxItem).where(InboxItem.id == item_id, InboxItem.user_id == user_id).with_for_update())
 
 
 def validate_subject(subject_id: int | None, user_id: int, db: Session) -> None:

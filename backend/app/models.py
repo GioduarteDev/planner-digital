@@ -416,6 +416,7 @@ class Task(Base):
     )
     text: Mapped[str] = mapped_column(String(300))
     description: Mapped[str] = mapped_column(Text, default="", server_default="")
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     done: Mapped[bool] = mapped_column(Boolean, default=False)
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -801,3 +802,16 @@ class EventReminderDelivery(Base):
     )
     signature: Mapped[str] = mapped_column(String(64), nullable=False)
     sent_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class WeeklyReview(Base):
+    __tablename__ = "weekly_reviews"
+    __table_args__ = (UniqueConstraint("user_id", "week_start", name="uq_weekly_reviews_user_week"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    week_start: Mapped[date] = mapped_column(Date, nullable=False)
+    priorities: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
+    reflection: Mapped[str] = mapped_column(Text, default="", server_default="")
+    goal: Mapped[str] = mapped_column(String(500), default="", server_default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

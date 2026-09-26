@@ -1121,6 +1121,201 @@ function LibraryPage() {
       : null
 
 
+  useEffect(() => {
+    const note =
+      document.querySelector<HTMLElement>(
+        '.room-collection-note',
+      )
+
+    if (!note) {
+      return
+    }
+
+    const storageKey =
+      'matcha-library-collection-note-position'
+
+    let position = {
+      x: 0,
+      y: 0,
+    }
+
+    try {
+      const saved =
+        localStorage.getItem(storageKey)
+
+      if (saved) {
+        const parsed =
+          JSON.parse(saved) as {
+            x?: number
+            y?: number
+          }
+
+        if (
+          typeof parsed.x === 'number'
+          && typeof parsed.y === 'number'
+        ) {
+          position = {
+            x: parsed.x,
+            y: parsed.y,
+          }
+        }
+      }
+    } catch {
+      // usa a posicao padrao
+    }
+
+    function applyPosition() {
+      note.style.setProperty(
+        '--note-x',
+        `${position.x}px`,
+      )
+
+      note.style.setProperty(
+        '--note-y',
+        `${position.y}px`,
+      )
+    }
+
+    applyPosition()
+
+    let dragging = false
+    let startPointerX = 0
+    let startPointerY = 0
+    let startNoteX = position.x
+    let startNoteY = position.y
+
+    function handlePointerDown(
+      event: PointerEvent,
+    ) {
+      const target =
+        event.target as HTMLElement
+
+      if (target.closest('button')) {
+        return
+      }
+
+      dragging = true
+
+      startPointerX =
+        event.clientX
+      startPointerY =
+        event.clientY
+
+      startNoteX =
+        position.x
+      startNoteY =
+        position.y
+
+      note.classList.add(
+        'is-dragging',
+      )
+
+      note.setPointerCapture(
+        event.pointerId,
+      )
+
+      event.preventDefault()
+    }
+
+    function handlePointerMove(
+      event: PointerEvent,
+    ) {
+      if (!dragging) {
+        return
+      }
+
+      position = {
+        x:
+          startNoteX
+          + event.clientX
+          - startPointerX,
+        y:
+          startNoteY
+          + event.clientY
+          - startPointerY,
+      }
+
+      applyPosition()
+    }
+
+    function handlePointerUp(
+      event: PointerEvent,
+    ) {
+      if (!dragging) {
+        return
+      }
+
+      dragging = false
+
+      note.classList.remove(
+        'is-dragging',
+      )
+
+      if (
+        note.hasPointerCapture(
+          event.pointerId,
+        )
+      ) {
+        note.releasePointerCapture(
+          event.pointerId,
+        )
+      }
+
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify(position),
+      )
+    }
+
+    note.addEventListener(
+      'pointerdown',
+      handlePointerDown,
+    )
+
+    note.addEventListener(
+      'pointermove',
+      handlePointerMove,
+    )
+
+    note.addEventListener(
+      'pointerup',
+      handlePointerUp,
+    )
+
+    note.addEventListener(
+      'pointercancel',
+      handlePointerUp,
+    )
+
+    return () => {
+      note.removeEventListener(
+        'pointerdown',
+        handlePointerDown,
+      )
+
+      note.removeEventListener(
+        'pointermove',
+        handlePointerMove,
+      )
+
+      note.removeEventListener(
+        'pointerup',
+        handlePointerUp,
+      )
+
+      note.removeEventListener(
+        'pointercancel',
+        handlePointerUp,
+      )
+    }
+  }, [
+    agendas.length,
+    activeFilter,
+    searchTerm,
+    visibleAgendas.length,
+  ])
+
+
   const modalCoverPreview =
     draftCoverPreview
     ?? (

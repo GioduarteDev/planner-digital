@@ -193,6 +193,7 @@ class TaskUpdate(BaseModel):
 
 
 class TaskResponse(BaseModel):
+    completed_at: datetime | None = None
     id: int
     user_id: int
     page_id: int | None
@@ -957,3 +958,16 @@ class InboxConvert(BaseModel):
     duration_minutes: int | None = Field(default=None, ge=1, le=1440)
     subject: str | None = Field(default=None, min_length=1, max_length=100)
     model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class WeeklyReviewSave(BaseModel):
+    priorities: list[Annotated[str, Field(max_length=300)]] = Field(default_factory=lambda: ["", "", ""], min_length=3, max_length=3)
+    reflection: str = Field(default="", max_length=5000)
+    goal: str = Field(default="", max_length=500)
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+
+class WeeklyReviewResponse(WeeklyReviewSave):
+    week_start: date
+    updated_at: datetime | None = None
+    model_config = ConfigDict(from_attributes=True)

@@ -1006,7 +1006,7 @@ function TasksPage() {
 
               return (
                 <article
-                  key={task.id}
+                  key={task.id} id={`task-${task.id}`}
                   className={
                     task.done
                       ? 'task-card done'

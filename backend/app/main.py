@@ -35,6 +35,7 @@ from app.routes.subjects import router as subjects_router
 from app.routes.tasks import router as tasks_router
 from app.routes.habits import router as habits_router
 from app.routes.inbox import router as inbox_router
+from app.routes.weekly_reviews import router as weekly_reviews_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -167,6 +168,7 @@ app.include_router(reminders_router)
 app.include_router(notifications_router)
 app.include_router(subjects_router)
 app.include_router(inbox_router)
+app.include_router(weekly_reviews_router)
 app.include_router(studies_router)
 app.include_router(presets_router)
 app.include_router(stationery_kits_router)

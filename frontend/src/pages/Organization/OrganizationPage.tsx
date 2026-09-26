@@ -11,6 +11,7 @@ import {
 import './OrganizationPage.css'
 import SubjectPicker from '../../components/SubjectPicker'
 import AcademicCenter from './AcademicCenter'
+import { useSearchParams } from 'react-router-dom'
 
 
 type ProjectStatus =
@@ -114,6 +115,7 @@ function projectPriorityLabel(
 
 
 function OrganizationPage() {
+  const [searchParams] = useSearchParams()
   const [projectSubjectId, setProjectSubjectId] = useState<number | null>(null)
   const [professor, setProfessor] = useState('')
   const [semester, setSemester] = useState('')
@@ -121,7 +123,7 @@ function OrganizationPage() {
     activeSection,
     setActiveSection,
   ] = useState<OrganizationSection>(
-    'academic',
+    searchParams.get('section') === 'projects' ? 'projects' : 'academic',
   )
 
   const [
@@ -904,7 +906,7 @@ function OrganizationPage() {
 
 
       <div className="organization-tabs">
-        <button type="button" className={activeSection === 'academic' ? 'active' : ''} onClick={() => setActiveSection('academic')}>Central Acadêmica</button>
+        <button type="button" className={activeSection === 'academic' ? 'organization-tab active' : 'organization-tab'} onClick={() => setActiveSection('academic')}>Central Acadêmica</button>
         <button
           type="button"
           className={
@@ -1210,6 +1212,7 @@ function OrganizationPage() {
                 (project) => (
                   <article
                     key={project.id}
+                    id={`project-${project.id}`}
                     className="organization-project-card"
                   >
                     <div

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { apiRequest } from '../../services/api'
 import './AcademicCenter.css'
 
@@ -8,7 +8,8 @@ type Task = { id: number; subject_id: number | null; project_id: number | null; 
 type Event = { id: number; subject_id: number | null; title: string; starts_at: string; all_day: boolean; reminder_minutes: number | null }
 type Project = { id: number; subject_id: number | null; title: string; due_date: string | null; status: string }
 type Study = { id: number; subject_id: number | null; subject: string; topic: string; study_date: string; duration_minutes: number }
-type Data = { subjects: Subject[]; tasks: Task[]; events: Event[]; projects: Project[]; studies: Study[] }
+type Reminder = { id: number; event_id: number | null; minutes_before: number; enabled: boolean; channel: string }
+type Data = { reminders: Reminder[]; subjects: Subject[]; tasks: Task[]; events: Event[]; projects: Project[]; studies: Study[] }
 type Kind = 'tasks' | 'events' | 'projects' | 'studies'
 const names: Record<Kind, string> = { tasks: 'Tarefa', events: 'Evento / prova', projects: 'Projeto', studies: 'Estudo' }
 const dateLabel = (date: string | null) => date ? new Date(`${date.slice(0, 10)}T00:00:00`).toLocaleDateString('pt-BR') : 'Sem prazo'
@@ -45,15 +46,16 @@ function AddRecord({ subject, onSaved }: { subject: Subject; onSaved: () => void
 }
 
 export default function AcademicCenter() {
+  const [searchParams] = useSearchParams()
   const [now, setNow] = useState(() => Date.now())
   const [data, setData] = useState<Data | null>(null)
   const [error, setError] = useState('')
-  const [selected, setSelected] = useState<number | null>(null)
+  const [selected, setSelected] = useState<number | null>(() => Number(searchParams.get('subject')) || null)
   const [semester, setSemester] = useState('all')
   const [busy, setBusy] = useState(false)
   const [revision, setRevision] = useState(0)
   const load = useCallback(async () => {
-    try { const [subjects, tasks, events, projects, studies] = await Promise.all([apiRequest<Subject[]>('/subjects'), apiRequest<Task[]>('/tasks'), apiRequest<Event[]>('/events'), apiRequest<Project[]>('/projects'), apiRequest<Study[]>('/studies')]); setData({ subjects, tasks, events, projects, studies }); setNow(Date.now()); setError('') } catch (err) { setError(err instanceof Error ? err.message : 'Falha ao carregar a Central Acadêmica.') }
+    try { const [subjects, tasks, events, projects, studies, reminders] = await Promise.all([apiRequest<Subject[]>('/subjects'), apiRequest<Task[]>('/tasks'), apiRequest<Event[]>('/events'), apiRequest<Project[]>('/projects'), apiRequest<Study[]>('/studies'), apiRequest<Reminder[]>('/reminders')]); setData({ subjects, tasks, events, projects, studies, reminders }); setNow(Date.now()); setError('') } catch (err) { setError(err instanceof Error ? err.message : 'Falha ao carregar a Central Acadêmica.') }
   }, [])
   useEffect(() => { void Promise.resolve().then(load); const refresh = () => { void load() }; window.addEventListener('focus', refresh); return () => window.removeEventListener('focus', refresh) }, [load, revision])
   async function patch(path: string, body: object) { setBusy(true); setError(''); try { await apiRequest(path, { method: 'PATCH', body: JSON.stringify(body) }); await load() } catch (err) { setError(err instanceof Error ? err.message : 'Falha ao atualizar.') } finally { setBusy(false) } }
@@ -91,7 +93,7 @@ export default function AcademicCenter() {
       <p>Próximo compromisso: {nextEvent ? `${nextEvent.title} · ${new Date(nextEvent.starts_at).toLocaleString('pt-BR')}` : 'Nenhum'}</p><p>Próximo prazo: {nextDeadline ? `${nextDeadline.title} · ${dateLabel(nextDeadline.day)}` : 'Nenhum'}</p>
       <AddRecord key={subject.id} subject={subject} onSaved={() => setRevision(r => r + 1)} />
       <div className="academic-sections"><section><h3>Próximas entregas</h3>{!tasks.length && <p>Sem tarefas. Adicione uma entrega ou vincule uma tarefa existente abaixo.</p>}{[...tasks].sort((a, b) => Number(a.done) - Number(b.done) || (a.due_date || '9999').localeCompare(b.due_date || '9999')).map(t => <div className="academic-row" key={t.id}><label><input type="checkbox" checked={t.done} disabled={busy} onChange={() => void patch(`/tasks/${t.id}`, { done: !t.done })} /> {t.text}</label><small>{dateLabel(t.due_date)} · {t.done ? 'Concluída' : 'Pendente'} · Prioridade {({ high: 'alta', medium: 'média', low: 'baixa' })[t.priority] || t.priority}</small></div>)}<Link to="/tasks">Abrir Tarefas</Link></section>
-      <section><h3>Provas e eventos</h3>{!events.length && <p>Sem eventos. Adicione sua próxima prova.</p>}{events.map(e => <div className="academic-row" key={e.id}><strong>{e.title}</strong><small>{e.all_day ? dateLabel(localDay(new Date(e.starts_at))) : new Date(e.starts_at).toLocaleString('pt-BR')}{e.all_day ? ' · Dia inteiro' : ''}</small><small>{e.reminder_minutes !== null ? `Lembrete: ${e.reminder_minutes} min antes` : 'Sem lembrete'}</small></div>)}<Link to="/calendar">Abrir Calendário</Link></section>
+      <section><h3>Provas e eventos</h3>{!events.length && <p>Sem eventos. Adicione sua próxima prova.</p>}{events.map(e => <div className="academic-row" key={e.id}><strong>{e.title}</strong><small>{e.all_day ? dateLabel(localDay(new Date(e.starts_at))) : new Date(e.starts_at).toLocaleString('pt-BR')}{e.all_day ? ' · Dia inteiro' : ''}</small><small>{[...(e.reminder_minutes !== null ? [`${e.reminder_minutes} min antes`] : []), ...data.reminders.filter(r => r.event_id === e.id && r.enabled).map(r => `${r.minutes_before} min antes (${r.channel})`)].join(' · ') || 'Sem lembrete'}</small></div>)}<Link to="/calendar">Abrir Calendário</Link></section>
       <section><h3>Projetos</h3>{!projects.length && <p>Sem projetos. Adicione um projeto para esta matéria.</p>}{projects.map(p => { const related = data.tasks.filter(t => t.project_id === p.id); const done = related.filter(t => t.done).length; return <div className="academic-row" key={p.id}><strong>{p.title}</strong><small>{dateLabel(p.due_date)} · {({ active: 'Ativo', completed: 'Concluído', archived: 'Arquivado' })[p.status] || p.status}</small><progress value={done} max={related.length || 1} aria-label={`Progresso de ${p.title}`} /><small>{done}/{related.length} tarefas concluídas</small>{related.map(t => <small key={t.id}>{t.done ? '✓' : '○'} {t.text}</small>)}</div> })}</section>
       <section><h3>Estudos</h3>{!studies.length && <p>Sem estudos registrados. Registre sua primeira sessão.</p>}{studies.map(s => <div className="academic-row" key={s.id}><strong>{s.topic || subject.name}</strong><small>{dateLabel(s.study_date)} · {duration(s.duration_minutes)}</small></div>)}<p>Total: {duration(studies.reduce((sum, s) => sum + s.duration_minutes, 0))}</p><Link to="/studies">Abrir Estudos</Link></section></div>
       <details className="academic-link"><summary>Vincular ou mover registros existentes</summary><p>A alteração mantém o mesmo registro em todas as áreas do planner.</p>{(['tasks', 'events', 'projects', 'studies'] as Kind[]).map(kind => <section key={kind}><h4>{names[kind]}</h4>{!data[kind].length && <p>Nenhum registro disponível.</p>}{data[kind].map(record => <label className="academic-association" key={record.id}><span>{'text' in record ? record.text : 'title' in record ? record.title : record.topic || record.subject}</span><select aria-label={`Matéria de ${'text' in record ? record.text : 'title' in record ? record.title : record.topic}`} value={record.subject_id ?? ''} disabled={busy} onChange={e => void patch(`/${kind}/${record.id}`, { subject_id: e.target.value ? Number(e.target.value) : null })}><option value="">Sem matéria</option>{data.subjects.map(s => <option value={s.id} key={s.id}>{s.name}</option>)}</select></label>)}</section>)}</details>

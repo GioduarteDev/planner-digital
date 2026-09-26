@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -183,6 +183,12 @@ def update_task(
         subject_id=updates.get("subject_id") if "subject_id" in updates else None,
         category_id=updates.get("category_id") if "category_id" in updates else None,
     )
+
+    if "done" in updates:
+        if updates["done"] is None:
+            raise HTTPException(status_code=422, detail="A conclusão não pode ser nula.")
+        if updates["done"] != task.done:
+            task.completed_at = datetime.now(timezone.utc) if updates["done"] else None
 
     for field, value in updates.items():
         setattr(task, field, value)
