@@ -4,6 +4,7 @@ import json
 from typing import Annotated, Any, Literal
 
 from pydantic import (
+    AliasChoices,
     AfterValidator,
     BaseModel,
     ConfigDict,
@@ -531,7 +532,7 @@ class StudySessionResponse(BaseModel):
     user_id: int
     project_id: int | None
     subject_id: int | None
-    subject: str
+    subject: str = Field(validation_alias=AliasChoices("subject_name", "subject"))
     topic: str
     study_date: date
     duration_minutes: int

@@ -12,6 +12,7 @@ const pages = [1, 2, 3, 4, 5].map(id => ({ id, agenda_id: 1, title: `Página ${i
 const elements = []
 const tasks = [{ id: 401, page_id: 1, text: 'Revisar vocabulário', done: false, due_date: null, priority: 'medium' }]
 let agendaSettings = {}
+let profileSettings = {}
 let mediaVisible = false
 const writes = []
 const runtimeErrors = []
@@ -26,6 +27,9 @@ const server = createServer(async (req, res) => {
     const path = url.pathname.slice(6)
     let result = []
     if (path === '/auth/me' || path === '/profile') result = { id: 1, name: 'Teste do editor', email: 'editor@example.test' }
+    if (path === '/profile') result.settings = profileSettings
+    if (path === '/profile/settings') { profileSettings = { ...profileSettings, ...body.settings }; result = { settings: profileSettings } }
+    if (path === '/library/media') result = [{ id: 900, name: 'Sticker', file_url: `${origin}/matcha-planner-icon.png` }]
     if (path === '/agendas/1') result = { id: 1, title: 'Meu diário', cover_color: '#9CA362' }
     if (path === '/agendas/1') {
       if (req.method === 'PATCH') agendaSettings = body.settings ?? agendaSettings
@@ -451,6 +455,42 @@ try {
   assert.equal(await evaluate('document.querySelector(".canvas-postit-element").value'), 'lembrete no post-it')
   assert(await evaluate(`Array.from(document.querySelectorAll('.canvas-inline-text')).some(input => input.value === 'nota mensal livre')`), 'Monthly free text lost')
   await writeFile('test-results/editor-writing-month.png', Buffer.from((await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'))
+  assert.deepEqual(runtimeErrors, [])
+  // Writing mode must place a separate, focused text over an existing post-it.
+  await click('[aria-label="Texto"]')
+  await physicalClick('.canvas-postit-element')
+  assert(await evaluate('document.activeElement?.matches(".canvas-inline-text")'), 'Writing over post-it did not focus free text')
+  await cdp('Input.insertText', { text: 'Texto sobre post-it' })
+  await physicalClick('.minimal-page-title-input')
+  await until(() => elements.some(item => item.data.text === 'Texto sobre post-it'), 'Text over post-it not saved')
+  assert.equal(await evaluate('document.querySelector(".canvas-postit-element").value'), 'lembrete no post-it')
+  await cdp('Page.navigate', { url: `${origin}/agenda/1?page=1` })
+  await until(() => evaluate('document.querySelectorAll(".media-canvas-item").length === 2'), 'Page sticker missing')
+  await click('[aria-label="Texto"]')
+  await physicalClick('.media-canvas-item:last-child')
+  assert(await evaluate('document.activeElement?.matches(".canvas-inline-text")'), 'Writing over page sticker did not focus text')
+  await cdp('Input.insertText', { text: 'Texto sobre adesivo da página' })
+  await physicalClick('.minimal-page-title-input')
+  await until(() => elements.some(item => item.page_id === 1 && item.data.text === 'Texto sobre adesivo da página'), 'Page sticker text not saved')
+  await cdp('Page.reload')
+  await until(() => evaluate('Array.from(document.querySelectorAll(".canvas-inline-text")).some(input => input.value === "Texto sobre adesivo da página")'), 'Page sticker text lost after reload')
+  await cdp('Page.navigate', { url: `${origin}/calendar` })
+  await until(() => evaluate('!!document.querySelector(".calendar-day")'), 'Calendar did not load')
+  await click('.creative-note-create button')
+  await physicalClick('.calendar-day:nth-of-type(20)')
+  assert(await evaluate('document.activeElement?.getAttribute("aria-label") === "Texto livre do calendário"'), 'Calendar did not focus free text')
+  await cdp('Input.insertText', { text: 'Anotação livre no calendário' })
+  await physicalClick('.creative-panel-heading')
+  await until(() => Object.values(profileSettings.calendar_creative ?? {}).some(month => month.texts.some(item => item.text === 'Anotação livre no calendário')), 'Calendar text not saved')
+  await click('.creative-sticker-picker button')
+  await physicalClick('.calendar-creative-sticker')
+  assert(await evaluate('document.activeElement?.getAttribute("aria-label") === "Texto livre do calendário"'), 'Writing over calendar sticker failed')
+  await cdp('Input.insertText', { text: 'Sobre adesivo' })
+  await physicalClick('.creative-panel-heading')
+  await until(() => Object.values(profileSettings.calendar_creative ?? {}).some(month => month.texts.some(item => item.text === 'Sobre adesivo')), 'Sticker text not saved')
+  await cdp('Page.reload')
+  await until(() => evaluate('document.querySelectorAll(".calendar-free-text").length === 2'), 'Calendar texts lost after reload')
+  assert(await evaluate('document.querySelector(".calendar-days").textContent.includes("Sobre adesivo")'))
   assert.deepEqual(runtimeErrors, [])
   console.log('PASS: direct template gallery, editable template fields, 10 required page templates, 10 section templates, direct text, post-it, photo, sticker, shape, washi, stamp and drawing over templates; persistence, spread, receipt isolation, geometry and runtime verified.')
 } finally {

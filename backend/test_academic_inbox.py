@@ -141,6 +141,32 @@ def run():
         request("PUT", "/weekly-reviews/2026-09-22", review, 422)
         request("PUT", "/weekly-reviews/2026-09-21", {"priorities": ["Only one"]}, 422)
 
+        # Integrity: linked Subject is canonical even for legacy divergent text.
+        request("PATCH", f'/subjects/{subjects[1]["id"]}', {"name": "Python renomeada"})
+        study_id = converted["study"]["id"]
+        assert request("GET", f'/studies/{study_id}')["subject"] == "Python renomeada"
+        with engine.begin() as connection:
+            connection.execute(text("UPDATE study_sessions SET subject='Legacy mismatch' WHERE id=:id"), {"id": study_id})
+        assert request("GET", f'/studies/{study_id}')["subject"] == "Python renomeada"
+        assert any(r["id"] == study_id and r["type"] == "study" for r in request("GET", "/search?q=Python%20renomeada"))
+        assert not any(r["type"] == "study" for r in request("GET", "/search?q=Legacy%20mismatch"))
+        assert request("PATCH", f'/studies/{study_id}', {"subject": "Wrong label", "notes": "Updated"})["subject"] == "Python renomeada"
+        assert request("PATCH", f'/studies/{study_id}', {"subject_id": None})["subject"] == "Python renomeada"
+        request("PATCH", f'/studies/{study_id}', {"subject_id": subjects[1]["id"]})
+        task_id = completed_task["id"]
+        shifted = request("PATCH", f'/tasks/{task_id}', {"due_date": "2026-09-28"})
+        assert datetime.fromisoformat(shifted["due_at"]).date().isoformat() == "2026-09-28"
+        assert request("PATCH", f'/tasks/{task_id}', {"due_date": None})["due_at"] is None
+        request("PATCH", f'/tasks/{task_id}', {"due_date": "2026-09-26"})
+        exported = request("GET", "/data/export")
+        assert exported["tasks"][0]["subject_id"] == subjects[1]["id"]
+        assert "completed_at" in exported["tasks"][0]
+        assert "reminder_minutes" in exported["events"][0]
+        assert "subject_id" in exported["projects"][0]
+        assert exported["study_sessions"][0]["subject"] == "Python renomeada"
+        assert len(exported["inbox_items"]) == 9 and len(exported["weekly_reviews"]) == 2
+        assert any(r["type"] == "task" for r in request("GET", "/search?q=Teste"))
+
         # A new client/session sees all committed receipts (reload persistence).
         assert len(request("GET", "/inbox")) == 9
         current[0] = users[1]
@@ -161,7 +187,21 @@ def run():
         assert request("GET", "/weekly-reviews/2026-09-21")["reflection"] == review["reflection"]
         request("DELETE", f'/subjects/{subjects[1]["id"]}', status=204)
         assert request("GET", "/tasks")[0]["subject_id"] is None
+        assert request("GET", f'/studies/{study_id}')["subject"] == "Python renomeada"
+        agenda = request("POST", "/agendas", {"title": "Integrity clone"}, 201)
+        page = request("POST", f'/agendas/{agenda["id"]}/pages', {"title": "Original"}, 201)
+        linked = request("POST", f'/pages/{page["id"]}/tasks', {"text": "Intentional copy", "subject_id": subjects[0]["id"]}, 201)
+        finished = request("PATCH", f'/tasks/{linked["id"]}', {"done": True})
+        duplicate = request("POST", f'/pages/{page["id"]}/duplicate', status=201)
+        copied = [t for t in request("GET", "/tasks") if t["page_id"] == duplicate["id"]][0]
+        assert copied["id"] != linked["id"] and copied["subject_id"] == subjects[0]["id"]
+        assert copied["completed_at"] == finished["completed_at"]
+
         assert len(app.openapi()["paths"]) >= 85
+        from test_backup_v3 import verify_backup_v3
+        verify_backup_v3(engine, request, current)
+        from test_data_analytics import verify_data_analytics
+        verify_data_analytics(engine, request, current)
         if '--browser' in sys.argv:
             subprocess.run(['node', 'tests/academic-browser.mjs'], cwd=Path(__file__).resolve().parent.parent / 'frontend', env={**os.environ, 'ACADEMIC_TEST_API': base_url}, check=True)
         server.should_exit = True

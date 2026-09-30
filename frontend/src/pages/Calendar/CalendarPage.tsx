@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
+  type MouseEvent as ReactMouseEvent,
 } from 'react'
 
 import {
@@ -84,6 +85,7 @@ type CreativeText = {
   text: string
   x: number
   y: number
+  plain?: boolean
 }
 
 type CreativeSticker = {
@@ -991,21 +993,55 @@ function CalendarPage() {
 
   const monthKey = getMonthKey(year, month)
   const currentCreative = creativeByMonth[monthKey] ?? emptyMonthCreative()
+  const [freeWriting, setFreeWriting] = useState(false)
+  const [focusedCreativeId, setFocusedCreativeId] = useState<string | null>(null)
+  const creativeInputRef = useRef<HTMLSpanElement | null>(null)
+  const creativePress = useRef<{ x: number; y: number } | null>(null)
+  const creativeSaveQueue = useRef<Promise<unknown>>(Promise.resolve())
+  const creativeSaveCount = useRef(0)
+
+  useEffect(() => {
+    creativeInputRef.current?.focus()
+  }, [focusedCreativeId])
+
+  function writeAtCalendarPoint(event: ReactMouseEvent<HTMLDivElement>) {
+    if (!freeWriting || (event.target as Element).closest('.calendar-creative-note, .calendar-creative-sticker button')) return
+    event.preventDefault()
+    event.stopPropagation()
+    if (creativePress.current && Math.hypot(event.clientX - creativePress.current.x, event.clientY - creativePress.current.y) > 5) return
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    const rect = event.currentTarget.getBoundingClientRect()
+    const id = crypto.randomUUID()
+    const item: CreativeText = {
+      id, text: '', plain: true,
+      x: Math.max(0, Math.min(96, (event.clientX - rect.left) / rect.width * 100)),
+      y: Math.max(0, Math.min(96, (event.clientY - rect.top) / rect.height * 100)),
+    }
+    setCreativeByMonth(current => {
+      const monthData = current[monthKey] ?? emptyMonthCreative()
+      return { ...current, [monthKey]: { ...monthData, texts: [...monthData.texts, item] } }
+    })
+    setFocusedCreativeId(id)
+  }
 
   async function persistCreative(next: MonthCreative) {
     const nextCreative = { ...creativeByMonth, [monthKey]: next }
     setCreativeByMonth(nextCreative)
     setIsSavingCreative(true)
+    creativeSaveCount.current += 1
     try {
-      await apiRequest('/profile/settings', {
+      const save = creativeSaveQueue.current.catch(() => undefined).then(() => apiRequest('/profile/settings', {
         method: 'PATCH',
         body: JSON.stringify({ settings: { calendar_creative: nextCreative } }),
-      })
+      }))
+      creativeSaveQueue.current = save
+      await save
     } catch (error) {
       console.error(error)
       alert(error instanceof Error ? error.message : 'Não foi possível salvar a decoração.')
     } finally {
-      setIsSavingCreative(false)
+      creativeSaveCount.current -= 1
+      setIsSavingCreative(creativeSaveCount.current > 0)
     }
   }
 
@@ -1242,6 +1278,11 @@ function CalendarPage() {
           localDateTime,
         ).toISOString()
 
+      const existingEvent = events.find(event => event.id === editingEventId)
+      const endsAt = existingEvent?.endsAt
+        ? new Date(new Date(startsAt).getTime() + new Date(existingEvent.endsAt).getTime() - new Date(existingEvent.startsAt).getTime()).toISOString()
+        : null
+
 
       const body =
         JSON.stringify({
@@ -1256,7 +1297,7 @@ function CalendarPage() {
           subject_id: subjectId,
 
           ends_at:
-            null,
+            endsAt,
 
           all_day:
             allDay,
@@ -1793,7 +1834,15 @@ function CalendarPage() {
           </div>
 
 
-          <div className="calendar-grid calendar-days">
+          <div className={`calendar-grid calendar-days ${freeWriting ? 'is-free-writing' : ''}`}
+            onClickCapture={writeAtCalendarPoint}
+            onPointerDownCapture={event => {
+              creativePress.current = { x: event.clientX, y: event.clientY }
+              if (freeWriting && !(event.target as Element).closest('.calendar-creative-note, .calendar-creative-sticker button')) {
+                event.preventDefault()
+                event.stopPropagation()
+              }
+            }}>
             {calendarCells.map(
               (
                 day,
@@ -1980,19 +2029,24 @@ function CalendarPage() {
               {currentCreative.texts.map(item => (
                 <div
                   key={item.id}
-                  className="calendar-creative-note"
-                  style={{ left: `${item.x}%`, top: `${item.y}%` }}
+                  className={`calendar-creative-note ${item.plain ? 'calendar-free-text' : ''}`}
+                  style={{ left: `${item.x}%`, top: `${item.y}%`, zIndex: Math.max(0, ...currentCreative.stickers.map(sticker => sticker.zIndex)) + 1 }}
                   onPointerDown={event => startCreativeDrag('text', item.id, event)}
                 >
                   <span
+                    ref={item.id === focusedCreativeId ? creativeInputRef : undefined}
+                    role="textbox"
+                    aria-label="Texto livre do calendário"
+                    aria-multiline="true"
                     contentEditable
                     suppressContentEditableWarning
                     onBlur={event => {
-                      const text = event.currentTarget.textContent?.trim() ?? ''
-                      if (!text) removeCreativeText(item.id)
+                      const text = event.currentTarget.innerText
+                      if (!text.trim()) removeCreativeText(item.id)
                       else if (text !== item.text) void persistCreative({ ...currentCreative, texts: currentCreative.texts.map(candidate => candidate.id === item.id ? { ...candidate, text } : candidate) })
                     }}
                     onPointerDown={event => event.stopPropagation()}
+                    onKeyDown={event => { event.stopPropagation(); if (event.key === 'Escape') event.currentTarget.blur() }}
                   >{item.text}</span>
                   <button type="button" aria-label="Excluir anotação" onClick={event => { event.stopPropagation(); removeCreativeText(item.id) }}>×</button>
                 </div>
@@ -2042,6 +2096,12 @@ function CalendarPage() {
               </div>
               <small>{isSavingCreative ? 'Salvando...' : `${currentCreative.texts.length + currentCreative.stickers.length} elementos`}</small>
             </div>
+            <div className="creative-note-create">
+              <button type="button" aria-pressed={freeWriting} onClick={() => setFreeWriting(value => !value)}>
+                {freeWriting ? 'Concluir escrita livre' : 'Escrever em qualquer lugar'}
+              </button>
+            </div>
+            {freeWriting && <p>Clique no calendário ou sobre um adesivo e escreva. O texto é salvo ao sair do campo.</p>}
             <div className="creative-note-create">
               <input value={creativeText} placeholder="Escreva uma nota..." onChange={event => setCreativeText(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') addCreativeText() }} />
               <button type="button" onClick={addCreativeText}>Adicionar</button>

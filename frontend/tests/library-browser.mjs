@@ -85,5 +85,5 @@ try {
   await evaluate('document.querySelector(".new-agenda-button").click()')
   assert(await evaluate('!!document.querySelector("[role=dialog]")'), 'Create dialog did not open')
   assert.deepEqual(runtimeErrors, [])
-  console.log('PASS: real Library route, single-book composition, clean header/hero, physical book actions, compact purple/green footer and mobile width; no runtime exceptions.')
+  console.log('PASS: real Library route, single-book composition, clean header/hero, physical book actions, compact peach/pink footer and mobile width; no runtime exceptions.')
 } finally { socket?.close(); browser.kill(); server.close() }

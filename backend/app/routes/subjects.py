@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models import Subject, User
+from app.models import StudySession, Subject, User
 from app.schemas import SubjectCreate, SubjectResponse, SubjectUpdate
 
 router = APIRouter(prefix="/subjects", tags=["Matérias"])
@@ -56,8 +56,15 @@ def update_subject(
     subject = get_user_subject(subject_id, current_user.id, db)
     if subject is None:
         raise HTTPException(status_code=404, detail="Matéria não encontrada.")
-    for field, value in data.model_dump(exclude_unset=True).items():
+    updates = data.model_dump(exclude_unset=True)
+    if any(field in updates and updates[field] is None for field in ("name", "color")):
+        raise HTTPException(status_code=422, detail="Nome e cor não podem ser nulos.")
+    for field, value in updates.items():
         setattr(subject, field, value)
+    if "name" in updates:
+        db.execute(update(StudySession).where(
+            StudySession.subject_id == subject.id, StudySession.user_id == current_user.id,
+        ).values(subject=subject.name))
     try:
         db.commit()
     except IntegrityError:
@@ -76,6 +83,9 @@ def delete_subject(
     subject = get_user_subject(subject_id, current_user.id, db)
     if subject is None:
         raise HTTPException(status_code=404, detail="Matéria não encontrada.")
+    db.execute(update(StudySession).where(
+        StudySession.subject_id == subject.id, StudySession.user_id == current_user.id,
+    ).values(subject=subject.name))
     db.delete(subject)
     db.commit()
     return None

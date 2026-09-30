@@ -511,6 +511,11 @@ class StudySession(Base):
     project: Mapped[Project | None] = relationship(back_populates="study_sessions")
     subject_ref: Mapped[Subject | None] = relationship(back_populates="study_sessions")
 
+    @property
+    def subject_name(self) -> str:
+        """The relation is authoritative; free text survives unlinked sessions."""
+        return self.subject_ref.name if self.subject_ref is not None else self.subject
+
 
 class CanvasElement(Base):
     __tablename__ = "canvas_elements"

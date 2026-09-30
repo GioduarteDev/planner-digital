@@ -330,7 +330,7 @@ function SearchPage() {
       || result.type === 'category'
       || result.type === 'subject'
     ) {
-      navigate('/organization')
+      navigate(result.type === 'subject' ? `/organization?section=academic&subject=${result.id}` : result.type === 'project' ? `/organization?section=projects#project-${result.id}` : '/organization?section=categories')
       return
     }
 

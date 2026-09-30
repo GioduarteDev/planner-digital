@@ -5,6 +5,7 @@ import { readFile, mkdir, writeFile, mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve, extname } from 'node:path'
 import { spawn } from 'node:child_process'
+import { verifyIntegrity } from './integrity-browser.mjs'
 import { addDays, mondayOf } from '../src/pages/Planning/planningModel.ts'
 
 assert(process.env.ACADEMIC_TEST_API, 'Use the isolated backend test runner')
@@ -40,8 +41,8 @@ try {
   socket = new WebSocket(targets.find(item => item.type === 'page').webSocketDebuggerUrl)
   await new Promise(done => socket.addEventListener('open', done, { once: true }))
   let nextId = 0; const pending = new Map()
-  socket.addEventListener('message', event => { const message = JSON.parse(event.data); if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails.text); if (message.id && pending.has(message.id)) { const { done, fail } = pending.get(message.id); pending.delete(message.id); if (message.error) fail(new Error(JSON.stringify(message.error))); else done(message.result) } })
-  const cdp = (method, params = {}) => new Promise((done, fail) => { const id = ++nextId; pending.set(id, { done, fail }); socket.send(JSON.stringify({ id, method, params })) })
+  socket.addEventListener('message', event => { const message = JSON.parse(event.data); if (message.method === 'Page.javascriptDialogOpening') { errors.push('Dialog: ' + message.params.message); void cdp('Page.handleJavaScriptDialog', { accept: true }) } if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails.text); if (message.id && pending.has(message.id)) { const { done, fail } = pending.get(message.id); pending.delete(message.id); if (message.error) fail(new Error(JSON.stringify(message.error))); else done(message.result) } })
+  const cdp = (method, params = {}) => new Promise((done, fail) => { const id = ++nextId; const timer = setTimeout(() => { pending.delete(id); fail(new Error('CDP timeout: ' + method)) }, 20000); pending.set(id, { done: value => { clearTimeout(timer); done(value) }, fail: error => { clearTimeout(timer); fail(error) } }); socket.send(JSON.stringify({ id, method, params })) })
   const evaluate = async expression => { const result = await cdp('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails)); return result.result.value }
   const fill = async (selector, value) => evaluate(`(() => { const input=document.querySelector(${JSON.stringify(selector)}); if(!input) throw new Error('Missing field '+${JSON.stringify(selector)}); const proto=input.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:input.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto,'value').set.call(input,${JSON.stringify(value)}); input.dispatchEvent(new Event(input.tagName==='SELECT'?'change':'input',{bubbles:true})); })()`)
   const clickText = async (selector, value) => {
@@ -95,6 +96,7 @@ try {
       await evaluate('document.querySelector("dialog details").open=true')
       await fill('dialog input[type=date]', today)
       await fill('dialog input[type=time]', '14:30')
+      await until(() => evaluate(`!!document.querySelector('dialog select option[value="${a.id}"]')`), 'Capture subjects not loaded')
       await fill('dialog select', String(a.id))
       await fill('dialog .capture-fields textarea', 'Observação UI')
     }
@@ -207,6 +209,8 @@ try {
   assert(await evaluate('document.documentElement.scrollWidth <= innerWidth + 2'), 'Weekly mobile overflow')
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false })
   await writeFile('test-results/weekly-desktop.png', Buffer.from((await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'))
+
+  await verifyIntegrity({ api, navigate, evaluate, fill, clickText, until, cdp, today, subject: a, otherSubject: b, project })
 
   // Smoke checks of existing pages with the real, isolated API, followed by F5.
   for (const path of ['/today', '/tasks', '/calendar', '/studies', '/search', '/profile', '/inbox', '/']) {

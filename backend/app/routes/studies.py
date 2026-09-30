@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.database import get_db
 from app.dependencies import get_current_user
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/studies", tags=["Estudos"])
 
 def get_user_study_session(session_id: int, user_id: int, db: Session) -> StudySession | None:
     return db.scalar(
-        select(StudySession).where(
+        select(StudySession).options(selectinload(StudySession.subject_ref)).where(
             StudySession.id == session_id,
             StudySession.user_id == user_id,
         )
@@ -50,6 +50,7 @@ def list_study_sessions(
 ):
     return db.scalars(
         select(StudySession)
+        .options(selectinload(StudySession.subject_ref))
         .where(StudySession.user_id == current_user.id)
         .order_by(StudySession.study_date.desc(), StudySession.id.desc())
     ).all()
@@ -109,17 +110,22 @@ def update_study_session(
         raise HTTPException(status_code=404, detail="Registro de estudo não encontrado.")
 
     updates = data.model_dump(exclude_unset=True)
+    if any(field in updates and updates[field] is None for field in ("subject", "topic", "study_date", "duration_minutes", "notes")):
+        raise HTTPException(status_code=422, detail="Os campos do estudo não podem ser nulos.")
+    previous_name = session.subject_name
     subject_ref = validate_links(
         user_id=current_user.id,
         db=db,
         project_id=updates.get("project_id") if "project_id" in updates else None,
-        subject_id=updates.get("subject_id") if "subject_id" in updates else None,
+        subject_id=updates.get("subject_id", session.subject_id),
     )
 
     for field, value in updates.items():
         setattr(session, field, value)
     if subject_ref is not None:
         session.subject = subject_ref.name
+    elif "subject_id" in updates and "subject" not in updates:
+        session.subject = previous_name
 
     db.commit()
     db.refresh(session)

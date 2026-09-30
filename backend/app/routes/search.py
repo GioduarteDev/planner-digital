@@ -9,6 +9,7 @@ from app.models import (
     CanvasElement,
     Category,
     Event,
+    MediaLibraryItem,
     Page,
     PageBlock,
     PageMedia,
@@ -95,7 +96,7 @@ def search_planner(
                 Text,
             ).ilike(pattern),
         )
-        .distinct()
+        .distinct(Page.id)
         .limit(20)
     ).all()
 
@@ -169,7 +170,8 @@ def search_planner(
         select(StudySession).where(
             StudySession.user_id == current_user.id,
             or_(
-                StudySession.subject.ilike(pattern),
+                (StudySession.subject_id.is_(None) & StudySession.subject.ilike(pattern)),
+                StudySession.subject_ref.has(Subject.name.ilike(pattern)),
                 StudySession.topic.ilike(pattern),
                 StudySession.notes.ilike(pattern),
             ),
@@ -180,7 +182,7 @@ def search_planner(
             SearchResult(
                 type="study",
                 id=study.id,
-                title=study.subject,
+                title=study.subject_name,
                 subtitle=study.topic or "Estudo",
             )
         )

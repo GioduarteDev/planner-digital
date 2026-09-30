@@ -6,6 +6,12 @@ export type Profile = {
 }
 
 export type Task = {
+  completed_at: string | null
+  due_at: string | null
+  subject_id: number | null
+  project_id: number | null
+  category_id: number | null
+  show_in_calendar: boolean
   id: number
   text: string
   done: boolean

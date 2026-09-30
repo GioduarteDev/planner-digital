@@ -52,13 +52,14 @@ def build_task(
     current_user: User,
     page_id: int | None,
 ) -> Task:
+    due_date = data.due_date or (data.due_at.date() if data.due_at else None)
     return Task(
         user_id=current_user.id,
         page_id=page_id,
         text=data.text,
         description=data.description,
         done=False,
-        due_date=data.due_date,
+        due_date=due_date,
         due_at=data.due_at,
         priority=data.priority,
         project_id=data.project_id,
@@ -172,6 +173,17 @@ def update_task(
         raise HTTPException(status_code=404, detail="Tarefa não encontrada.")
 
     updates = data.model_dump(exclude_unset=True)
+    if any(field in updates and updates[field] is None for field in ("text", "description", "done", "priority", "show_in_calendar")):
+        raise HTTPException(status_code=422, detail="Os campos obrigatórios da tarefa não podem ser nulos.")
+    if updates.get("due_at") is not None:
+        timestamp_day = updates["due_at"].date()
+        # An explicit calendar date can differ from the UTC timestamp's date.
+        # Respect the caller's local day; derive only when it was not supplied.
+        if "due_date" not in updates:
+            updates["due_date"] = timestamp_day
+    elif "due_date" in updates and "due_at" not in updates and task.due_at:
+        day = updates["due_date"]
+        updates["due_at"] = task.due_at.replace(year=day.year, month=day.month, day=day.day) if day else None
 
     if "page_id" in updates and updates["page_id"] is not None:
         get_user_page_or_404(updates["page_id"], current_user, db)

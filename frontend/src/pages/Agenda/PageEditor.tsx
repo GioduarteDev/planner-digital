@@ -131,6 +131,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
     useState<Agenda | null>(null)
   const [pages, setPages] =
     useState<PlannerPage[]>([])
+  const [receiptExternalTasks, setReceiptExternalTasks] = useState<PlannerTask[]>([])
   const [folders, setFolders] =
     useState<PlannerFolder[]>([])
   const [activePageId, setActivePageId] =
@@ -446,6 +447,9 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
           ),
         )
 
+        setReceiptExternalTasks(tasksData.filter(task => !pageIds.has(task.page_id)).map(task => ({
+          id: task.id, text: task.text, done: task.done, dueDate: task.due_date ?? '', priority: task.priority,
+        })))
         const tasksByPage =
           new Map<
             number,
@@ -2033,7 +2037,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
     taskId: number,
   ) {
     const ownerPage = pages.find(page => page.tasks.some(item => item.id === taskId))
-    const task = ownerPage?.tasks.find(item => item.id === taskId)
+    const task = ownerPage?.tasks.find(item => item.id === taskId) ?? receiptExternalTasks.find(item => item.id === taskId)
 
     if (!task) {
       return
@@ -2041,6 +2045,8 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
 
     const newDoneValue =
       !task.done
+
+    setReceiptExternalTasks(current => current.map(item => item.id === taskId ? { ...item, done: newDoneValue } : item))
 
     setPages(
       (currentPages) =>
@@ -2067,7 +2073,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
     )
 
     try {
-      await apiRequest(
+      const updated = await apiRequest<TaskFromApi>(
         `/tasks/${taskId}`,
         {
           method: 'PATCH',
@@ -2076,8 +2082,12 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
           }),
         },
       )
+      setPages(current => current.map(page => ({ ...page, tasks: page.tasks.map(task => task.id === updated.id ? { ...task, text: updated.text, done: updated.done, dueDate: updated.due_date ?? '', priority: updated.priority } : task) })))
+      setReceiptExternalTasks(current => current.map(task => task.id === updated.id ? { ...task, text: updated.text, done: updated.done, dueDate: updated.due_date ?? '', priority: updated.priority } : task))
     } catch (error) {
       console.error(error)
+
+      setReceiptExternalTasks(current => current.map(item => item.id === taskId ? { ...item, done: task.done } : item))
 
       setPages(
         (currentPages) =>
@@ -4683,6 +4693,11 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
       setMediaType('sticker')
     }
 
+    if (tool === 'text') {
+      setDrawingMode(null)
+      setDrawingDraft(null)
+    }
+
     if (tool === 'pen') {
       setDrawingMode('fineliner')
       setDrawingColor('#3f3934')
@@ -5463,15 +5478,16 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
     const blank = target === event.currentTarget || target.matches(
       '.sheet-content-layer, .sheet-block-list, .free-canvas-layer, .page-media-layer',
     )
-    if (!blank) return
+    const freeWriting = activeTool === 'text'
+      && !target.closest('button, .canvas-inline-text, .canvas-element-toolbar, .media-layer-controls')
+    if (!blank && !freeWriting) return
+    if (freeWriting) { event.preventDefault(); event.stopPropagation() }
 
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
     setEditingTextElementId(null)
     setSelectedCanvasElementId(null)
     setSelectedMediaId(null)
     if (drawingMode !== null) return
-    setActiveTool(null)
-
     const rect = event.currentTarget.getBoundingClientRect()
     const x = Math.max(0, Math.min(sheetWidth - 24, (event.clientX - rect.left) / scale))
     const y = Math.max(0, Math.min(sheetHeight - 36, (event.clientY - rect.top) / scale))
@@ -5625,9 +5641,9 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
               >
                 <CanvasElementContent element={element.element_type.startsWith('template:') ? { ...element, data: legacyTemplateFields(element, pageCanvasElements) } : element} editing={editingTextElementId === element.id} onTextBlur={handleCanvasTextBlur}
                   onTextInput={handleCanvasTextInput}
-                  onSelect={id => { setEditingTextElementId(id); setSelectedCanvasElementId(null); setSelectedMediaId(null); setActiveTool(null) }}
+                  onSelect={id => { setEditingTextElementId(id); setSelectedCanvasElementId(null); setSelectedMediaId(null) }}
                   onDuplicateSection={(title, text) => { void createStructuredElement('section:notes-block', { title, text }, 300, 200, activePageId, 80, 160, 4) }}
-                  tasks={pages.flatMap(page => page.tasks)}
+                  tasks={[...pages.flatMap(page => page.tasks), ...receiptExternalTasks]}
                   onDataChange={(item, data) => { void patchPageCanvasElement(item.id, { data }) }}
                   onToggleTask={id => { void handleToggleTask(id) }} />
 
@@ -6493,7 +6509,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
     return (
       <div className="tool-panel-stack">
         <p className="tool-panel-description">
-          Adicione blocos à folha. Eles aparecem no centro e salvam automaticamente.
+          Clique em qualquer ponto da folha, de um adesivo ou de um post-it para escrever ali. Você também pode adicionar os blocos abaixo.
         </p>
 
         <div className="tool-action-grid">
@@ -8422,8 +8438,14 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
                   onFocusCapture={event => { if ((event.target as Element).matches('input, textarea, [contenteditable]')) { setSelectedCanvasElementId(null); setSelectedMediaId(null); const frame = (event.target as Element).closest<HTMLElement>('[data-element-id]'); if (frame) setEditingTextElementId(Number(frame.dataset.elementId)) } }}
                   onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setEditingTextElementId(null) }}
                   style={sheetStyle}
-                  onPointerDownCapture={event => { paperPress.current = { x: event.clientX, y: event.clientY } }}
-                  onClick={handlePaperClick}
+                  onPointerDownCapture={event => {
+                    paperPress.current = { x: event.clientX, y: event.clientY }
+                    if (activeTool === 'text' && !(event.target as Element).closest('button, .canvas-inline-text, .canvas-element-toolbar, .media-layer-controls')) {
+                      event.preventDefault()
+                      event.stopPropagation()
+                    }
+                  }}
+                  onClickCapture={handlePaperClick}
                 >
                   <div className="sheet-content-layer">
                     {blocksLoading && (

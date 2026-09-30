@@ -607,7 +607,7 @@ function TodayPage() {
     )
 
     try {
-      await apiRequest(
+      const updated = await apiRequest<Task>(
         `/tasks/${id}`,
         {
           method:
@@ -620,6 +620,7 @@ function TodayPage() {
             }),
         },
       )
+      setTasks(current => current.map(item => item.id === updated.id ? updated : item))
     } catch {
       setTasks(current =>
         current.map(

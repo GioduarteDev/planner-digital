@@ -37,6 +37,7 @@ const server = createServer(async (req, res) => {
     if (path === `/daily-entries/${key}` && req.method === 'GET' && dailyEntry === null) { res.writeHead(404, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ detail: 'Registro diário não encontrado.' })); return }
     if (path === `/daily-entries/${key}` && req.method === 'GET') value = dailyEntry
     if (path === `/daily-entries/${key}` && req.method === 'PUT') { dailyEntry = { ...body, entry_date: key }; value = dailyEntry }
+    if (path === '/daily-entries' && req.method === 'GET') value = dailyEntry ? [dailyEntry] : []
     if (path === '/tasks') value = tasks
     if (path === '/tasks/1' && req.method === 'PATCH') { tasks[0].done = body.done; value = tasks[0] }
     if (path === '/events') value = events
@@ -70,7 +71,7 @@ try {
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false })
   await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `const realFetch=window.fetch;window.fetch=(url,options)=>{const target=new URL(typeof url==='string'?url:url.url,location.href);if(target.port==='8000')return realFetch('/__api'+target.pathname+target.search,options);if(target.hostname.includes('open-meteo.com'))return realFetch('/__weather/'+(target.hostname.startsWith('geocoding')?'geocode':'forecast')+target.search,options);return realFetch(url,options)};` })
   await cdp('Page.navigate', { url: `${origin}/today` })
-  await until(() => evaluate('document.querySelector(".today-hero h1")?.textContent.includes("Giovanna")'), 'Greeting did not load real name')
+  await until(() => evaluate('document.querySelector(".today-social-panel header b")?.textContent.includes("Giovanna")'), 'Profile name did not load')
   assert(await evaluate('document.querySelector(".today-receipt-lines")?.textContent.includes("Cuidar das plantas")'))
   assert(await evaluate('document.querySelector(".today-upcoming")?.textContent.includes("Café com amiga")'))
   assert(await evaluate('document.querySelector(".today-studies")?.textContent.includes("45 min")'))

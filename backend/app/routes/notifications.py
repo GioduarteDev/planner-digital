@@ -196,7 +196,7 @@ def generic_reminder_target(
 
     if reminder.task_id is not None:
         task = db.get(Task, reminder.task_id)
-        if task is None or task.user_id != reminder.user_id or task.due_at is None:
+        if task is None or task.user_id != reminder.user_id or task.due_at is None or task.done:
             return None
         target_at = normalize_datetime(task.due_at)
         body = describe_offset(reminder.minutes_before, noun="Prazo")

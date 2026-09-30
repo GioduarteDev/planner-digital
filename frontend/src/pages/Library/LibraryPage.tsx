@@ -1122,14 +1122,16 @@ function LibraryPage() {
 
 
   useEffect(() => {
-    const note =
+    const foundNote =
       document.querySelector<HTMLElement>(
         '.room-collection-note',
       )
 
-    if (!note) {
+    if (!foundNote) {
       return
     }
+
+    const note: HTMLElement = foundNote
 
     const storageKey =
       'matcha-library-collection-note-position'

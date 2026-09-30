@@ -20,6 +20,7 @@ type TaskPriority =
 
 
 type Task = {
+  completed_at: string | null
   subject_id: number | null
   id: number
   user_id: number

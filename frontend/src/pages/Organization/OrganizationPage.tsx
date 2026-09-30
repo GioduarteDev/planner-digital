@@ -123,7 +123,7 @@ function OrganizationPage() {
     activeSection,
     setActiveSection,
   ] = useState<OrganizationSection>(
-    searchParams.get('section') === 'projects' ? 'projects' : 'academic',
+    searchParams.get('section') === 'projects' ? 'projects' : searchParams.get('section') === 'categories' ? 'categories' : 'academic',
   )
 
   const [
