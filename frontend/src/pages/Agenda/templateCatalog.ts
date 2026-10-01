@@ -1,7 +1,7 @@
 import type { PaperType } from './editorModel'
 
 export type TemplateCategory = 'Study' | 'Weekly' | 'Daily' | 'Monthly' | 'Projects' | 'Journal' | 'Productivity' | 'Habits' | 'Goals'
-export type TemplateLayout = 'dashboard-blue' | 'dashboard-kawaii' | 'roadmap' | 'project-month' | 'study-grid' | 'weekly-clean' | 'weekly-dots' | 'weekly-cute' | 'daily-focus' | 'monthly-focus' | 'weekly-scrapbook' | 'daily-time-block'
+export type TemplateLayout = 'dashboard-blue' | 'dashboard-kawaii' | 'roadmap' | 'project-month' | 'study-grid' | 'weekly-clean' | 'weekly-dots' | 'weekly-cute' | 'daily-focus' | 'monthly-focus' | 'weekly-scrapbook' | 'weekly-open-journal' | 'daily-time-block'
 
 export type BuiltInTemplate = {
   id: string
@@ -78,6 +78,7 @@ export const BUILT_IN_TEMPLATES: BuiltInTemplate[] = [
   { id: 'daily-study-focus', name: 'Daily Study Focus', category: 'Daily', type: 'page', description: 'Objetivos, clima, humor, tarefas, timeline e notas.', paperType: 'grid', accent: 'var(--clover)', layout: 'daily-focus', supportedMode: 'single', orientation: 'portrait' },
   { id: 'monthly-focus-tracker', name: 'Monthly Focus Tracker', category: 'Monthly', type: 'page', description: 'Calendário, metas, duração e tracker de 31 dias.', paperType: 'blank', accent: 'var(--milk-shake)', layout: 'monthly-focus', supportedMode: 'single', orientation: 'portrait' },
   { id: 'weekly-scrapbook', name: 'Weekly Scrapbook Journal', category: 'Journal', type: 'page', description: 'Semana livre com post-its, humor, notas e colagem.', paperType: 'blank', accent: 'var(--apricot-jam)', layout: 'weekly-scrapbook', supportedMode: 'both', orientation: 'landscape' },
+  { id: 'weekly-open-journal', name: 'Weekly Open Journal', category: 'Weekly', type: 'page', description: 'Diário semanal aberto para intenções, planos diários e memórias.', paperType: 'blank', accent: 'var(--apricot-jam)', layout: 'weekly-open-journal', supportedMode: 'spread', orientation: 'landscape' },
   { id: 'daily-time-block-study', name: 'Daily Time-Block Study', category: 'Study', type: 'page', description: 'Metas, prioridades, mood, color code e time blocking.', paperType: 'grid', accent: 'var(--seafoam)', layout: 'daily-time-block', supportedMode: 'single', orientation: 'portrait' },
 ]
 
@@ -128,6 +129,7 @@ export function getTemplateEditableFields(
     'daily-focus': [make('date', 'Data', .55, .035, .34, 58, date, 16), make('objectives', 'Objetivos do dia…', .07, .1, .4, 82), make('notes', 'Adicione uma nota…', .58, .77, .32, 105)],
     'monthly-focus': [make('month', 'Mês', .07, .035, .17, 58, month, 18), make('year', 'Ano', .8, .035, .12, 58, year, 18), make('focus', 'Foco do mês…', .33, .14, .34, 82), make('goals', 'Defina suas metas…', .33, .31, .34, 120)],
     'weekly-scrapbook': [make('weekTitle', 'Nomeie esta semana…', .66, .05, .27, 58), make('journal', 'Escreva uma lembrança…', .67, .77, .27, 88)],
+    'weekly-open-journal': [make('open-journal:week-title', 'Dê um nome para esta semana…', .08, .06, .74, 62), make('open-journal:intention', 'Escreva sua intenção…', .08, .2, .36, 90), make('open-journal:reflection', 'Guarde uma memória da semana…', .58, .76, .34, 100)],
     'daily-time-block': [make('date', 'Data', .08, .035, .27, 58, date, 16), make('goal', 'Meta do dia…', .08, .13, .36, 80), make('priority', 'Prioridade…', .54, .13, .36, 80)],
     'dashboard-blue': [make('focus', 'Defina sua missão principal…', .08, .13, .56, 82), make('notes', 'Adicione uma nota…', .55, .62, .34, 120)],
     'dashboard-kawaii': [make('hello', 'Escreva um recado…', .08, .13, .48, 75), make('memory', 'Guarde um momento…', .52, .54, .36, 88)],

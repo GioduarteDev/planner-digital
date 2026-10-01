@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pencil, Plus, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { apiRequest } from '../../services/api'
 import type { PlannerPage } from './editorModel'
 
 type PageTab = { id: string; label: string; color: string; target: `page:${number}` | `section:${number}`; order: number }
 type AgendaSettings = { settings: Record<string, unknown> }
 type Folder = { id: number; title: string }
-const COLORS = ['#FCD57D', '#E6E3F7', '#B3DFE8', '#FDD0D0', '#9CA362']
+const COLORS = ['#DCC37A', '#C9C4D9', '#AFC4E8', '#E7B5B8', '#9BB695']
 
 function readTabs(settings?: Record<string, unknown>): PageTab[] {
   const value = settings?.page_tabs_v1
@@ -18,9 +18,10 @@ function readTabs(settings?: Record<string, unknown>): PageTab[] {
   ).sort((a, b) => a.order - b.order)
 }
 
-export function PageTabs({ agendaId, pages, onNavigate, left, top }: {
+export function PageTabs({ agendaId, pages, onNavigate, left, top, previewMode = false }: {
   agendaId: number; pages: PlannerPage[]; onNavigate: (id: number) => void
   left: number; top: number
+  previewMode?: boolean
 }) {
   const [tabs, setTabs] = useState<PageTab[]>([])
   const tabsRef = useRef<PageTab[]>([])
@@ -117,13 +118,13 @@ export function PageTabs({ agendaId, pages, onNavigate, left, top }: {
         style={{ backgroundColor: tab.color }} title={`Ir para ${tab.label}`} onClick={() => navigate(tab)}>
         <span>{tab.label}</span>
       </button>)}
-      {tabs.length < 24 && <button className="page-tab-add" type="button" aria-label="Adicionar marcador"
+      {!previewMode && tabs.length < 24 && <button className="page-tab-add" type="button" aria-label="Adicionar marcador"
         onClick={() => beginEdit()}><Plus size={16} /></button>}
-      {tabs.length > 0 && <button className="page-tab-manage" type="button" aria-label="Editar marcadores"
+      {!previewMode && tabs.length > 0 && <button className="page-tab-manage" type="button" aria-label="Editar marcadores"
         onClick={() => setOpen(current => !current)}><Pencil size={13} /></button>}
     </div>
 
-    {open && <div className="page-tabs-panel" role="dialog" aria-label="Marcadores da agenda">
+    {!previewMode && open && <div className="page-tabs-panel" role="dialog" aria-label="Marcadores da agenda">
       <header><strong>{editing ? 'Editar marcador' : 'Novo marcador'}</strong>
         <button type="button" aria-label="Fechar marcadores" onClick={() => setOpen(false)}><X size={16} /></button></header>
       <label>Nome curto<input aria-label="Nome do marcador" maxLength={18} value={label} onChange={event => setLabel(event.target.value)} placeholder="Ex.: Estudos" /></label>
@@ -142,11 +143,11 @@ export function PageTabs({ agendaId, pages, onNavigate, left, top }: {
         <button type="button" aria-label={`Subir ${tab.label}`} disabled={index === 0} onClick={() => {
           const next = [...tabsRef.current]; [next[index - 1], next[index]] = [next[index], next[index - 1]]
           persist(next.map((item, order) => ({ ...item, order })))
-        }}>↑</button>
+        }}><ChevronUp size={14} aria-hidden="true" /></button>
         <button type="button" aria-label={`Descer ${tab.label}`} disabled={index === tabs.length - 1} onClick={() => {
           const next = [...tabsRef.current]; [next[index], next[index + 1]] = [next[index + 1], next[index]]
           persist(next.map((item, order) => ({ ...item, order })))
-        }}>↓</button>
+        }}><ChevronDown size={14} aria-hidden="true" /></button>
         <button type="button" aria-label={`Excluir ${tab.label}`} onClick={() => persist(tabsRef.current.filter(item => item.id !== tab.id).map((item, order) => ({ ...item, order })))}><Trash2 size={14} /></button>
       </li>)}</ul>}
     </div>}

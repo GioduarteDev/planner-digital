@@ -80,7 +80,8 @@ def upsert_daily_entry(
     if entry is None:
         entry = DailyEntry(user_id=current_user.id, entry_date=entry_date)
         db.add(entry)
-    for field, value in data.model_dump().items():
+    updates = data.model_dump(exclude_unset=True)
+    for field, value in updates.items():
         setattr(entry, field, value)
     try:
         db.commit()
@@ -91,7 +92,7 @@ def upsert_daily_entry(
         entry = get_user_entry(entry_date, current_user, db)
         if entry is None:
             raise
-        for field, value in data.model_dump().items():
+        for field, value in updates.items():
             setattr(entry, field, value)
         db.commit()
     db.refresh(entry)

@@ -1,5 +1,5 @@
 ﻿import { useCanvasElements } from './useCanvasElements'
-import { ArrowDown, ArrowDownRight, ArrowLeft, ArrowUp, BringToFront, Copy, LockKeyhole, LockKeyholeOpen, Menu, Minus, Pencil, Plus, RotateCcw, RotateCw, Scissors, X } from 'lucide-react'
+import { ArrowDown, ArrowDownRight, ArrowLeft, ArrowUp, BringToFront, Copy, LockKeyhole, LockKeyholeOpen, Menu, Minus, Pencil, Plus, Redo2, RotateCcw, RotateCw, Scissors, SendToBack, Undo2, X } from 'lucide-react'
 import {
   Link,
   useParams,
@@ -9,6 +9,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useCallback,
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
@@ -96,6 +97,8 @@ import { TemplateGallery } from './TemplateGallery'
 import { SECTION_TEMPLATES, getTemplateDefaultSettings, type BuiltInTemplate } from './templateCatalog'
 import { legacyTemplateFields } from './templateEditingModel'
 import { useTransientPanels } from './useTransientPanels'
+import { useEditorHistory } from './useEditorHistory'
+import { reorderLayers, type LayerAction } from './canvasGeometry'
 import { PEN_COLORS, HIGHLIGHTER_PRESETS, SHAPE_OPTIONS, EXTRA_SHAPE_OPTIONS, ARROW_OPTIONS, EXTRA_ARROW_OPTIONS, POSTIT_OPTIONS, WASHI_OPTIONS, STAMP_OPTIONS } from './editorCatalog'
 import './AgendaPage.css'
 import './PlannerWidgets.css'
@@ -108,13 +111,19 @@ type PageEditorProps = {
   initialPageId?: number
   scale: number
   focused: boolean
+  agendaTheme?: 'light' | 'dark'
+  weeklyStart?: string
+  onWeeklyWeekChange?: (weekStart: string) => Promise<void>
+  previewMode: boolean
+  onExitPreview: () => void
+  onTogglePreview: () => void
   onFocus: () => void
   onPageChange?: (pageId: number, pages: PlannerPage[]) => void
   onNavigate?: (pageId: number) => void
   onPreferredMode?: (mode: 'single' | 'spread') => void
 }
 
-function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNavigate, onPreferredMode }: PageEditorProps) {
+function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', weeklyStart, onWeeklyWeekChange, previewMode, onExitPreview, onTogglePreview, onFocus, onPageChange, onNavigate, onPreferredMode }: PageEditorProps) {
   const { id } = useParams()
   const agendaId = Number(id)
   const [searchParams] =
@@ -219,6 +228,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
     useRef<MediaResizeState | null>(null)
   const mediaRotateRef =
     useRef<MediaRotateState | null>(null)
+  const mediaWritesRef = useRef<Record<number, Promise<void>>>({})
 
   const [isLoading, setIsLoading] =
     useState(true)
@@ -228,6 +238,18 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
     useState<SaveStatus>('saved')
   const [blockSaveStatus, setBlockSaveStatus] =
     useState<SaveStatus>('saved')
+  const [historyError, setHistoryError] = useState<{ pageId: number | null; message: string } | null>(null)
+  const handleHistoryError = useCallback((error: unknown) => {
+    setHistoryError({
+      pageId: activePageId,
+      message: error instanceof Error ? error.message : 'Não foi possível aplicar a operação do histórico.',
+    })
+  }, [activePageId])
+  const history = useEditorHistory(handleHistoryError)
+  const clearHistory = history.clear
+  useEffect(() => {
+    clearHistory()
+  }, [activePageId, clearHistory])
   const [isDuplicatingPage, setIsDuplicatingPage] =
     useState(false)
 
@@ -271,8 +293,9 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
   const [drawingError, setDrawingError] =
     useState('')
 
-  const { editingTextElementId, setEditingTextElementId, pageCanvasElements, setPageCanvasElements, selectedCanvasElementId, setSelectedCanvasElementId, canvasSaveStatus, failedElementWrites, createInlineText, createStructuredElement, createPageCanvasElement, patchPageCanvasElement, handleCanvasElementPointerDown, handleCanvasElementPointerMove, finishCanvasElementDrag, handleCanvasElementResizeStart, handleCanvasElementResizeMove, finishCanvasElementResize, duplicatePageCanvasElement, deletePageCanvasElement, rotatePageCanvasElement } = useCanvasElements({
+  const { editingTextElementId, setEditingTextElementId, pageCanvasElements, setPageCanvasElements, selectedCanvasElementId, setSelectedCanvasElementId, canvasSaveStatus, failedElementWrites, createInlineText, createStructuredElement, createPageCanvasElement, patchPageCanvasElement, handleCanvasElementPointerDown, handleCanvasElementPointerMove, finishCanvasElementDrag, handleCanvasElementResizeStart, handleCanvasElementResizeMove, finishCanvasElementResize, duplicatePageCanvasElement, deletePageCanvasElement, rotatePageCanvasElement, reorderPageCanvasElements } = useCanvasElements({
     activePageId, scale, stampColor,
+    history,
     onInsert: () => { setDrawingMode(null); setDrawingDraft(null) },
     onCreated: () => { setActiveTool(null); setElementLibraryCategory(null) },
     onError: setDrawingError,
@@ -290,12 +313,30 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (!focused) return
+      if (event.key === 'Escape' && previewMode) {
+        onExitPreview()
+        return
+      }
       if (event.key === 'Escape' && focused) {
         setSectionLibraryOpen(false)
         setSelectedCanvasElementId(null)
         setSelectedMediaId(null)
         setEditingTextElementId(null)
         if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+        return
+      }
+      if (previewMode || event.isComposing || event.altKey) return
+      const target = event.target
+      if (target instanceof Element && target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return
+      const modifier = event.ctrlKey || event.metaKey
+      if (!modifier) return
+      const key = event.key.toLowerCase()
+      const shouldUndo = key === 'z' && !event.shiftKey
+      const shouldRedo = key === 'y' || (key === 'z' && event.shiftKey)
+      if ((shouldUndo && history.canUndo) || (shouldRedo && history.canRedo)) {
+        event.preventDefault()
+        void (shouldUndo ? history.undo() : history.redo())
       }
     }
     const onPointerDown = (event: PointerEvent) => {
@@ -313,7 +354,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
       document.removeEventListener('keydown', onKeyDown)
       document.removeEventListener('pointerdown', onPointerDown)
     }
-  }, [focused, setSelectedCanvasElementId, setEditingTextElementId])
+  }, [focused, history, onExitPreview, previewMode, setSelectedCanvasElementId, setEditingTextElementId])
 
   function handleCanvasTextInput(element: CanvasElementFromApi, text: string) {
     const input = document.querySelector<HTMLTextAreaElement>(`[data-element-id="${element.id}"] .canvas-inline-text`)
@@ -2217,139 +2258,112 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
   async function persistMediaPatch(
     mediaId: number,
     patch: MediaPatch,
-  ) {
+    recordHistory = true,
+    historyBefore?: PlannerMedia,
+  ): Promise<boolean> {
+    const before = historyBefore ?? mediaItems.find(item => item.id === mediaId)
+    const trackedPatch: MediaPatch = {}
+    if (recordHistory && before) {
+      if (patch.x !== undefined && patch.x !== before.x) trackedPatch.x = patch.x
+      if (patch.y !== undefined && patch.y !== before.y) trackedPatch.y = patch.y
+      if (patch.width !== undefined && patch.width !== before.width) trackedPatch.width = patch.width
+      if (patch.height !== undefined && patch.height !== before.height) trackedPatch.height = patch.height
+      if (patch.rotation !== undefined && patch.rotation !== before.rotation) trackedPatch.rotation = patch.rotation
+      if (patch.z_index !== undefined && patch.z_index !== before.zIndex) trackedPatch.z_index = patch.z_index
+      if (patch.locked !== undefined && patch.locked !== before.locked) trackedPatch.locked = patch.locked
+    }
+    if (before && Object.keys(trackedPatch).length > 0) {
+      const after: PlannerMedia = {
+        ...before,
+        ...(trackedPatch.x !== undefined ? { x: trackedPatch.x } : {}),
+        ...(trackedPatch.y !== undefined ? { y: trackedPatch.y } : {}),
+        ...(trackedPatch.width !== undefined ? { width: trackedPatch.width } : {}),
+        ...(trackedPatch.height !== undefined ? { height: trackedPatch.height } : {}),
+        ...(trackedPatch.rotation !== undefined ? { rotation: trackedPatch.rotation } : {}),
+        ...(trackedPatch.z_index !== undefined ? { zIndex: trackedPatch.z_index } : {}),
+        ...(trackedPatch.locked !== undefined ? { locked: trackedPatch.locked } : {}),
+      }
+      let targetId = mediaId
+      const apply = async (target: PlannerMedia) => {
+        const didSave = await persistMediaPatch(targetId, {
+          x: target.x,
+          y: target.y,
+          width: target.width,
+          height: target.height,
+          rotation: target.rotation,
+          z_index: target.zIndex,
+          locked: target.locked,
+        }, false)
+        if (!didSave) throw new Error('Não foi possível persistir a operação da mídia.')
+      }
+      history.push({
+        undo: () => apply(before),
+        redo: () => apply(after),
+        remapEntityId: (entityType, previousId, nextId) => {
+          if (entityType === 'media' && targetId === previousId) targetId = nextId
+        },
+      })
+    }
+    const previous = mediaWritesRef.current[mediaId] ?? Promise.resolve()
+    let succeeded = true
+    const write = previous.then(async () => {
+      try {
+        const updated = await apiRequest<MediaFromApi>(`/media/${mediaId}`, {
+          method: 'PATCH',
+          body: JSON.stringify(patch),
+        })
+
+        setMediaItems(currentItems => currentItems.map(item => item.id === mediaId ? convertMedia(updated) : item))
+        setMediaError('')
+      } catch (error) {
+        succeeded = false
+        console.error(error)
+        setMediaError(error instanceof Error ? error.message : 'Não foi possível salvar as alterações da mídia.')
+      }
+    })
+    mediaWritesRef.current[mediaId] = write
     try {
-      const updated =
-        await apiRequest<MediaFromApi>(
-          `/media/${mediaId}`,
-          {
-            method: 'PATCH',
-            body: JSON.stringify(patch),
-          },
-        )
-
-      setMediaItems(
-        (currentItems) =>
-          currentItems.map(
-            (item) =>
-              item.id === mediaId
-                ? convertMedia(updated)
-                : item,
-          ),
-      )
-
-      setMediaError('')
+      await write
+      return succeeded
     } catch (error) {
       console.error(error)
+      setMediaError(error instanceof Error ? error.message : 'Não foi possível salvar as alterações da mídia.')
+      return false
+    }
+  }
 
-      if (error instanceof Error) {
-        setMediaError(error.message)
-      } else {
-        setMediaError(
-          'Não foi possível salvar as alterações da mídia.',
-        )
+  async function handleReorderMediaLayers(item: PlannerMedia, action: LayerAction) {
+    const changes = reorderLayers(mediaItems.map(current => ({ id: current.id, zIndex: current.zIndex })), item.id, action)
+    if (!changes.length) return
+    const before = changes.map(change => ({ id: change.id, zIndex: mediaItems.find(current => current.id === change.id)!.zIndex }))
+    const after = changes.map(change => ({ id: change.id, zIndex: change.zIndex }))
+    const apply = async (values: typeof before) => {
+      for (const value of values) {
+        const didSave = await persistMediaPatch(value.id, { z_index: value.zIndex }, false)
+        if (!didSave) throw new Error('Não foi possível salvar a ordem das camadas.')
       }
     }
-  }
-
-
-  function handleBringMediaToFront(
-    item: PlannerMedia,
-  ) {
-    const highestZ =
-      mediaItems.reduce(
-        (highest, currentItem) =>
-          Math.max(
-            highest,
-            currentItem.zIndex,
-          ),
-        item.zIndex,
-      )
-
-    if (item.zIndex >= highestZ) {
-      return
-    }
-
-    const nextZ = highestZ + 1
-
-    setMediaItems(
-      (currentItems) =>
-        currentItems.map(
-          (currentItem) =>
-            currentItem.id === item.id
-              ? {
-                  ...currentItem,
-                  zIndex: nextZ,
-                }
-              : currentItem,
-        ),
-    )
-
-    void persistMediaPatch(
-      item.id,
-      {
-        z_index: nextZ,
+    history.push({
+      undo: () => apply(before),
+      redo: () => apply(after),
+      remapEntityId: (entityType, previousId, nextId) => {
+        if (entityType !== 'media') return
+        for (const value of [...before, ...after]) {
+          if (value.id === previousId) value.id = nextId
+        }
       },
-    )
-  }
-
-  function handleSendMediaToBack(
-    item: PlannerMedia,
-  ) {
-    const lowestZ =
-      mediaItems.reduce(
-        (lowest, currentItem) =>
-          Math.min(
-            lowest,
-            currentItem.zIndex,
-          ),
-        item.zIndex,
-      )
-
-    if (item.zIndex <= lowestZ) {
-      return
+    })
+    try {
+      await apply(after)
+    } catch (error) {
+      setMediaError(error instanceof Error ? error.message : 'Não foi possível salvar a ordem das camadas.')
     }
-
-    const nextZ = lowestZ - 1
-
-    setMediaItems(
-      (currentItems) =>
-        currentItems.map(
-          (currentItem) =>
-            currentItem.id === item.id
-              ? {
-                  ...currentItem,
-                  zIndex: nextZ,
-                }
-              : currentItem,
-        ),
-    )
-
-    void persistMediaPatch(
-      item.id,
-      {
-        z_index: nextZ,
-      },
-    )
   }
 
   function handleToggleMediaLocked(
     item: PlannerMedia,
   ) {
     const nextLocked = !item.locked
-
-    setMediaItems(
-      (currentItems) =>
-        currentItems.map(
-          (currentItem) =>
-            currentItem.id === item.id
-              ? {
-                  ...currentItem,
-                  locked: nextLocked,
-                }
-              : currentItem,
-        ),
-    )
 
     mediaDragRef.current = null
     mediaResizeRef.current = null
@@ -2387,6 +2401,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
     mediaDragRef.current = {
       mediaId: item.id,
       pointerId: event.pointerId,
+      before: item,
       startClientX: event.clientX,
       startClientY: event.clientY,
       startX: item.x,
@@ -2480,6 +2495,8 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
         y: position.y,
         z_index: drag.zIndex,
       },
+      true,
+      { ...drag.before, x: drag.startX, y: drag.startY },
     )
   }
 
@@ -2563,6 +2580,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
     mediaResizeRef.current = {
       mediaId: item.id,
       pointerId: event.pointerId,
+      before: item,
       startClientX: event.clientX,
       startClientY: event.clientY,
       startWidth: item.width,
@@ -2660,6 +2678,8 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
         height: size.height,
         z_index: resize.zIndex,
       },
+      true,
+      { ...resize.before, width: resize.startWidth, height: resize.startHeight },
     )
 
     event.stopPropagation()
@@ -2746,6 +2766,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
     mediaRotateRef.current = {
       mediaId: item.id,
       pointerId: event.pointerId,
+      before: item,
       centerX,
       centerY,
       startPointerAngle:
@@ -2839,6 +2860,8 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
         rotation,
         z_index: rotate.zIndex,
       },
+      true,
+      { ...rotate.before, rotation: rotate.startRotation },
     )
 
     event.stopPropagation()
@@ -4173,6 +4196,28 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
         converted.id,
       )
       setMediaError('')
+      let duplicatedId = converted.id
+      let sourceId = item.id
+      history.push({
+        undo: async () => {
+          await apiRequest<void>(`/media/${duplicatedId}`, { method: 'DELETE' })
+          setMediaItems(current => current.filter(media => media.id !== duplicatedId))
+          setSelectedMediaId(current => current === duplicatedId ? null : current)
+        },
+        redo: async () => {
+          const previousId = duplicatedId
+          const restored = convertMedia(await apiRequest<MediaFromApi>(`/media/${sourceId}/duplicate`, { method: 'POST' }))
+          duplicatedId = restored.id
+          history.remapEntityId('media', previousId, duplicatedId)
+          setMediaItems(current => [...current, restored])
+          setSelectedMediaId(restored.id)
+        },
+        remapEntityId: (entityType, previousId, nextId) => {
+          if (entityType !== 'media') return
+          if (duplicatedId === previousId) duplicatedId = nextId
+          if (sourceId === previousId) sourceId = nextId
+        },
+      })
     } catch (error) {
       console.error(error)
 
@@ -4189,6 +4234,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
   async function handleDeleteMedia(
     mediaId: number,
   ) {
+    if (!window.confirm('Excluir esta mídia permanentemente? O arquivo enviado também será removido e esta ação não pode ser desfeita.')) return
     try {
       await apiRequest<void>(
         `/media/${mediaId}`,
@@ -5320,7 +5366,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
     readSettingString(
       paperSettings,
       'backgroundColor',
-      '#fffdf8',
+      '#F7F1E7',
     )
 
   const paperLineColor =
@@ -5430,9 +5476,16 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
   sheetHeight =
     Math.round(sheetHeight * 1.08)
 
+  const effectivePaperLineColor = agendaTheme === 'dark' && paperLineColor.toLowerCase() === '#d8d1ca'
+    ? '#56605e'
+    : paperLineColor
+  const effectivePaperBackgroundColor = agendaTheme === 'dark'
+    && ['#fffdf8', '#f7f1e7'].includes(paperBackgroundColor.toLowerCase())
+    ? '#1B1B1D'
+    : paperBackgroundColor
   const markColor =
     hexToRgba(
-      paperLineColor,
+      effectivePaperLineColor,
       paperOpacity,
     )
 
@@ -5464,7 +5517,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
       `${sheetWidth} / ${sheetHeight}`,
     padding: `${paperMargin}px`,
     backgroundColor:
-      paperBackgroundColor,
+      effectivePaperBackgroundColor,
     backgroundImage,
     backgroundSize,
   }
@@ -5479,7 +5532,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
       '.sheet-content-layer, .sheet-block-list, .free-canvas-layer, .page-media-layer',
     )
     const freeWriting = activeTool === 'text'
-      && !target.closest('button, .canvas-inline-text, .canvas-element-toolbar, .media-layer-controls')
+      && !target.closest('button, input, textarea, select, [contenteditable], .canvas-inline-text, .canvas-element-toolbar, .media-layer-controls')
     if (!blank && !freeWriting) return
     if (freeWriting) { event.preventDefault(); event.stopPropagation() }
 
@@ -5641,13 +5694,24 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
               >
                 <CanvasElementContent element={element.element_type.startsWith('template:') ? { ...element, data: legacyTemplateFields(element, pageCanvasElements) } : element} editing={editingTextElementId === element.id} onTextBlur={handleCanvasTextBlur}
                   onTextInput={handleCanvasTextInput}
-                  onSelect={id => { setEditingTextElementId(id); setSelectedCanvasElementId(null); setSelectedMediaId(null) }}
+                  onSelect={id => {
+                    if (activeTool === 'text') {
+                      const postIt = pageCanvasElements.find(item => item.id === id)
+                      if (postIt) void createInlineText(postIt.x, postIt.y, postIt.width)
+                      return
+                    }
+                    setEditingTextElementId(id)
+                    setSelectedCanvasElementId(null)
+                    setSelectedMediaId(null)
+                  }}
                   onDuplicateSection={(title, text) => { void createStructuredElement('section:notes-block', { title, text }, 300, 200, activePageId, 80, 160, 4) }}
                   tasks={[...pages.flatMap(page => page.tasks), ...receiptExternalTasks]}
                   onDataChange={(item, data) => { void patchPageCanvasElement(item.id, { data }) }}
+                  weekStart={weeklyStart}
+                  onWeeklyWeekChange={onWeeklyWeekChange}
                   onToggleTask={id => { void handleToggleTask(id) }} />
 
-                {isSelected && editingTextElementId === null && (
+                {!previewMode && isSelected && editingTextElementId === null && (
                   <>
                     <div
                       className="canvas-element-toolbar"
@@ -5688,9 +5752,21 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
                         onClick={() => void patchPageCanvasElement(element.id, { locked: !element.locked })}>
                         {element.locked ? <LockKeyhole size={14} /> : <LockKeyholeOpen size={14} />}
                       </button>
-                      <button type="button" aria-label="Trazer para frente" disabled={element.locked}
-                        onClick={() => void patchPageCanvasElement(element.id, { z_index: Math.max(...pageCanvasElements.map(item => item.z_index)) + 1 })}>
+                      <button type="button" aria-label="Subir uma camada" title="Subir uma camada" disabled={element.locked}
+                        onClick={() => void reorderPageCanvasElements(element.id, 'up')}>
+                        <ArrowUp size={14} />
+                      </button>
+                      <button type="button" aria-label="Descer uma camada" title="Descer uma camada" disabled={element.locked}
+                        onClick={() => void reorderPageCanvasElements(element.id, 'down')}>
+                        <ArrowDown size={14} />
+                      </button>
+                      <button type="button" aria-label="Trazer para frente" title="Trazer para frente" disabled={element.locked}
+                        onClick={() => void reorderPageCanvasElements(element.id, 'front')}>
                         <BringToFront size={14} />
+                      </button>
+                      <button type="button" aria-label="Enviar para trás" title="Enviar para trás" disabled={element.locked}
+                        onClick={() => void reorderPageCanvasElements(element.id, 'back')}>
+                        <SendToBack size={14} />
                       </button>
                       <button
                         type="button"
@@ -6032,7 +6108,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
           (item) => (
             <article
               className={
-                selectedMediaId === item.id
+                selectedMediaId === item.id && !previewMode
                   ? item.locked
                     ? 'media-canvas-item is-selected is-locked'
                     : 'media-canvas-item is-selected'
@@ -6086,22 +6162,21 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
               />
 
               {selectedMediaId
-                === item.id && (
+              === item.id && !previewMode && (
                 <>
                   <div className="media-layer-controls">
                     <button
                       className="media-layer-button"
                       type="button"
-                      aria-label="Trazer para frente"
-                      title="Trazer para frente"
+                      aria-label="Subir uma camada"
+                      title="Subir uma camada"
+                      disabled={item.locked}
                       onPointerDown={(event) =>
                         event.stopPropagation()
                       }
                       onClick={(event) => {
                         event.stopPropagation()
-                        handleBringMediaToFront(
-                          item,
-                        )
+                        void handleReorderMediaLayers(item, 'up')
                       }}
                     >
                       <ArrowUp size={16} />
@@ -6110,19 +6185,52 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
                     <button
                       className="media-layer-button"
                       type="button"
-                      aria-label="Mandar para trás"
-                      title="Mandar para trás"
+                      aria-label="Descer uma camada"
+                      title="Descer uma camada"
+                      disabled={item.locked}
                       onPointerDown={(event) =>
                         event.stopPropagation()
                       }
                       onClick={(event) => {
                         event.stopPropagation()
-                        handleSendMediaToBack(
-                          item,
-                        )
+                        void handleReorderMediaLayers(item, 'down')
                       }}
                     >
                       <ArrowDown size={16} />
+                    </button>
+
+                    <button
+                      className="media-layer-button"
+                      type="button"
+                      aria-label="Trazer para frente"
+                      title="Trazer para frente"
+                      disabled={item.locked}
+                      onPointerDown={(event) =>
+                        event.stopPropagation()
+                      }
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        void handleReorderMediaLayers(item, 'front')
+                      }}
+                    >
+                      <ArrowUp size={16} />
+                    </button>
+
+                    <button
+                      className="media-layer-button"
+                      type="button"
+                      aria-label="Enviar para trás"
+                      title="Enviar para trás"
+                      disabled={item.locked}
+                      onPointerDown={(event) =>
+                        event.stopPropagation()
+                      }
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        void handleReorderMediaLayers(item, 'back')
+                      }}
+                    >
+                      <SendToBack size={16} />
                     </button>
                   </div>
 
@@ -6150,8 +6258,8 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
                     }}
                   >
                     {item.locked
-                      ? 'ðŸ”“'
-                      : 'ðŸ”’'}
+                      ? <LockKeyhole size={14} aria-hidden="true" />
+                      : <LockKeyholeOpen size={14} aria-hidden="true" />}
                   </button>
 
                   <button
@@ -8025,8 +8133,8 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
         : 'Salvo'
 
   return (
-    <main className={`agenda-page agenda-workspace ${focused ? 'is-focused' : 'is-unfocused'}`} onPointerDownCapture={onFocus} onFocusCapture={onFocus}>
-      <button
+    <main className={`agenda-page agenda-workspace ${focused ? 'is-focused' : 'is-unfocused'}${previewMode ? ' is-preview' : ''}`} onPointerDownCapture={onFocus} onFocusCapture={onFocus}>
+      {!previewMode && <button
         className={
           isNavigationOpen
             ? 'workspace-menu-button active'
@@ -8042,9 +8150,9 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
         onClick={toggleNavigation}
       >
         <Menu size={16} />
-      </button>
+      </button>}
 
-      {isNavigationOpen && (
+      {!previewMode && isNavigationOpen && (
         <>
           <button
             className="workspace-drawer-backdrop"
@@ -8363,7 +8471,9 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
               <header className="minimal-editor-header">
                 <div className="editor-title-cluster">
                   <span className="editor-page-number">Página {pages.findIndex(page => page.id === activePageId) + 1}</span>
-                  <input
+                  {previewMode
+                    ? <span className="minimal-page-title-input">{activePage.title || 'Sem título'}</span>
+                    : <input
                     aria-label="Título da página"
                     className="minimal-page-title-input"
                     type="text"
@@ -8375,9 +8485,9 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
                       )
                     }
                     onBlur={handleTitleBlur}
-                  />
+                    />}
 
-                  <span role="status" aria-live="polite"
+                  {!previewMode && <span role="status" aria-live="polite"
                     className={
                       saveLabel === 'Erro ao salvar'
                         ? 'minimal-save-status error'
@@ -8389,10 +8499,19 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
                     {saveLabel === 'Salvo'
                       ? 'Salvo'
                       : saveLabel}
-                  </span>
+                  </span>}
                 </div>
 
-                {drawingMode !== null && (
+                {!previewMode && <div className="editor-history-controls" aria-label="Histórico de edição">
+                  <button type="button" title="Desfazer" aria-label="Desfazer" disabled={!history.canUndo} onClick={() => void history.undo()}>
+                    <Undo2 size={16} aria-hidden="true" />
+                  </button>
+                  <button type="button" title="Refazer" aria-label="Refazer" disabled={!history.canRedo} onClick={() => void history.redo()}>
+                    <Redo2 size={16} aria-hidden="true" />
+                  </button>
+                </div>}
+
+                {!previewMode && drawingMode !== null && (
                   <div className="active-drawing-pill">
                     <span>
                       {drawingMode === 'highlighter'
@@ -8423,7 +8542,7 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
                 )}
               </header>
 
-              <div className="template-section-menu">
+              {!previewMode && <div className="template-section-menu">
                 <button type="button" className="template-add-section" aria-expanded={sectionLibraryOpen} onClick={() => setSectionLibraryOpen(current => !current)}>Adicionar seção</button>
                 {sectionLibraryOpen && <div className="template-section-picker" role="group" aria-label="Biblioteca de seções">
                   {SECTION_TEMPLATES.filter(section => !['study-planner', 'task-receipt'].includes(section.id)).map(section => <button type="button" data-section-template={section.id} key={section.id} onClick={() => {
@@ -8431,19 +8550,28 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
                     setSectionLibraryOpen(false)
                   }}>{section.name}</button>)}
                 </div>}
-              </div>
+              </div>}
               <div className="sheet-viewport">
                 <article
-                  className={`planner-sheet paper-${activePage.paperType}${editingTextElementId !== null ? ' is-writing' : ''}`}
+                  className={`planner-sheet paper-${activePage.paperType}${editingTextElementId !== null ? ' is-writing' : ''}${previewMode ? ' is-preview' : ''}`}
+                  inert={previewMode}
                   onFocusCapture={event => { if ((event.target as Element).matches('input, textarea, [contenteditable]')) { setSelectedCanvasElementId(null); setSelectedMediaId(null); const frame = (event.target as Element).closest<HTMLElement>('[data-element-id]'); if (frame) setEditingTextElementId(Number(frame.dataset.elementId)) } }}
                   onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setEditingTextElementId(null) }}
                   style={sheetStyle}
                   onPointerDownCapture={event => {
                     paperPress.current = { x: event.clientX, y: event.clientY }
-                    if (activeTool === 'text' && !(event.target as Element).closest('button, .canvas-inline-text, .canvas-element-toolbar, .media-layer-controls')) {
+                    if (activeTool === 'text' && !(event.target as Element).closest('button, input, textarea, select, [contenteditable], .canvas-inline-text, .canvas-element-toolbar, .media-layer-controls')) {
                       event.preventDefault()
                       event.stopPropagation()
                     }
+                  }}
+                  onClick={event => {
+                    if (activeTool === 'text') return
+                    const target = event.target
+                    if (target instanceof Element && target.closest('.free-canvas-element, .media-canvas-item, button, input, textarea, select, [contenteditable], .block-list')) return
+                    setSelectedCanvasElementId(null)
+                    setSelectedMediaId(null)
+                    setEditingTextElementId(null)
                   }}
                   onClickCapture={handlePaperClick}
                 >
@@ -8540,9 +8668,10 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
                 </article>
               </div>
 
-              {drawingError && (
+              {(drawingError || (historyError?.pageId === activePageId ? historyError.message : '') || mediaError) && (
                 <p className="workspace-floating-error">
-                  {drawingError}
+                  {(historyError?.pageId === activePageId ? historyError.message : '') || mediaError || drawingError}
+                  {historyError?.pageId === activePageId && <button type="button" onClick={() => setHistoryError(null)}>Fechar</button>}
                   {canvasSaveStatus === 'error' && <button type="button" onClick={() => {
                     setDrawingError('')
                     for (const [id, patch] of Object.entries(failedElementWrites.current)) void patchPageCanvasElement(Number(id), patch)
@@ -8558,14 +8687,12 @@ function PageEditor({ initialPageId, scale, focused, onFocus, onPageChange, onNa
           )}
       </section>
 
-      <EditorToolbar activeTool={activeTool} title={activeToolTitle}
+      {!previewMode && <EditorToolbar activeTool={activeTool} title={activeToolTitle} onTogglePreview={onTogglePreview}
         onToggle={toggleTool} onClose={() => setActiveTool(null)}>
         {activeTool !== null && renderToolPanelContent()}
-      </EditorToolbar>
+      </EditorToolbar>}
     </main>
   )
 }
 
 export default PageEditor
-
-

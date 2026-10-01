@@ -5,12 +5,12 @@ import {
   type FormEvent,
 } from 'react'
 
+import SubjectPicker from '../../components/SubjectPicker'
 import {
   apiRequest,
 } from '../../services/api'
 
 import './TasksPage.css'
-import SubjectPicker from '../../components/SubjectPicker'
 
 
 type TaskPriority =
@@ -54,9 +54,17 @@ type Category = {
 }
 
 
+type Subject = {
+  id: number
+  name: string
+  color: string
+}
+
+
 type TaskFilter =
   | 'all'
   | 'pending'
+  | 'overdue'
   | 'done'
   | 'calendar'
 
@@ -94,8 +102,26 @@ function formatDate(
 }
 
 
+function todayIso() {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(
+    now.getMonth() + 1,
+  ).padStart(2, '0')
+  const day = String(
+    now.getDate(),
+  ).padStart(2, '0')
+
+  return `${year}-${month}-${day}`
+}
+
+
 function TasksPage() {
-  const [subjectId, setSubjectId] = useState<number | null>(null)
+  const [
+    subjectId,
+    setSubjectId,
+  ] = useState<number | null>(null)
+
   const [
     tasks,
     setTasks,
@@ -110,6 +136,11 @@ function TasksPage() {
     categories,
     setCategories,
   ] = useState<Category[]>([])
+
+  const [
+    subjects,
+    setSubjects,
+  ] = useState<Subject[]>([])
 
   const [
     loading,
@@ -138,6 +169,10 @@ function TasksPage() {
     'all',
   )
 
+  const [
+    search,
+    setSearch,
+  ] = useState('')
 
   const [
     editingTaskId,
@@ -199,28 +234,26 @@ function TasksPage() {
       apiRequest<Category[]>(
         '/categories',
       ),
+
+      apiRequest<Subject[]>(
+        '/subjects',
+      ),
     ])
       .then(
         ([
           tasksData,
           projectsData,
           categoriesData,
+          subjectsData,
         ]) => {
           if (cancelled) {
             return
           }
 
-          setTasks(
-            tasksData,
-          )
-
-          setProjects(
-            projectsData,
-          )
-
-          setCategories(
-            categoriesData,
-          )
+          setTasks(tasksData)
+          setProjects(projectsData)
+          setCategories(categoriesData)
+          setSubjects(subjectsData)
         },
       )
       .catch((err) => {
@@ -246,48 +279,167 @@ function TasksPage() {
   }, [])
 
 
+  const today = todayIso()
+
+  function isOverdue(
+    task: Task,
+  ) {
+    return (
+      !task.done
+      && task.due_date !== null
+      && task.due_date < today
+    )
+  }
+
+
+  function isDueToday(
+    task: Task,
+  ) {
+    return (
+      !task.done
+      && task.due_date === today
+    )
+  }
+
+
+  function getProject(
+    id: number | null,
+  ) {
+    if (id === null) {
+      return null
+    }
+
+    return projects.find(
+      (project) =>
+        project.id === id,
+    ) ?? null
+  }
+
+
+  function getCategory(
+    id: number | null,
+  ) {
+    if (id === null) {
+      return null
+    }
+
+    return categories.find(
+      (category) =>
+        category.id === id,
+    ) ?? null
+  }
+
+
+  function getSubject(
+    id: number | null,
+  ) {
+    if (id === null) {
+      return null
+    }
+
+    return subjects.find(
+      (subject) =>
+        subject.id === id,
+    ) ?? null
+  }
+
+
   const filteredTasks =
     useMemo(
       () => {
-        if (filter === 'pending') {
-          return tasks.filter(
-            (task) =>
-              !task.done,
+        const normalizedSearch =
+          search.trim().toLocaleLowerCase(
+            'pt-BR',
           )
-        }
 
-        if (filter === 'done') {
-          return tasks.filter(
-            (task) =>
-              task.done,
-          )
-        }
+        return tasks.filter(
+          (task) => {
+            if (
+              filter === 'pending'
+              && task.done
+            ) {
+              return false
+            }
 
-        if (filter === 'calendar') {
-          return tasks.filter(
-            (task) =>
-              task.show_in_calendar,
-          )
-        }
+            if (
+              filter === 'done'
+              && !task.done
+            ) {
+              return false
+            }
 
-        return tasks
+            if (
+              filter === 'calendar'
+              && !task.show_in_calendar
+            ) {
+              return false
+            }
+
+            if (
+              filter === 'overdue'
+              && !isOverdue(task)
+            ) {
+              return false
+            }
+
+            if (!normalizedSearch) {
+              return true
+            }
+
+            const project =
+              getProject(
+                task.project_id,
+              )
+
+            const category =
+              getCategory(
+                task.category_id,
+              )
+
+            const subject =
+              getSubject(
+                task.subject_id,
+              )
+
+            const haystack = [
+              task.text,
+              task.description,
+              project?.title ?? '',
+              category?.name ?? '',
+              subject?.name ?? '',
+            ]
+              .join(' ')
+              .toLocaleLowerCase(
+                'pt-BR',
+              )
+
+            return haystack.includes(
+              normalizedSearch,
+            )
+          },
+        )
       },
-      [
-        filter,
-        tasks,
-      ],
+      [filter, getCategory, getProject, getSubject, isOverdue, search, tasks],
     )
+
 
   const completedCount =
     tasks.filter(
       (task) => task.done,
     ).length
 
+  const overdueCount =
+    tasks.filter(
+      (task) => isOverdue(task),
+    ).length
+
   const completionPercent =
     tasks.length === 0
       ? 0
       : Math.round(
-          completedCount / tasks.length * 100,
+          completedCount
+          / tasks.length
+          * 100,
         )
 
 
@@ -313,7 +465,10 @@ function TasksPage() {
   function startEdit(
     task: Task,
   ) {
-    setSubjectId(task.subject_id ?? null)
+    setSubjectId(
+      task.subject_id ?? null,
+    )
+
     clearMessages()
 
     setEditingTaskId(
@@ -392,7 +547,9 @@ function TasksPage() {
 
           priority,
 
-          subject_id: subjectId,
+          subject_id:
+            subjectId,
+
           project_id:
             projectId
               ? Number(projectId)
@@ -476,6 +633,7 @@ function TasksPage() {
 
     try {
       clearMessages()
+
       const updated =
         await apiRequest<Task>(
           `/tasks/${task.id}`,
@@ -516,6 +674,7 @@ function TasksPage() {
 
     try {
       clearMessages()
+
       const updated =
         await apiRequest<Task>(
           `/tasks/${task.id}`,
@@ -597,38 +756,13 @@ function TasksPage() {
   }
 
 
-  function getProject(
-    id: number | null,
-  ) {
-    if (id === null) {
-      return null
-    }
-
-    return projects.find(
-      (project) =>
-        project.id === id,
-    ) ?? null
-  }
-
-
-  function getCategory(
-    id: number | null,
-  ) {
-    if (id === null) {
-      return null
-    }
-
-    return categories.find(
-      (category) =>
-        category.id === id,
-    ) ?? null
-  }
-
-
   if (loading) {
     return (
       <section className="tasks-page">
-        <div className="tasks-loading">
+        <div
+          className="tasks-loading"
+          role="status"
+        >
           Carregando tarefas...
         </div>
       </section>
@@ -656,34 +790,130 @@ function TasksPage() {
         </div>
       </header>
 
+
       <div className="tasks-receipt-banner">
         <div>
-          <span className="tasks-receipt-kicker">LISTA Nº {String(tasks.length).padStart(2, '0')}</span>
-          <strong>CHECKOUT DO DIA</strong>
+          <span className="tasks-receipt-kicker">
+            LISTA Nº{' '}
+            {
+              String(
+                tasks.length,
+              ).padStart(
+                2,
+                '0',
+              )
+            }
+          </span>
+
+          <strong>
+            CHECKOUT DO DIA
+          </strong>
         </div>
-        <div className="tasks-receipt-stamp" aria-label={`${completionPercent}% das tarefas concluídas`}>
-          <strong>{completionPercent}%</strong>
-          <span>feito</span>
+
+        <div
+          className="tasks-receipt-stamp"
+          aria-label={
+            `${completionPercent}% das tarefas concluídas`
+          }
+        >
+          <strong>
+            {completionPercent}%
+          </strong>
+
+          <span>
+            feito
+          </span>
         </div>
       </div>
 
-      <div className="tasks-summary-strip" aria-label="Resumo das tarefas">
-        <span><b>{String(tasks.length).padStart(2, '0')}</b> itens</span>
-        <span><b>{String(tasks.length - completedCount).padStart(2, '0')}</b> abertos</span>
-        <span><b>{String(completedCount).padStart(2, '0')}</b> pagos</span>
-        <span className="tasks-progress-bar"><i style={{ width: `${completionPercent}%` }} /></span>
+
+      <div
+        className="tasks-summary-strip"
+        aria-label="Resumo das tarefas"
+      >
+        <span>
+          <b>
+            {
+              String(
+                tasks.length,
+              ).padStart(
+                2,
+                '0',
+              )
+            }
+          </b>{' '}
+          itens
+        </span>
+
+        <span>
+          <b>
+            {
+              String(
+                tasks.length
+                - completedCount,
+              ).padStart(
+                2,
+                '0',
+              )
+            }
+          </b>{' '}
+          abertos
+        </span>
+
+        <span>
+          <b>
+            {
+              String(
+                completedCount,
+              ).padStart(
+                2,
+                '0',
+              )
+            }
+          </b>{' '}
+          pagos
+        </span>
+
+        <span>
+          <b>
+            {
+              String(
+                overdueCount,
+              ).padStart(
+                2,
+                '0',
+              )
+            }
+          </b>{' '}
+          atrasados
+        </span>
+
+        <span className="tasks-progress-bar">
+          <i
+            style={{
+              width:
+                `${completionPercent}%`,
+            }}
+          />
+        </span>
       </div>
 
 
       {message && (
-        <div className="tasks-message success">
+        <div
+          className="tasks-message success"
+          role="status"
+        >
           {message}
         </div>
       )}
 
 
       {error && (
-        <div className="tasks-message error">
+        <div
+          className="tasks-message error"
+          role="alert"
+        >
           {error}
         </div>
       )}
@@ -710,7 +940,6 @@ function TasksPage() {
             </h2>
           </div>
 
-
           {editingTaskId !== null && (
             <button
               type="button"
@@ -726,7 +955,16 @@ function TasksPage() {
 
 
         <div className="tasks-form-grid">
-          <SubjectPicker value={subjectId} onChange={setSubjectId} />
+          <SubjectPicker
+            value={subjectId}
+            onChange={
+              (
+                id,
+              ) =>
+                setSubjectId(id)
+            }
+          />
+
           <label className="tasks-full">
             Tarefa
 
@@ -783,9 +1021,7 @@ function TasksPage() {
             <select
               value={priority}
               onChange={(event) =>
-                setPriority(
-                  event.target.value as TaskPriority,
-                )
+                setPriority(event.target.value as TaskPriority)
               }
             >
               <option value="low">
@@ -919,63 +1155,100 @@ function TasksPage() {
           </p>
         </div>
 
+        <div className="tasks-list-tools">
+          <label className="tasks-search">
+            <span className="sr-only">
+              Buscar tarefas
+            </span>
 
-        <div className="tasks-filters">
-          <button
-            type="button"
-            className={
-              filter === 'all'
-                ? 'active'
-                : ''
-            }
-            onClick={() =>
-              setFilter('all')
-            }
-          >
-            Todas
-          </button>
+            <input
+              type="search"
+              value={search}
+              placeholder="Buscar tarefa..."
+              onChange={(event) =>
+                setSearch(
+                  event.target.value,
+                )
+              }
+            />
+          </label>
 
-          <button
-            type="button"
-            className={
-              filter === 'pending'
-                ? 'active'
-                : ''
-            }
-            onClick={() =>
-              setFilter('pending')
-            }
+          <div
+            className="tasks-filters"
+            aria-label="Filtrar tarefas"
           >
-            Pendentes
-          </button>
+            <button
+              type="button"
+              className={
+                filter === 'all'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() =>
+                setFilter('all')
+              }
+            >
+              Todas
+            </button>
 
-          <button
-            type="button"
-            className={
-              filter === 'done'
-                ? 'active'
-                : ''
-            }
-            onClick={() =>
-              setFilter('done')
-            }
-          >
-            Concluídas
-          </button>
+            <button
+              type="button"
+              className={
+                filter === 'pending'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() =>
+                setFilter('pending')
+              }
+            >
+              Pendentes
+            </button>
 
-          <button
-            type="button"
-            className={
-              filter === 'calendar'
-                ? 'active'
-                : ''
-            }
-            onClick={() =>
-              setFilter('calendar')
-            }
-          >
-            No calendário
-          </button>
+            <button
+              type="button"
+              className={
+                filter === 'overdue'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() =>
+                setFilter('overdue')
+              }
+            >
+              Atrasadas
+            </button>
+
+            <button
+              type="button"
+              className={
+                filter === 'done'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() =>
+                setFilter('done')
+              }
+            >
+              Concluídas
+            </button>
+
+            <button
+              type="button"
+              className={
+                filter === 'calendar'
+                  ? 'active'
+                  : ''
+              }
+              onClick={() =>
+                setFilter(
+                  'calendar',
+                )
+              }
+            >
+              No calendário
+            </button>
+          </div>
         </div>
       </div>
 
@@ -987,14 +1260,18 @@ function TasksPage() {
           </strong>
 
           <span>
-            Crie uma tarefa ou altere
-            o filtro selecionado.
+            {search.trim()
+              ? 'Nenhuma tarefa corresponde à busca e ao filtro selecionados.'
+              : 'Crie uma tarefa ou altere o filtro selecionado.'}
           </span>
         </div>
       ) : (
         <div className="tasks-list">
           {filteredTasks.map(
-            (task, index) => {
+            (
+              task,
+              index,
+            ) => {
               const project =
                 getProject(
                   task.project_id,
@@ -1005,18 +1282,47 @@ function TasksPage() {
                   task.category_id,
                 )
 
+              const subject =
+                getSubject(
+                  task.subject_id,
+                )
+
+              const overdue =
+                isOverdue(task)
+
+              const dueToday =
+                isDueToday(task)
+
               return (
                 <article
-                  key={task.id} id={`task-${task.id}`}
-                  className={
+                  key={task.id}
+                  id={`task-${task.id}`}
+                  className={[
+                    'task-card',
                     task.done
-                      ? 'task-card done'
-                      : 'task-card'
-                  }
+                      ? 'done'
+                      : '',
+                    overdue
+                      ? 'overdue'
+                      : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                 >
-                  <div className="task-item-number" aria-hidden="true">
-                    {String(index + 1).padStart(2, '0')}
+                  <div
+                    className="task-item-number"
+                    aria-hidden="true"
+                  >
+                    {
+                      String(
+                        index + 1,
+                      ).padStart(
+                        2,
+                        '0',
+                      )
+                    }
                   </div>
+
                   <button
                     type="button"
                     className={
@@ -1070,16 +1376,31 @@ function TasksPage() {
 
                     <div className="task-meta">
                       <span className="task-status-label">
-                        {task.done ? 'STATUS: PAGO' : 'STATUS: ABERTO'}
+                        {task.done
+                          ? 'STATUS: PAGO'
+                          : 'STATUS: ABERTO'}
                       </span>
+
                       <span>
-                        Data: {
+                        Data:{' '}
+                        {
                           formatDate(
                             task.due_date,
                           )
                         }
                       </span>
 
+                      {overdue && (
+                        <span className="task-deadline-badge task-deadline-overdue">
+                          ATRASADA
+                        </span>
+                      )}
+
+                      {dueToday && (
+                        <span className="task-deadline-badge task-deadline-today">
+                          VENCE HOJE
+                        </span>
+                      )}
 
                       {task.page_id !== null && (
                         <span>
@@ -1087,6 +1408,17 @@ function TasksPage() {
                         </span>
                       )}
 
+                      {subject && (
+                        <span
+                          className="task-tag"
+                          style={{
+                            borderColor:
+                              subject.color,
+                          }}
+                        >
+                          Matéria: {subject.name}
+                        </span>
+                      )}
 
                       {project && (
                         <span
@@ -1099,7 +1431,6 @@ function TasksPage() {
                           {project.title}
                         </span>
                       )}
-
 
                       {category && (
                         <span
@@ -1133,7 +1464,6 @@ function TasksPage() {
                           ? '✓ No calendário'
                           : 'Fora do calendário'}
                       </button>
-
 
                       {task.show_in_calendar
                         && !task.due_date && (
@@ -1177,10 +1507,19 @@ function TasksPage() {
         </div>
       )}
 
+
       <footer className="tasks-receipt-total">
-        <span>TOTAL DO DIA</span>
-        <strong>{completedCount} / {tasks.length || 0}</strong>
-        <small>tarefas concluídas</small>
+        <span>
+          TOTAL DO DIA
+        </span>
+
+        <strong>
+          {completedCount} / {tasks.length}
+        </strong>
+
+        <small>
+          tarefas concluídas
+        </small>
       </footer>
     </section>
   )

@@ -5,7 +5,7 @@ Only the schema created by this test is removed; application data is untouched.
 """
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from alembic import command
 from alembic.config import Config
@@ -41,7 +41,7 @@ def run():
             connection.execute(text("INSERT INTO subjects (user_id, name) VALUES (1, 'Legacy')"))
         command.upgrade(config, "head")
         with engine.connect() as connection:
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "a925001"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "a925002"
             assert connection.scalar(text("SELECT name FROM subjects WHERE id=1")) == "Legacy"
         inspector = inspect(engine)
         for table in ("tasks", "events", "study_sessions", "projects", "inbox_items"):
@@ -141,6 +141,17 @@ def run():
         request("PUT", "/weekly-reviews/2026-09-22", review, 422)
         request("PUT", "/weekly-reviews/2026-09-21", {"priorities": ["Only one"]}, 422)
 
+        water_date = date.today().isoformat()
+        assert request("GET", f"/daily-entries?start={water_date}&end={water_date}") == []
+        daily_entry = request("PUT", f"/daily-entries/{water_date}", {})
+        assert daily_entry["water_ml"] == 0
+        assert request("PATCH", f"/daily-entries/{water_date}", {"water_ml": 250})["water_ml"] == 250
+        assert request("GET", f"/daily-entries/{water_date}")["water_ml"] == 250
+        assert request("PATCH", f"/daily-entries/{water_date}", {"water_ml": 1000})["water_ml"] == 1000
+        partial_upsert = request("PUT", f"/daily-entries/{water_date}", {"water_ml": 1250})
+        assert partial_upsert["water_ml"] == 1250 and partial_upsert["mood"] == ""
+        request("PATCH", f"/daily-entries/{water_date}", {"water_ml": -1}, 422)
+
         # Integrity: linked Subject is canonical even for legacy divergent text.
         request("PATCH", f'/subjects/{subjects[1]["id"]}', {"name": "Python renomeada"})
         study_id = converted["study"]["id"]
@@ -170,6 +181,10 @@ def run():
         # A new client/session sees all committed receipts (reload persistence).
         assert len(request("GET", "/inbox")) == 9
         current[0] = users[1]
+        assert request("GET", f"/daily-entries?start={water_date}&end={water_date}") == []
+        request("PATCH", f"/daily-entries/{water_date}", {"water_ml": 500}, 404)
+        request("GET", f"/daily-entries/{water_date}", status=404)
+        assert request("PUT", f"/daily-entries/{water_date}", {"water_ml": 500})["water_ml"] == 500
         assert request("GET", "/weekly-reviews/2026-09-21")["reflection"] == ""
         request("PUT", "/weekly-reviews/2026-09-21", {"priorities": ["B private", "", ""]})
 
@@ -184,6 +199,7 @@ def run():
         request("PATCH", f'/inbox/{own["id"]}', {"optional_subject_id": subjects[0]["id"]}, 404)
         request("DELETE", f'/inbox/{own["id"]}', status=204)
         current[0] = users[0]
+        assert request("GET", f"/daily-entries/{water_date}")["water_ml"] == 1250
         assert request("GET", "/weekly-reviews/2026-09-21")["reflection"] == review["reflection"]
         request("DELETE", f'/subjects/{subjects[1]["id"]}', status=204)
         assert request("GET", "/tasks")[0]["subject_id"] is None

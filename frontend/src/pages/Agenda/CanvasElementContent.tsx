@@ -5,7 +5,7 @@ import type { PlannerTask } from './editorModel'
 import { DailyPlanner, KoreanStudyPlanner, TaskReceipt } from './PlannerWidgets'
 import { TemplateBackground } from './TemplateBackground'
 import { SectionTemplateContent } from './SectionTemplates'
-export function CanvasElementContent({ element, editing, onTextBlur, onTextInput, onSelect, onDataChange, onDuplicateSection, tasks, onToggleTask }: {
+export function CanvasElementContent({ element, editing, onTextBlur, onTextInput, onSelect, onDataChange, onDuplicateSection, tasks, onToggleTask, weekStart, onWeeklyWeekChange }: {
   element: CanvasElementFromApi
   editing?: boolean
   onDuplicateSection?: (title: string, text: string) => void
@@ -15,6 +15,8 @@ export function CanvasElementContent({ element, editing, onTextBlur, onTextInput
   onDataChange: (element: CanvasElementFromApi, data: Record<string, unknown>) => void
   tasks: PlannerTask[]
   onToggleTask: (id: number, done: boolean) => void
+  weekStart?: string
+  onWeeklyWeekChange?: (weekStart: string) => Promise<void>
 }) {
     const textRef = useRef<HTMLTextAreaElement>(null)
     useLayoutEffect(() => {
@@ -24,7 +26,7 @@ export function CanvasElementContent({ element, editing, onTextBlur, onTextInput
       const spreadSide = element.data.spreadSide === 'left' || element.data.spreadSide === 'right'
         ? element.data.spreadSide
         : undefined
-      return <TemplateBackground templateId={element.element_type.slice('template:'.length)} spreadSide={spreadSide} data={element.data} onChange={data => onDataChange(element, data)} onDuplicateSection={onDuplicateSection} />
+      return <TemplateBackground templateId={element.element_type.slice('template:'.length)} spreadSide={spreadSide} data={element.data} onChange={data => onDataChange(element, data)} onDuplicateSection={onDuplicateSection} weekStart={weekStart} onWeeklyWeekChange={onWeeklyWeekChange} />
     }
     if (['section:habit-tracker', 'section:mini-calendar', 'section:notes-block', 'section:goal-block', 'section:priorities-block', 'section:checklist-block', 'section:quote-block', 'section:time-blocking'].includes(element.element_type)) {
       return <SectionTemplateContent element={element} onDataChange={data => onDataChange(element, data)} />
@@ -419,4 +421,3 @@ export function CanvasElementContent({ element, editing, onTextBlur, onTextInput
       </div>
     )
   }
-

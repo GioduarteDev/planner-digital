@@ -7,7 +7,10 @@ import { join, resolve, extname } from 'node:path'
 import { spawn } from 'node:child_process'
 
 const key = new Date().toLocaleDateString('en-CA')
-let settings = { matcha_profile: { favoriteColor: '#9CA362' } }
+let settings = {
+  matcha_profile: { favoriteColor: '#9CA362' },
+  today_v2: { [key]: { waterMl: 750 } },
+}
 let dailyEntry = null
 const tasks = [{ id: 1, page_id: 1, text: 'Cuidar das plantas', due_date: key, done: false }]
 const events = [{ id: 1, title: 'Café com amiga', starts_at: new Date(Date.now() + 86400000).toISOString() }]
@@ -94,6 +97,9 @@ try {
   await until(() => evaluate('document.querySelector(".today-weather-reading")?.textContent.includes("24°") && !document.querySelector(".today-weather-error")'), 'Weather did not recover after error')
   await evaluate('document.querySelector(".today-receipt-lines input").click()')
   await until(() => tasks[0].done, 'Task completion did not reach backend')
+  await until(() => evaluate('document.querySelector(".today-water-value")?.textContent.includes("0 / 2000 ml")'), 'Legacy hydration settings overrode DailyEntry')
+  await evaluate('document.querySelector(".today-water-actions button:last-child").click()')
+  await until(() => dailyEntry?.water_ml === 250, 'Hydration did not persist to daily entry')
   await evaluate('document.querySelector(".today-mood button").click()')
   await until(() => dailyEntry?.mood === 'calm', 'Mood did not persist in daily entry')
   assert.equal(settings.matcha_profile.favoriteColor, '#9CA362')
@@ -110,6 +116,7 @@ try {
   assert(await evaluate('document.querySelector(".today-polaroid img")?.alt === "Foto do dia"'))
   await cdp('Page.reload')
   await until(() => evaluate('document.querySelector(".today-mood button")?.classList.contains("is-selected")'), 'Mood did not survive reload')
+  await until(() => evaluate('document.querySelector(".today-water-value")?.textContent.includes("250 / 2000 ml")'), 'Hydration did not survive reload')
   assert.equal(await evaluate('document.querySelector(".today-quote p").textContent'), quote)
   await cdp('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
   await delay(300)
@@ -120,5 +127,5 @@ try {
   await writeFile('test-results/today-tablet.png', Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' })).data, 'base64'))
   assert(await evaluate('document.documentElement.scrollWidth <= innerWidth + 2'), 'Today overflows tablet width')
   assert.deepEqual(errors, [])
-  console.log('PASS: real greeting, tasks, events, studies, task PATCH, weather city and errors, denied geolocation, daily-entry persistence, profile settings preservation, quote stability, mobile width; no runtime exceptions.')
+  console.log('PASS: real greeting, tasks, events, studies, task PATCH, weather city and errors, denied geolocation, daily-entry mood and hydration persistence, legacy hydration settings ignored, profile settings preservation, quote stability, mobile width; no runtime exceptions.')
 } finally { socket?.close(); browser.kill(); server.close() }

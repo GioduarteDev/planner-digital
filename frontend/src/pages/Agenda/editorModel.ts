@@ -60,6 +60,7 @@ export type DrawingDraft = Omit<DrawingStroke, 'id'>
 export type CanvasElementDragState = {
   elementId: number
   pointerId: number
+  before: CanvasElementFromApi
   startClientX: number
   startClientY: number
   startX: number
@@ -73,6 +74,7 @@ export type CanvasElementDragState = {
 export type CanvasElementResizeState = {
   elementId: number
   pointerId: number
+  before: CanvasElementFromApi
   startClientX: number
   startClientY: number
   maxWidth: number
@@ -282,6 +284,7 @@ export type CanvasElementFromApi = {
   id: number
   user_id: number
   page_id: number | null
+  asset_url?: string | null
   surface_type: string
   surface_key: string
   element_type: string
@@ -338,6 +341,7 @@ export type MediaPatch = {
 export type MediaDragState = {
   mediaId: number
   pointerId: number
+  before: PlannerMedia
   startClientX: number
   startClientY: number
   startX: number
@@ -350,6 +354,7 @@ export type MediaDragState = {
 export type MediaResizeState = {
   mediaId: number
   pointerId: number
+  before: PlannerMedia
   startClientX: number
   startClientY: number
   startWidth: number
@@ -362,6 +367,7 @@ export type MediaResizeState = {
 export type MediaRotateState = {
   mediaId: number
   pointerId: number
+  before: PlannerMedia
   centerX: number
   centerY: number
   startPointerAngle: number
@@ -649,4 +655,3 @@ export const DEFAULT_PAPER_SETTINGS: PaperSettings = {
   customWidth: 820,
   customHeight: 1160,
 }
-

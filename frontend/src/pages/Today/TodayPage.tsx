@@ -16,6 +16,7 @@ import {
   LibraryBig,
   Moon,
   Music2,
+  Droplets,
   Pencil,
   PencilLine,
   Smile,
@@ -2328,6 +2329,21 @@ function TodayPage() {
                       )}
                     </div>
                   </div>
+
+                  <section className="today-water" aria-label="Hidratação do dia">
+                    <header>
+                      <div><Droplets size={18} aria-hidden="true" /><h3>Hidratação</h3></div>
+                      <span>META VISUAL · 2000 ml</span>
+                    </header>
+                    <p className="today-water-value" aria-live="polite">{moment.waterMl} / 2000 ml</p>
+                    <div className="today-water-marks" aria-hidden="true">
+                      {Array.from({ length: 8 }, (_, index) => <i className={moment.waterMl >= (index + 1) * 250 ? 'is-filled' : ''} key={index} />)}
+                    </div>
+                    <div className="today-water-actions">
+                      <button type="button" aria-label={`Remover 250 ml de ${selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}`} disabled={loading || moment.waterMl < 250} onClick={() => updateMoment({ waterMl: Math.max(0, moment.waterMl - 250) })}>−250 ml</button>
+                      <button type="button" aria-label={`Adicionar 250 ml em ${selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}`} disabled={loading} onClick={() => updateMoment({ waterMl: moment.waterMl + 250 })}>+250 ml</button>
+                    </div>
+                  </section>
 
                   <div className="today-current-grid">
                     <div className="today-current-section">

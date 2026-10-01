@@ -41,6 +41,7 @@ export type Media = {
 
 export type Moment = {
   mood: string
+  waterMl: number
   music: string
   artist: string
   album: string
@@ -52,6 +53,7 @@ export type Moment = {
 }
 
 type DailyEntry = {
+  water_ml: number
   mood: string
   quick_note: string
   music_data: Record<string, unknown>
@@ -90,6 +92,7 @@ export type HabitCreate = {
 
 export const emptyMoment: Moment = {
   mood: '',
+  waterMl: 0,
   music: '',
   artist: '',
   album: '',
@@ -468,6 +471,7 @@ export function readMoment(
   return {
     ...emptyMoment,
     ...(record as Partial<Moment>),
+    waterMl: 0,
   }
 }
 
@@ -477,6 +481,13 @@ function momentFromEntry(
   return {
     mood:
       entry.mood,
+
+    waterMl:
+      typeof entry.water_ml === 'number'
+        && Number.isSafeInteger(entry.water_ml)
+        && entry.water_ml >= 0
+        ? entry.water_ml
+        : 0,
 
     note:
       entry.quick_note,
@@ -597,6 +608,9 @@ export function saveMoment(
                   {
                     mood:
                       moment.mood,
+
+                    water_ml:
+                      moment.waterMl,
 
                     quick_note:
                       moment.note,

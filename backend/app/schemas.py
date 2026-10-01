@@ -397,6 +397,7 @@ class DailyEntryUpsert(BaseModel):
     music_data: BoundedJsonDict = Field(default_factory=dict)
     reading_data: BoundedJsonDict = Field(default_factory=dict)
     watching_data: BoundedJsonDict = Field(default_factory=dict)
+    water_ml: int = Field(default=0, ge=0)
     photo_media_id: int | None = Field(default=None, gt=0)
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -408,6 +409,7 @@ class DailyEntryUpdate(BaseModel):
     music_data: BoundedJsonDict | None = None
     reading_data: BoundedJsonDict | None = None
     watching_data: BoundedJsonDict | None = None
+    water_ml: int | None = Field(default=None, ge=0)
     photo_media_id: int | None = Field(default=None, gt=0)
 
     model_config = ConfigDict(str_strip_whitespace=True)
@@ -420,6 +422,7 @@ class DailyEntryUpdate(BaseModel):
             "music_data",
             "reading_data",
             "watching_data",
+            "water_ml",
         )
         if any(
             field in self.model_fields_set and getattr(self, field) is None
@@ -438,6 +441,7 @@ class DailyEntryResponse(BaseModel):
     music_data: dict[str, Any]
     reading_data: dict[str, Any]
     watching_data: dict[str, Any]
+    water_ml: int
     photo_media_id: int | None
     created_at: datetime
     updated_at: datetime | None = None

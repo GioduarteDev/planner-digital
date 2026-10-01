@@ -571,6 +571,7 @@ def export_user_data(
                     "music_data",
                     "reading_data",
                     "watching_data",
+                    "water_ml",
                     "photo_media_id",
                     "created_at",
                     "updated_at",

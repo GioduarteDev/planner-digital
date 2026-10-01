@@ -437,3 +437,5 @@
     opacity: 1;
   }
 }
+/* Shared DailyEntry hydration control */
+.today-water{margin:16px 0 8px;padding:15px 17px;border:1px solid #e3e5d7;border-radius:12px;background:#f5f5eb}.today-water>header,.today-water>header>div,.today-water-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}.today-water>header>div{justify-content:flex-start;color:#687b68}.today-water h3{margin:0;font:italic 17px Georgia,serif}.today-water>header>span{color:#8a8b7d;font-size:9px;font-weight:700;letter-spacing:.1em}.today-water-value{margin:10px 0 6px;color:#586d62;font:italic 22px Georgia,serif;font-variant-numeric:tabular-nums}.today-water-marks{display:flex;gap:5px}.today-water-marks i{height:11px;flex:1;border:1px solid #c8d1c5;border-radius:50% 50% 4px 4px}.today-water-marks i.is-filled{border-color:#9db8b1;background:#b9d4cb}.today-water-actions{justify-content:flex-start;margin-top:11px}.today-water-actions button{border:1px solid #d4dacb;border-radius:7px;padding:7px 10px;background:#fffdf9;color:#60705f;font-size:11px;cursor:pointer}.today-water-actions button:disabled{opacity:.45;cursor:not-allowed}

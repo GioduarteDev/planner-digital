@@ -35,7 +35,7 @@ def verify_backup_v3(engine, request, current):
             task = save(m.Task, user_id=uid, page_id=page.id, subject_id=subject.id, project_id=project.id, category_id=category.id, text='Conclusão', done=True, completed_at=now)
             event = save(m.Event, user_id=uid, subject_id=subject.id, project_id=project.id, category_id=category.id, title='Avaliação', starts_at=now, reminder_minutes=15)
             save(m.StudySession, user_id=uid, subject_id=subject.id, project_id=project.id, subject='Álgebra', study_date=today, duration_minutes=45)
-            save(m.DailyEntry, user_id=uid, entry_date=today, quick_note='Ótimo!', photo_media_id=media.id)
+            save(m.DailyEntry, user_id=uid, entry_date=today, quick_note='Ótimo!', water_ml=1250, photo_media_id=media.id)
             habit = save(m.Habit, user_id=uid, name='Ler', days_of_week=[0, 2], time_of_day=time(9, 30))
             save(m.HabitCompletion, habit_id=habit.id, completion_date=today)
             save(m.InboxItem, user_id=uid, text='Capturação', subject_id=subject.id, status='processed', processed_at=now, converted_type='task', converted_id=task.id)
@@ -97,6 +97,7 @@ def verify_backup_v3(engine, request, current):
             assert payload['inbox_items'][0]['processed_at']
             assert any(r['habit_id'] == habit.id for r in payload['reminders'])
             assert payload['daily_entries'][0]['photo_media_id'] == media.id
+            assert payload['daily_entries'][0]['water_ml'] == 1250
             assert payload['media_library'][0]['file_url'] == media.file_url
             snapshots.append(payload)
     for key in collections:

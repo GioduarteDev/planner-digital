@@ -2,10 +2,27 @@
 
 .editor-workspace-v6 {
   min-height: calc(100vh - 68px);
-  background: var(--latte);
+  background: var(--agenda-backdrop);
   color: var(--editor-ink);
   padding: 28px 80px 72px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] {
+  --wisteria: #3b3d51;
+  --latte: #171d1e;
+  --agenda-backdrop: #171d1e;
+  --editor-ink: #e5e0d8;
+  --editor-muted: #b3aaa1;
+  --editor-surface: #232b2c;
+  --editor-border: #414b4b;
+  --editor-binding: #323c3c;
+  --editor-focus: #d5c58e;
+  --editor-shadow: rgb(0 0 0 / 32%);
+  --editor-handle: rgb(35 43 44 / 88%);
+  color-scheme: dark;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .planner-sheet {
+  color: var(--editor-ink);
 }
 .workspace-view-controls { display: flex; align-items: center; justify-content: space-between; gap: 24px; max-width: 1800px; margin: 0 auto 28px; }
 .workspace-eyebrow { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--editor-muted); }
@@ -14,6 +31,8 @@
 .editor-workspace-v6 button { transition: background-color 140ms ease, color 140ms ease; }
 .workspace-mode-switch button { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 0; border-radius: 8px; color: var(--editor-muted); background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
 .workspace-mode-switch button[aria-pressed='true'] { background: var(--wisteria); color: var(--editor-ink); }
+.workspace-settings-error { max-width: 1800px; margin: -16px auto 20px; color: #a03434; font-size: 12px; }
+.editor-workspace-v6[data-agenda-theme='dark'] .workspace-settings-error { color: #ffb4ab; }
 .workspace-book { display: flex; align-items: flex-start; justify-content: safe center; gap: 12px; overflow-x: auto; padding: 0 4px 32px; }
 .editor-workspace-v6 .agenda-workspace { min-height: 0; overflow: visible; background: transparent; flex: 0 0 auto; }
 .editor-workspace-v6 .minimal-editor { min-height: 0; padding: 0; }
@@ -33,6 +52,30 @@
 .editor-workspace-v6 .tool-rail-button:hover, .editor-workspace-v6 .tool-rail-button.active { background: var(--wisteria); color: var(--editor-ink); }
 .editor-workspace-v6 .editor-tool-drawer { position: fixed; top: 146px; right: 76px; bottom: 28px; width: min(340px, calc(100vw - 98px)); background: var(--editor-surface); border: 1px solid var(--editor-border); border-radius: 18px; box-shadow: 0 10px 30px var(--editor-shadow); z-index: 90; }
 .editor-workspace-v6 .agenda-navigation-drawer { background: var(--editor-surface); border-right: 1px solid var(--editor-border); box-shadow: 6px 0 30px var(--editor-shadow); }
+.editor-workspace-v6[data-agenda-theme='dark'] :is(.editor-tool-drawer, .agenda-navigation-drawer, .workspace-mode-switch, .workspace-page-turner button, .workspace-page-turner select, .template-section-picker) {
+  color: var(--editor-ink);
+  background-color: var(--editor-surface);
+  border-color: var(--editor-border);
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .template-section-picker button {
+  color: var(--editor-ink);
+  background: #303a3a;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] :is(input, textarea, select) {
+  color-scheme: dark;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .planner-template-base {
+  color: var(--editor-ink);
+  background-color: #202829;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .planner-template-base .tpl-box {
+  color: var(--editor-ink);
+  border-color: #485352;
+  background-color: #293333;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .planner-template-base :is(.tpl-lines i, .tpl-korean-table i, .tpl-hour-grid i) {
+  background-color: #485352;
+}
 .editor-workspace-v6 .drawer-header h2, .editor-workspace-v6 .tool-drawer-header h3 { font-family: Georgia, serif; font-weight: 400; }
 .editor-workspace-v6 .is-unfocused .editor-tool-rail,
 .editor-workspace-v6 .is-unfocused .editor-tool-drawer,
@@ -73,4 +116,439 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .editor-workspace-v6 *, .editor-workspace-v6 *::before, .editor-workspace-v6 *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+.editor-history-controls {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  margin-left: auto;
+}
+.editor-history-controls button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--editor-border);
+  border-radius: 9px;
+  color: var(--editor-ink);
+  background: var(--editor-surface);
+  cursor: pointer;
+}
+.editor-history-controls button:disabled { opacity: .4; cursor: not-allowed; }
+.editor-history-controls button:focus-visible,
+.preview-exit-button:focus-visible { outline: 2px solid var(--editor-focus); outline-offset: 3px; }
+.preview-exit-button {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  z-index: 150;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 11px;
+  border: 1px solid var(--editor-border);
+  border-radius: 10px;
+  color: var(--editor-ink);
+  background: var(--editor-surface);
+  box-shadow: 0 4px 14px var(--editor-shadow);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.editor-workspace-v6.is-preview .workspace-view-controls,
+.editor-workspace-v6.is-preview .workspace-settings-error,
+.editor-workspace-v6.is-preview .workspace-menu-button,
+.editor-workspace-v6.is-preview .agenda-navigation-drawer,
+.editor-workspace-v6.is-preview .workspace-drawer-backdrop,
+.editor-workspace-v6.is-preview .editor-tool-rail,
+.editor-workspace-v6.is-preview .editor-tool-drawer,
+.editor-workspace-v6.is-preview .template-section-menu,
+.editor-workspace-v6.is-preview .minimal-editor-header,
+.editor-workspace-v6.is-preview .workspace-floating-error,
+.editor-workspace-v6.is-preview .canvas-element-toolbar,
+.editor-workspace-v6.is-preview .canvas-element-resize-handle,
+.editor-workspace-v6.is-preview .canvas-move-handle,
+.editor-workspace-v6.is-preview .media-layer-controls,
+.editor-workspace-v6.is-preview .media-lock-button,
+.editor-workspace-v6.is-preview .media-duplicate-button,
+.editor-workspace-v6.is-preview .media-delete-button,
+.editor-workspace-v6.is-preview .media-rotate-handle,
+.editor-workspace-v6.is-preview .media-resize-handle,
+.editor-workspace-v6.is-preview .active-drawing-pill,
+.editor-workspace-v6.is-preview .workspace-page-turner select,
+.editor-workspace-v6.is-preview .page-tab-add,
+.editor-workspace-v6.is-preview .page-tab-manage,
+.editor-workspace-v6.is-preview .page-tabs-panel {
+  display: none !important;
+}
+.editor-workspace-v6.is-preview .planner-sheet.is-preview :is(.free-canvas-element, .media-canvas-item) {
+  cursor: default;
+}
+.editor-workspace-v6.is-preview .planner-sheet.is-preview :is(.free-canvas-element.is-selected, .media-canvas-item.is-selected) {
+  border-color: transparent;
+  box-shadow: none;
+}
+.editor-workspace-v6.is-preview .workspace-page-turner { padding-top: 12px; }
+@media (max-width: 760px) {
+  .editor-history-controls { margin-left: 0; }
+  .preview-exit-button { top: 10px; right: 10px; }
+}
+
+/* Stage 5: scrapbook workspace surfaces and compact page navigation. */
+.editor-workspace-v6 {
+  --latte: #EADCCB;
+  --agenda-backdrop: #DAE9C2;
+  --editor-ink: #4B3B32;
+  --editor-muted: #746459;
+  --editor-surface: #FFF7E8;
+  --editor-border: #D5D2CC;
+  --editor-binding: #D5C8B9;
+  --editor-focus: #6F8F8F;
+  --editor-shadow: rgb(75 59 50 / 12%);
+  --editor-handle: rgb(255 247 232 / 94%);
+  position: relative;
+  min-height: calc(100vh - 68px);
+  padding: 18px clamp(24px, 4vw, 64px) 36px;
+  background: var(--agenda-backdrop);
+  color: var(--editor-ink);
+  font-family: "Segoe UI", Tahoma, sans-serif;
+}
+.editor-workspace-v6::before,
+.editor-workspace-v6::after {
+  content: "";
+  position: fixed;
+  z-index: 0;
+  width: 11px;
+  height: 11px;
+  clip-path: polygon(50% 0, 59% 41%, 100% 50%, 59% 59%, 50% 100%, 41% 59%, 0 50%, 41% 41%);
+  background: #B57B7F;
+  opacity: .38;
+  pointer-events: none;
+}
+.editor-workspace-v6::before {
+  top: 27%;
+  left: 3.2%;
+  box-shadow: 0 205px 0 -2px #8CA58C, 0 410px 0 -1px #AFC4E8;
+}
+.editor-workspace-v6::after {
+  top: 34%;
+  right: 3%;
+  width: 9px;
+  height: 9px;
+  background: #6F8F8F;
+  box-shadow: 0 180px 0 -1px #B57B7F, 0 365px 0 -2px #8CA58C;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] {
+  --latte: #121212;
+  --agenda-backdrop: #121212;
+  --editor-ink: #EDE7DD;
+  --editor-muted: #B9B0A5;
+  --editor-surface: #1B1B1D;
+  --editor-border: #3A3939;
+  --editor-binding: #29292B;
+  --editor-focus: #AFC4E8;
+  --editor-shadow: rgb(0 0 0 / 38%);
+  --editor-handle: rgb(27 27 29 / 94%);
+  background:
+    radial-gradient(ellipse at 50% 42%, rgb(91 68 97 / 13%), transparent 58%),
+    radial-gradient(ellipse at 50% 78%, rgb(111 143 143 / 8%), transparent 58%),
+    var(--agenda-backdrop);
+  color-scheme: dark;
+}
+.editor-workspace-v6[data-agenda-theme='dark']::before,
+.editor-workspace-v6[data-agenda-theme='dark']::after {
+  opacity: .34;
+}
+.workspace-view-controls,
+.workspace-book-stage,
+.workspace-page-turner {
+  position: relative;
+  z-index: 1;
+}
+.workspace-view-controls {
+  max-width: 1800px;
+  margin-bottom: 14px;
+}
+.workspace-eyebrow {
+  color: var(--editor-muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .19em;
+}
+.workspace-view-controls h1 {
+  margin-top: 4px;
+  color: var(--editor-ink);
+  font: 400 clamp(19px, 1.8vw, 25px)/1.15 Georgia, serif;
+}
+.workspace-mode-switch {
+  gap: 2px;
+  padding: 3px;
+  border-color: rgb(107 79 63 / 12%);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--editor-surface) 94%, transparent);
+  box-shadow: 0 4px 14px var(--editor-shadow);
+}
+.workspace-mode-switch button {
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+.workspace-mode-switch button[aria-pressed='true'] {
+  background: #E7E2D8;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .workspace-mode-switch button[aria-pressed='true'] {
+  background: #343137;
+}
+.workspace-book-stage {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+}
+.workspace-book {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  gap: 0;
+  padding: 0 2px 20px;
+  scrollbar-color: #A89787 transparent;
+}
+.workspace-companion {
+  margin-left: 0;
+}
+.mode-spread .agenda-workspace:first-child .planner-sheet {
+  border-right: 0;
+  border-radius: 7px 0 0 7px;
+}
+.mode-spread .workspace-companion .planner-sheet {
+  border-left: 0;
+  border-radius: 0 7px 7px 0;
+}
+.mode-spread .workspace-book::after {
+  content: "";
+  position: absolute;
+  z-index: 45;
+  top: 28px;
+  bottom: 20px;
+  left: 50%;
+  width: 17px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, rgb(53 42 33 / 12%), rgb(255 255 255 / 22%) 45%, rgb(53 42 33 / 9%));
+  pointer-events: none;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .mode-spread .workspace-book::after {
+  background: linear-gradient(90deg, rgb(0 0 0 / 35%), rgb(237 231 221 / 5%) 50%, rgb(0 0 0 / 28%));
+}
+.editor-workspace-v6.mode-spread:has(.template-weekly-open-journal) .binding-rings {
+  display: none;
+}
+.book-page-arrow {
+  position: absolute;
+  z-index: 120;
+  top: 50%;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 1px solid var(--editor-border);
+  border-radius: 50%;
+  color: var(--editor-ink);
+  background: color-mix(in srgb, var(--editor-surface) 92%, transparent);
+  box-shadow: 0 5px 16px var(--editor-shadow);
+  cursor: pointer;
+}
+.book-page-arrow-previous { left: 0; }
+.book-page-arrow-next { right: 0; }
+.book-page-arrow:disabled {
+  opacity: .32;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.book-page-arrow:focus-visible {
+  outline: 2px solid var(--editor-focus);
+  outline-offset: 3px;
+}
+.workspace-page-turner {
+  gap: 12px;
+  margin-top: 0;
+  padding: 4px 0 0;
+  color: var(--editor-muted);
+  font-size: 11px;
+}
+.workspace-page-turner select {
+  padding: 7px 9px;
+  border-radius: 10px;
+  color: var(--editor-ink);
+  background: var(--editor-surface);
+}
+.editor-workspace-v6 .planner-sheet {
+  border-color: rgb(107 79 63 / 17%);
+  background-color: #F7F1E7;
+  box-shadow: 0 2px 5px rgb(75 59 50 / 5%), 0 18px 42px rgb(75 59 50 / 13%);
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .planner-sheet {
+  border-color: #333335;
+  background-color: #1B1B1D;
+  color: #EDE7DD;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 24%), 0 20px 46px rgb(0 0 0 / 37%);
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .planner-template-base {
+  color: #EDE7DD;
+  background-color: #1B1B1D;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] :is(.editor-tool-drawer, .agenda-navigation-drawer, .workspace-mode-switch, .workspace-page-turner select, .template-section-picker) {
+  color: var(--editor-ink);
+  background-color: var(--editor-surface);
+  border-color: var(--editor-border);
+}
+.editor-workspace-v6[data-agenda-theme='dark'] :is(input, textarea, select)::placeholder {
+  color: #AFA69B;
+  opacity: 1;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] :is(button, input, textarea, select):focus-visible {
+  outline-color: #AFC4E8;
+}
+.editor-workspace-v6 .editor-tool-rail {
+  top: 112px;
+  right: 14px;
+  gap: 3px;
+  padding: 6px;
+  border-color: rgb(107 79 63 / 13%);
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--editor-surface) 96%, transparent);
+  box-shadow: 0 8px 24px var(--editor-shadow);
+}
+.editor-workspace-v6 .tool-rail-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  color: #4B3B32;
+  transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+.editor-workspace-v6 .tool-rail-button[data-tool='preview'],
+.editor-workspace-v6 .tool-rail-button[data-tool='text'],
+.editor-workspace-v6 .tool-rail-button[data-tool='photos'] { background: #A7BBD84D; }
+.editor-workspace-v6 .tool-rail-button[data-tool='pen'],
+.editor-workspace-v6 .tool-rail-button[data-tool='tasks'] { background: #9BB69566; }
+.editor-workspace-v6 .tool-rail-button[data-tool='highlighter'],
+.editor-workspace-v6 .tool-rail-button[data-tool='templates'] { background: #F6E3A766; }
+.editor-workspace-v6 .tool-rail-button[data-tool='stickers'] { background: #E7B5B866; }
+.editor-workspace-v6 .tool-rail-button[data-tool='elements'] { background: #C9C4D966; }
+.editor-workspace-v6 .tool-rail-button[data-tool='paper'] { background: #FAD8C566; }
+.editor-workspace-v6 .tool-rail-button[data-tool='more'] { background: #EADCCB99; }
+.editor-workspace-v6 .tool-rail-button:hover,
+.editor-workspace-v6 .tool-rail-button.active {
+  border-color: rgb(75 59 50 / 20%);
+  color: #30261F;
+  box-shadow: inset 0 0 0 1px rgb(75 59 50 / 8%);
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .tool-rail-button {
+  color: #EDE7DD;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .tool-rail-button[data-tool='preview'],
+.editor-workspace-v6[data-agenda-theme='dark'] .tool-rail-button[data-tool='text'],
+.editor-workspace-v6[data-agenda-theme='dark'] .tool-rail-button[data-tool='photos'] { background: #A7BBD82B; }
+.editor-workspace-v6[data-agenda-theme='dark'] .tool-rail-button[data-tool='pen'],
+.editor-workspace-v6[data-agenda-theme='dark'] .tool-rail-button[data-tool='tasks'] { background: #9BB69530; }
+.editor-workspace-v6[data-agenda-theme='dark'] .tool-rail-button[data-tool='highlighter'],
+.editor-workspace-v6[data-agenda-theme='dark'] .tool-rail-button[data-tool='templates'] { background: #DCC37A30; }
+.editor-workspace-v6[data-agenda-theme='dark'] .tool-rail-button[data-tool='stickers'] { background: #B57B7F38; }
+.editor-workspace-v6[data-agenda-theme='dark'] .tool-rail-button[data-tool='elements'] { background: #C9C4D938; }
+.editor-workspace-v6[data-agenda-theme='dark'] .tool-rail-button[data-tool='paper'] { background: #FAD8C52B; }
+.editor-workspace-v6[data-agenda-theme='dark'] .tool-rail-button[data-tool='more'] { background: #EDE7DD20; }
+.editor-workspace-v6 .editor-tool-drawer {
+  right: 64px;
+  width: min(320px, calc(100vw - 84px));
+  border-radius: 16px;
+  box-shadow: 0 12px 36px var(--editor-shadow);
+}
+.editor-workspace-v6 .editor-history-controls button {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+}
+.editor-workspace-v6 .free-canvas-element.is-selected,
+.editor-workspace-v6 .media-canvas-item.is-selected {
+  border: 2px solid #6F8F8F;
+  box-shadow: 0 0 0 2px #F7F1E7, 0 0 0 4px #6F8F8F;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .free-canvas-element.is-selected,
+.editor-workspace-v6[data-agenda-theme='dark'] .media-canvas-item.is-selected {
+  border-color: #AFC4E8;
+  box-shadow: 0 0 0 2px #1B1B1D, 0 0 0 4px #AFC4E8;
+}
+.editor-workspace-v6.is-preview .workspace-book::after {
+  opacity: .78;
+}
+@media (max-width: 1023px) {
+  .editor-workspace-v6 {
+    padding-inline: clamp(14px, 3vw, 28px);
+  }
+  .editor-workspace-v6.mode-spread.is-compact .workspace-companion {
+    display: contents;
+  }
+  .editor-workspace-v6.mode-spread.is-compact .agenda-workspace.is-unfocused {
+    display: none;
+  }
+  .editor-workspace-v6.mode-spread.is-compact .workspace-book::after {
+    display: none;
+  }
+  .editor-workspace-v6.mode-spread.is-compact .book-page-arrow {
+    top: auto;
+    bottom: 8px;
+    transform: none;
+  }
+  .editor-workspace-v6.mode-spread.is-compact .book-page-arrow-previous { left: 8px; }
+  .editor-workspace-v6.mode-spread.is-compact .book-page-arrow-next { right: 8px; }
+}
+@media (max-width: 900px) {
+  .editor-workspace-v6 .editor-tool-rail {
+    top: auto;
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    z-index: 132;
+    flex-direction: row;
+    justify-content: flex-start;
+    overflow-x: auto;
+    border-radius: 15px;
+    scrollbar-width: none;
+  }
+  .editor-workspace-v6 .editor-tool-rail::-webkit-scrollbar { display: none; }
+  .editor-workspace-v6 .tool-rail-button { flex: 0 0 36px; }
+  .editor-workspace-v6 .editor-tool-drawer {
+    top: auto;
+    right: 10px;
+    bottom: 60px;
+    left: 10px;
+    width: auto;
+    max-height: min(68vh, 560px);
+  }
+  .editor-workspace-v6 .tool-drawer-content { max-height: calc(min(68vh, 560px) - 72px); }
+}
+@media (max-width: 600px) {
+  .editor-workspace-v6 {
+    padding: 12px 8px 82px;
+  }
+  .workspace-view-controls {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding-inline: 42px 4px;
+  }
+  .workspace-view-controls h1 { font-size: 20px; }
+  .workspace-mode-switch { max-width: 100%; }
+  .workspace-mode-switch button { gap: 5px; padding-inline: 8px; font-size: 10px; }
+  .workspace-book { padding-bottom: 16px; }
+  .workspace-page-turner { padding-top: 2px; }
+  .editor-workspace-v6.is-preview .workspace-book { padding-bottom: 46px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .editor-workspace-v6 .tool-rail-button,
+  .editor-workspace-v6 .workspace-mode-switch button,
+  .editor-workspace-v6 .book-page-arrow { transition: none; }
 }

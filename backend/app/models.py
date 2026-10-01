@@ -579,6 +579,7 @@ class DailyEntry(Base):
     music_data: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     reading_data: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     watching_data: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    water_ml: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     photo_media_id: Mapped[int | None] = mapped_column(
         ForeignKey("media_library_items.id", ondelete="SET NULL"), nullable=True, index=True
     )

@@ -6,6 +6,8 @@ import { getBuiltInTemplate } from './templateCatalog'
 import './TemplateBackground.css'
 import './TemplateReferences.css'
 import './TemplateReferences2.css'
+import './WeeklyOpenJournal.css'
+import { WeeklyOpenJournal } from './WeeklyOpenJournal'
 
 const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 const Lines = ({ count = 4 }: { count?: number }) => <div className="tpl-lines">{Array.from({ length: count }, (_, index) => <i key={index} />)}</div>
@@ -18,10 +20,12 @@ function getLocalDateKey(date: Date) {
 }
 
 
-export function TemplateBackground({ templateId, spreadSide, data = {}, onChange, onDuplicateSection }: {
+export function TemplateBackground({ templateId, spreadSide, data = {}, onChange, onDuplicateSection, weekStart, onWeeklyWeekChange }: {
   templateId: string; spreadSide?: 'left' | 'right'; data?: Record<string, unknown>
   onChange?: (data: Record<string, unknown>) => void
   onDuplicateSection?: (title: string, text: string) => void
+  weekStart?: string
+  onWeeklyWeekChange?: (weekStart: string) => Promise<void>
 }) {
   const latest = useRef(data)
   useLayoutEffect(() => { latest.current = data }, [data])
@@ -39,15 +43,17 @@ export function TemplateBackground({ templateId, spreadSide, data = {}, onChange
   const currentYear = now.getFullYear()
   const startOfWeek = new Date(now)
   startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7))
+  const defaultWeekStart = getLocalDateKey(startOfWeek)
   const weekDates = days.map((_, index) => {
     const date = new Date(startOfWeek)
     date.setDate(startOfWeek.getDate() + index)
     return date.getDate()
   })
   return <TemplateEditingContext.Provider value={onChange ? { data, update, duplicate: onDuplicateSection } : null}><div className={`planner-template-base template-${layout}`} style={{ '--template-accent': template.accent } as CSSProperties} aria-hidden={onChange ? undefined : true}>
-    <div className="tpl-date-controls">{layout.includes('weekly') || template.category === 'Weekly' || layout === 'weekly-scrapbook'
+    {layout !== 'weekly-open-journal' && <div className="tpl-date-controls">{layout.includes('weekly') || template.category === 'Weekly' || layout === 'weekly-scrapbook'
       ? <TemplateField field="templateDate" type="date" value={String(data.templateDate ?? new Date().toLocaleDateString('en-CA'))} label="Semana escolhida" />
       : template.category === 'Daily' || template.category === 'Study' ? <TemplateField field="templateDate" type="date" value={String(data.templateDate ?? new Date().toLocaleDateString('en-CA'))} label="Data da página" /> : <><TemplateField field="month" value={currentMonth} label="M?s" /><TemplateField field="year" value={String(currentYear)} label="Ano" /></>}</div>
+    }
     <header className="tpl-heading"><span>MATCHA PLANNER · {template.category.toUpperCase()}</span><h2><TemplateField field="title" value={template.name} label="T?tulo do template" /></h2><i /></header>
 
     {layout === 'dashboard-blue' && <div className="tpl-dashboard-grid"><Box title="MAIN TASK STRATEGY" className="tpl-main"><div className="tpl-strategy"><span>01 · START</span><span>02 · FOCUS</span><span>03 · REVIEW</span><span>04 · DONE</span></div></Box><Box title="TODAY"><Lines count={5} /></Box><Box title="THIS WEEK"><Lines count={5} /></Box><Box title="PROGRESS"><div className="tpl-progress">—</div></Box><Box title="NOTES"><Lines count={7} /></Box></div>}
@@ -66,6 +72,11 @@ export function TemplateBackground({ templateId, spreadSide, data = {}, onChange
     {layout === 'monthly-focus' && <div className="tpl-ref-monthly"><nav>{['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((month,index)=><span className={index===currentMonthIndex?'active':''} key={month}>{month}</span>)}</nav><div className="tpl-month-main"><aside><h3><TemplateField field="heading:calendar" value="CALENDAR" label="CALENDAR" /></h3><div className="tpl-small-calendar">{['S','M','T','W','T','F','S'].map((d,i)=><b key={i}>{d}</b>)}{calendarDays(currentYear, currentMonthIndex, false).map((day, i) => <span data-calendar-day={day ?? ''} key={i}>{day}</span>)}</div><Box title="SCHEDULE"><Lines count={9}/></Box></aside><section><Box title="FOCUS"><Lines count={3}/></Box><Box title="GOAL"><div className="tpl-goal-bars">{Array.from({length:6},(_,i)=><p key={i}><span/><i><b style={{width:'0%'}}/></i></p>)}</div></Box><Box title="TO DO"><Lines count={9}/></Box></section><section className="tpl-duration"><h3><TemplateField field="heading:duration" value="DURATION" label="DURATION" /></h3>{Array.from({length:31},(_,i)=><p key={i}><b>{i+1}</b></p>)}</section></div><Box title="TRACKER" className="tpl-month-tracker"><div>{Array.from({length:5},(_,r)=><p key={r}><b>HABIT {r+1}</b>{Array.from({length:31},(_,i)=><i key={i}/>)}</p>)}</div></Box></div>}
     {layout === 'weekly-scrapbook' && <div className="tpl-ref-scrap"><div className="tpl-scrap-tabs">PROJECT / TRACKER / EXPENSE / REFLECT / JOURNAL</div><div className="tpl-scrap-days">{days.map((day,i)=><article className={`scrap-day scrap-${i+1}`} key={day}><h3>{String(weekDates[i]).padStart(2,'0')} <small>{day[0]+day.slice(1).toLowerCase()}</small></h3><b>NOTE</b><Lines count={3}/><i>{['NOTE','STAR','WARN','HOME','DONE','BREAK','MOOD'][i]}</i></article>)}</div><footer><div className="tpl-scrap-calendar">{currentMonth} {currentYear}<br/>M T W T F S S</div><div className="tpl-scrap-note"><b>WEEK NOTES</b><Lines count={3}/></div></footer></div>}
     {layout === 'daily-time-block' && <div className="tpl-ref-timeblock"><header><span><TemplateField field="timeblock-date" type="date" value={getLocalDateKey(now)} label="Data do time-block" /></span><h3><TemplateField field="heading:daily-time-block-study" value="Daily Time-Block Study" label="Daily Time-Block Study" /></h3><b><TemplateField field="timeblock-mood" value="MOOD ○ ○ ○ ○ ○" label="Humor do dia" /></b></header><div className="tpl-timeblock-meta"><Box title="GOAL"><Lines count={3} /></Box><Box title="PRIORITY"><Lines count={3} /></Box></div><div className="tpl-timeblock-body"><section><Box title="TASKS / COLOR CODE"><div className="tpl-check-lines">{Array.from({ length: 12 }, (_, i) => <p key={i}><i /><span /></p>)}</div></Box><Box title="NOTES"><Lines count={7} /></Box></section><section><h4><TemplateField field="heading:timetable" value="TIMETABLE" label="TIMETABLE" /></h4><div className="tpl-timeblock-hours">{Array.from({ length: 16 }, (_, i) => <p key={i}><b>{String(i + 7).padStart(2, '0')}:00</b><i /><i /><i /><i /></p>)}</div><footer><span><TemplateField field="timeblock-total" value="TOTAL ____ h" label="Total de horas" /></span><span><TemplateField field="timeblock-progress" value="PROGRESS ____ %" label="Progresso" /></span></footer></section></div></div>}
+    {layout === 'weekly-open-journal' && <WeeklyOpenJournal
+      spreadSide={spreadSide}
+      weekStart={weekStart ?? defaultWeekStart}
+      onWeekChange={onWeeklyWeekChange ?? (async () => undefined)}
+      enabled={Boolean(onChange && weekStart && onWeeklyWeekChange)}
+    />}
   </div></TemplateEditingContext.Provider>
 }
-

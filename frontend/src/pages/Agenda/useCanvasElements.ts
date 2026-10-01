@@ -2,15 +2,21 @@ import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { apiRequest } from '../../services/api'
 import type { CanvasElementFromApi, CanvasElementPatch, CanvasElementDragState, CanvasElementResizeState, SaveStatus } from './editorModel'
 import { POSTIT_OPTIONS, WASHI_OPTIONS, STAMP_OPTIONS } from './editorCatalog'
+import type { EditorHistoryEntry } from './useEditorHistory'
+import { reorderLayers, type LayerAction } from './canvasGeometry'
 
 /** Shared DOM canvas controller. CanvasElement remains the sole persistence contract. */
-export function useCanvasElements({ activePageId, scale, stampColor, onInsert, onCreated, onError: setDrawingError }: {
+export function useCanvasElements({ activePageId, scale, stampColor, onInsert, onCreated, onError: setDrawingError, history }: {
   activePageId: number | null
   scale: number
   stampColor: string
   onInsert: () => void
   onCreated: () => void
   onError: (message: string) => void
+  history: {
+    push: (entry: EditorHistoryEntry) => void
+    remapEntityId: (entityType: 'canvas' | 'media', previousId: number, nextId: number) => void
+  }
 }) {
   const [
     pageCanvasElements,
@@ -33,6 +39,49 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
   const canvasElementResizeRef =
     useRef<CanvasElementResizeState | null>(null)
 
+  function historyPayload(element: CanvasElementFromApi) {
+    if (element.asset_url) return null
+    return {
+      surface_type: element.surface_type,
+      surface_key: element.surface_key,
+      page_id: element.page_id,
+      element_type: element.element_type,
+      x: element.x,
+      y: element.y,
+      width: element.width,
+      height: element.height,
+      rotation: element.rotation,
+      z_index: element.z_index,
+      locked: element.locked,
+      data: element.data,
+    }
+  }
+
+  function pushCreatedElementHistory(payload: Record<string, unknown>, created: CanvasElementFromApi) {
+    let entityId = created.id
+    history.push({
+      undo: async () => {
+        await apiRequest<void>(`/canvas/elements/${entityId}`, { method: 'DELETE' })
+        setPageCanvasElements(current => current.filter(element => element.id !== entityId))
+        setSelectedCanvasElementId(current => current === entityId ? null : current)
+      },
+      redo: async () => {
+        const previousId = entityId
+        const restored = await apiRequest<CanvasElementFromApi>('/canvas/elements', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        })
+        entityId = restored.id
+        history.remapEntityId('canvas', previousId, entityId)
+        setPageCanvasElements(current => [...current, restored])
+        setSelectedCanvasElementId(restored.id)
+      },
+      remapEntityId: (entityType, previousId, nextId) => {
+        if (entityType === 'canvas' && entityId === previousId) entityId = nextId
+      },
+    })
+  }
+
   function createInlineText(x: number, y: number, width: number) {
     if (activePageId === null) return
     const id = draftSequence.current--
@@ -52,7 +101,10 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
     setCanvasSaveStatus('saving')
     createdIds.current[id] = apiRequest<CanvasElementFromApi>('/canvas/elements', {
       method: 'POST', body: JSON.stringify(payload),
-    }).then(created => created.id)
+    }).then(created => {
+      pushCreatedElementHistory(payload, created)
+      return created.id
+    })
     void createdIds.current[id].catch(error => {
       failedElementWrites.current[id] = { data: draft.data }
       setDrawingError(error instanceof Error ? error.message : 'Falha ao criar texto.')
@@ -71,6 +123,21 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
       })
       if (targetPageId === activePageId) setPageCanvasElements(current => [...current, created])
       if (select) setSelectedCanvasElementId(created.id)
+      if (select && !elementType.startsWith('template:')) {
+        pushCreatedElementHistory({
+          surface_type: 'page',
+          page_id: targetPageId,
+          element_type: elementType,
+          x,
+          y,
+          width,
+          height,
+          rotation: 0,
+          z_index: created.z_index,
+          locked,
+          data,
+        }, created)
+      }
       onCreated()
       return created
     } catch (error) {
@@ -191,61 +258,58 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
       }
     }
 
-    try {
-      setDrawingError('')
-
-      const created =
-        await apiRequest<
-          CanvasElementFromApi
-        >(
-          '/canvas/elements',
-          {
-            method: 'POST',
-            body: JSON.stringify({
-              surface_type: 'page',
-              page_id: activePageId,
-              element_type:
-                defaults.elementType,
-              x: 110,
-              y: 120,
-              width: defaults.width,
-              height: defaults.height,
-              rotation: 0,
-              z_index: Math.max(0, ...pageCanvasElements.map(element => element.z_index)) + 1,
-              locked: false,
-              data: defaults.data,
-            }),
-          },
-        )
-
-      setPageCanvasElements(
-        (current) => [
-          ...current,
-          created,
-        ],
-      )
-      setSelectedCanvasElementId(
-        created.id,
-      )
-      onCreated()
-    } catch (error) {
-      console.error(error)
-
-      if (error instanceof Error) {
-        setDrawingError(error.message)
-      } else {
-        setDrawingError(
-          'Não foi possível inserir o elemento.',
-        )
-      }
-    }
+    await createStructuredElement(
+      defaults.elementType,
+      defaults.data,
+      defaults.width,
+      defaults.height,
+      activePageId,
+      110,
+      120,
+      Math.max(0, ...pageCanvasElements.map(element => element.z_index)) + 1,
+    )
   }
 
-  async function patchPageCanvasElement(elementId: number, patch: CanvasElementPatch) {
+  async function patchPageCanvasElement(elementId: number, patch: CanvasElementPatch, recordHistory = true, historyBefore?: CanvasElementFromApi): Promise<boolean> {
+    const before = historyBefore ?? pageCanvasElements.find(element => element.id === elementId)
+    const trackedPatch: CanvasElementPatch = {}
+    if (recordHistory && !('data' in patch) && before) {
+      if (patch.x !== undefined && patch.x !== before.x) trackedPatch.x = patch.x
+      if (patch.y !== undefined && patch.y !== before.y) trackedPatch.y = patch.y
+      if (patch.width !== undefined && patch.width !== before.width) trackedPatch.width = patch.width
+      if (patch.height !== undefined && patch.height !== before.height) trackedPatch.height = patch.height
+      if (patch.rotation !== undefined && patch.rotation !== before.rotation) trackedPatch.rotation = patch.rotation
+      if (patch.z_index !== undefined && patch.z_index !== before.z_index) trackedPatch.z_index = patch.z_index
+      if (patch.locked !== undefined && patch.locked !== before.locked) trackedPatch.locked = patch.locked
+    }
+    if (Object.keys(trackedPatch).length > 0 && before) {
+      const after = { ...before, ...trackedPatch }
+      let targetId = elementId
+      const apply = async (target: CanvasElementFromApi) => {
+        const didSave = await patchPageCanvasElement(targetId, {
+          x: target.x,
+          y: target.y,
+          width: target.width,
+          height: target.height,
+          rotation: target.rotation,
+          z_index: target.z_index,
+          locked: target.locked,
+        }, false)
+        if (!didSave) throw new Error('Não foi possível persistir a operação do canvas.')
+      }
+      history.push({
+        undo: () => apply(before),
+        redo: () => apply(after),
+        remapEntityId: (entityType, previousId, nextId) => {
+          if (entityType === 'canvas' && targetId === previousId) targetId = nextId
+        },
+      })
+    }
     setPageCanvasElements(current => current.map(element => element.id === elementId ? { ...element, ...patch } : element))
     canvasPendingCount.current += 1
     setCanvasSaveStatus('saving')
     const previous = elementWrites.current[elementId] ?? Promise.resolve()
+    let succeeded = true
     const write = previous.then(async () => {
       const payload = { ...failedElementWrites.current[elementId], ...patch }
       try {
@@ -262,6 +326,7 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
         })
         delete failedElementWrites.current[elementId]
       } catch (error) {
+        succeeded = false
         failedElementWrites.current[elementId] = payload
         setDrawingError(error instanceof Error ? error.message : 'Não foi possível salvar o elemento.')
       } finally {
@@ -271,6 +336,39 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
     })
     elementWrites.current[elementId] = write
     await write
+    return succeeded
+  }
+
+  async function reorderPageCanvasElements(elementId: number, action: LayerAction) {
+    const reorderable = pageCanvasElements.filter(element => !element.element_type.startsWith('template:'))
+    const changes = reorderLayers(
+      reorderable.map(element => ({ id: element.id, zIndex: element.z_index })),
+      elementId,
+      action,
+    )
+    if (changes.length === 0) return
+    const before = changes.map(change => ({
+      id: change.id,
+      zIndex: reorderable.find(element => element.id === change.id)?.z_index ?? change.zIndex,
+    }))
+    const after = changes.map(change => ({ id: change.id, zIndex: change.zIndex }))
+    const apply = async (values: typeof before) => {
+      for (const value of values) {
+        const didSave = await patchPageCanvasElement(value.id, { z_index: value.zIndex }, false)
+        if (!didSave) throw new Error('Não foi possível salvar a ordem das camadas.')
+      }
+    }
+    await apply(after)
+    history.push({
+      undo: () => apply(before),
+      redo: () => apply(after),
+      remapEntityId: (entityType, previousId, nextId) => {
+        if (entityType !== 'canvas') return
+        for (const value of [...before, ...after]) {
+          if (value.id === previousId) value.id = nextId
+        }
+      },
+    })
   }
 
   function handleCanvasElementPointerDown(
@@ -312,6 +410,7 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
     canvasElementDragRef.current = {
       elementId: element.id,
       pointerId: event.pointerId,
+      before: element,
       startClientX: event.clientX,
       startClientY: event.clientY,
       startX: element.x,
@@ -411,6 +510,8 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
         x: drag.currentX,
         y: drag.currentY,
       },
+      true,
+      { ...drag.before, x: drag.startX, y: drag.startY },
     )
   }
 
@@ -427,6 +528,7 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
     canvasElementResizeRef.current = {
       elementId: element.id,
       pointerId: event.pointerId,
+      before: element,
       startClientX: event.clientX,
       startClientY: event.clientY,
       startWidth: element.width,
@@ -508,6 +610,8 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
         width: resize.currentWidth,
         height: resize.currentHeight,
       },
+      true,
+      { ...resize.before, width: resize.startWidth, height: resize.startHeight },
     )
   }
 
@@ -534,6 +638,28 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
       setSelectedCanvasElementId(
         duplicated.id,
       )
+      let duplicatedId = duplicated.id
+      let sourceId = persistedId
+      history.push({
+        undo: async () => {
+          await apiRequest<void>(`/canvas/elements/${duplicatedId}`, { method: 'DELETE' })
+          setPageCanvasElements(current => current.filter(element => element.id !== duplicatedId))
+          setSelectedCanvasElementId(current => current === duplicatedId ? null : current)
+        },
+        redo: async () => {
+          const previousId = duplicatedId
+          const restored = await apiRequest<CanvasElementFromApi>(`/canvas/elements/${sourceId}/duplicate`, { method: 'POST' })
+          duplicatedId = restored.id
+          history.remapEntityId('canvas', previousId, duplicatedId)
+          setPageCanvasElements(current => [...current, restored])
+          setSelectedCanvasElementId(restored.id)
+        },
+        remapEntityId: (entityType, previousId, nextId) => {
+          if (entityType !== 'canvas') return
+          if (duplicatedId === previousId) duplicatedId = nextId
+          if (sourceId === previousId) sourceId = nextId
+        },
+      })
     } catch (error) {
       console.error(error)
       setDrawingError(
@@ -550,6 +676,8 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
     try {
       await elementWrites.current[elementId]
       const persistedId = elementId < 0 ? await createdIds.current[elementId] : elementId
+      const element = pageCanvasElements.find(item => item.id === elementId)
+      if (element?.asset_url && !window.confirm('Este elemento contém um arquivo que será removido permanentemente. Deseja continuar?')) return
       await apiRequest<void>(
         `/canvas/elements/${persistedId}`,
         { method: 'DELETE' },
@@ -570,6 +698,31 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
             ? null
             : current,
       )
+      const payload = element ? historyPayload(element) : null
+      if (payload) {
+        let restoredId = persistedId
+        history.push({
+          undo: async () => {
+            const previousId = restoredId
+            const restored = await apiRequest<CanvasElementFromApi>('/canvas/elements', {
+              method: 'POST',
+              body: JSON.stringify(payload),
+            })
+            restoredId = restored.id
+            history.remapEntityId('canvas', previousId, restoredId)
+            setPageCanvasElements(current => [...current, restored])
+            setSelectedCanvasElementId(restored.id)
+          },
+          redo: async () => {
+            await apiRequest<void>(`/canvas/elements/${restoredId}`, { method: 'DELETE' })
+            setPageCanvasElements(current => current.filter(item => item.id !== restoredId))
+            setSelectedCanvasElementId(current => current === restoredId ? null : current)
+          },
+          remapEntityId: (entityType, previousId, nextId) => {
+            if (entityType === 'canvas' && restoredId === previousId) restoredId = nextId
+          },
+        })
+      }
     } catch (error) {
       console.error(error)
       setDrawingError(
@@ -636,5 +789,5 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
     )
   }
 
-  return { editingTextElementId, setEditingTextElementId, pageCanvasElements, setPageCanvasElements, selectedCanvasElementId, setSelectedCanvasElementId, canvasSaveStatus, failedElementWrites, createInlineText, createStructuredElement, createPageCanvasElement, patchPageCanvasElement, handleCanvasElementPointerDown, handleCanvasElementPointerMove, finishCanvasElementDrag, handleCanvasElementResizeStart, handleCanvasElementResizeMove, finishCanvasElementResize, duplicatePageCanvasElement, deletePageCanvasElement, rotatePageCanvasElement, handlePostItTextBlur }
+  return { editingTextElementId, setEditingTextElementId, pageCanvasElements, setPageCanvasElements, selectedCanvasElementId, setSelectedCanvasElementId, canvasSaveStatus, failedElementWrites, createInlineText, createStructuredElement, createPageCanvasElement, patchPageCanvasElement, handleCanvasElementPointerDown, handleCanvasElementPointerMove, finishCanvasElementDrag, handleCanvasElementResizeStart, handleCanvasElementResizeMove, finishCanvasElementResize, duplicatePageCanvasElement, deletePageCanvasElement, rotatePageCanvasElement, reorderPageCanvasElements, handlePostItTextBlur }
 }

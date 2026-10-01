@@ -28,3 +28,51 @@
 .page-tabs-panel li button:first-of-type { margin-left: auto; }
 .page-tabs-panel :is(button,input,select):focus-visible, .page-tabs :is(button):focus-visible { outline: 2px solid #707318; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .page-tabs *, .binding-rings * { transition: none !important; } }
+
+.editor-workspace-v6 .page-tab,
+.editor-workspace-v6 .page-tab-add,
+.editor-workspace-v6 .page-tab-manage {
+  border: 1px solid rgb(75 59 50 / 10%);
+  border-radius: 0 8px 8px 0;
+  box-shadow: 0 2px 5px rgb(75 59 50 / 9%);
+}
+.editor-workspace-v6 .page-tab {
+  width: 30px;
+  color: #30261F;
+  font-weight: 700;
+}
+.editor-workspace-v6 .page-tab:hover,
+.editor-workspace-v6 .page-tab:focus-visible {
+  width: 37px;
+}
+.editor-workspace-v6 .page-tab-add,
+.editor-workspace-v6 .page-tab-manage {
+  color: #4B3B32;
+  background: #FFF7E8;
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .page-tab-add,
+.editor-workspace-v6[data-agenda-theme='dark'] .page-tab-manage {
+  border-color: #4A4542;
+  color: #EDE7DD;
+  background: #1B1B1D;
+}
+.editor-workspace-v6 .page-tabs-panel {
+  border-color: var(--editor-border);
+  border-radius: 14px;
+  color: var(--editor-ink);
+  background: var(--editor-surface);
+  box-shadow: 0 12px 32px var(--editor-shadow);
+}
+.editor-workspace-v6 .page-tabs-panel :is(input, select) {
+  border-color: var(--editor-border);
+  border-radius: 9px;
+  color: var(--editor-ink);
+  background: var(--editor-surface);
+}
+.editor-workspace-v6[data-agenda-theme='dark'] .page-tabs-panel :is(input, select) {
+  color-scheme: dark;
+}
+.editor-workspace-v6 .page-tabs-panel :is(button, input, select):focus-visible,
+.editor-workspace-v6 .page-tabs :is(button):focus-visible {
+  outline-color: var(--editor-focus);
+}

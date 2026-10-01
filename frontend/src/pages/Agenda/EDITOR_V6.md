@@ -32,6 +32,16 @@ Post-its têm alça de arraste visível, seleção ao editar, movimento por seta
 - Catálogos de formas e setas incluem linha e seta decorativa. Os demais catálogos continuam expansíveis. Nenhuma rota ou tabela de backend foi adicionada.
 - Os testes de navegador usam uma API isolada em memória. Ainda é necessário revisar com uma conta autenticada e dados reais, além de validar visualmente em navegadores e tamanhos de tela variados.
 
+## Evolução V6.3 — histórico, camadas e visualização
+
+- Cada folha tem histórico independente, limitado às 50 operações mais recentes. Mover, redimensionar, girar, bloquear, reordenar camadas, criar, duplicar e excluir CanvasElements graváveis podem ser desfeitos/refeitos com chamadas às rotas existentes; gestos de ponteiro gravam apenas no fim do gesto.
+- Mídia de página registra em histórico mover, redimensionar, girar, bloquear, reordenar e duplicar. Undo/redo de duplicação usa a rota de duplicação existente; IDs de recursos recriados são remapeados nas entradas ainda pendentes.
+- Traços mantêm o comando dedicado de desfazer o último traço; apagamentos por borracha e traços novos ainda não participam do histórico unificado.
+- A exclusão de mídia exige confirmação e não entra no histórico: a rota DELETE apaga também o arquivo físico. CanvasElements com asset persistido também exigem confirmação e não têm undo de exclusão; elementos sem asset podem ser restaurados pelo POST existente.
+- Camadas são ordenadas separadamente dentro de CanvasElements e de PageMedia. O CSS coloca PageMedia abaixo de CanvasElements e desenhos acima de ambos; não há ordenação cruzada falsa entre tabelas. Ao alterar a ordem do mesmo grupo, os índices são normalizados para posições compactas e persistidos.
+- Ctrl/Cmd+Z desfaz, Ctrl/Cmd+Shift+Z e Ctrl+Y refazem. O atalho global ignora campos editáveis. A entrada em outra página limpa o histórico da folha anterior.
+- O modo Visualizar oculta controles de edição e torna o papel inerte, mantendo conteúdo, tabs de navegação e paginação. O botão fixo “Sair da visualização” e Escape encerram o modo; não há gravação de estado ao alterná-lo.
+
 ## Validação
 
 ```text
