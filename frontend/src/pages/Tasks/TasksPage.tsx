@@ -6,6 +6,7 @@ import {
 } from 'react'
 
 import SubjectPicker from '../../components/SubjectPicker'
+import ReceiptPaper from '../../components/ReceiptPaper'
 import {
   apiRequest,
 } from '../../services/api'
@@ -759,12 +760,14 @@ function TasksPage() {
   if (loading) {
     return (
       <section className="tasks-page">
-        <div
-          className="tasks-loading"
-          role="status"
-        >
-          Carregando tarefas...
-        </div>
+        <ReceiptPaper className="receipt-paper--tasks" label="Task Slip · Controle de tarefas">
+          <div
+            className="tasks-loading"
+            role="status"
+          >
+            Carregando tarefas...
+          </div>
+        </ReceiptPaper>
       </section>
     )
   }
@@ -772,6 +775,7 @@ function TasksPage() {
 
   return (
     <section className="tasks-page">
+      <ReceiptPaper className="receipt-paper--tasks" label="Task Slip · Controle de tarefas">
       <header className="tasks-heading">
         <div>
           <span className="tasks-eyebrow">
@@ -1267,6 +1271,12 @@ function TasksPage() {
         </div>
       ) : (
         <div className="tasks-list">
+          <div className="tasks-list-columns" aria-hidden="true">
+            <span>Nº</span>
+            <span>OK</span>
+            <span>ITEM · PRAZO · STATUS</span>
+            <span>AÇÕES</span>
+          </div>
           {filteredTasks.map(
             (
               task,
@@ -1510,17 +1520,23 @@ function TasksPage() {
 
       <footer className="tasks-receipt-total">
         <span>
-          TOTAL DO DIA
+          TOTAL DA LISTA
         </span>
 
         <strong>
-          {completedCount} / {tasks.length}
+          {tasks.length}
         </strong>
 
         <small>
-          tarefas concluídas
+          tarefas registradas
         </small>
+        <div className="tasks-receipt-breakdown">
+          <span>Concluídas <b>{completedCount}</b></span>
+          <span>Pendentes <b>{tasks.length - completedCount}</b></span>
+          <span>Atrasadas <b>{overdueCount}</b></span>
+        </div>
       </footer>
+      </ReceiptPaper>
     </section>
   )
 }

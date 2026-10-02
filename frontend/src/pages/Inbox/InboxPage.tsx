@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { CaptureForm, type CaptureSubject, type InboxItem } from '../../components/QuickCapture'
+import ReceiptPaper from '../../components/ReceiptPaper'
 import { apiRequest } from '../../services/api'
 
 const targets = { task: 'Tarefa', event: 'Evento', study: 'Estudo', project: 'Projeto', note: 'Nota' }
@@ -53,11 +54,11 @@ export default function InboxPage() {
     <div className="capture-actions"><label>Mostrar <select value={filter} onChange={e => setFilter(e.target.value)}><option value="new">Novos</option><option value="processed">Processados</option><option value="all">Todos</option></select></label><button onClick={() => void load()}>Atualizar</button></div>
     {loading && <p role="status">Carregando Inbox…</p>}{error && <p role="alert">{error}</p>}<p role="status">{message}</p>
     {!loading && !error && !items.filter(i => filter === 'all' || i.status === filter).length && <p>Nenhum item aqui. Use ＋ Capturar para guardar sua próxima ideia.</p>}
-    <div className="inbox-list">{items.filter(i => filter === 'all' || i.status === filter).map(item => <article className={`inbox-card ${item.status}`} key={item.id}>
+    <div className="inbox-list">{items.filter(i => filter === 'all' || i.status === filter).map(item => <ReceiptPaper className="receipt-paper--inbox-entry" label="Registro da Inbox" key={item.id}><article className={`inbox-card ${item.status}`}>
       <span className="inbox-status">{item.status === 'new' ? 'Novo' : 'Processado'}{item.converted_type ? ` · ${targets[item.converted_type as Target]}` : ''}</span>
       {editing === item.id ? <CaptureForm item={item} onSaved={updated} onCancel={() => setEditing(null)} /> : <><h2>{item.text}</h2><div className="inbox-meta"><span>Criado em {new Date(item.created_at).toLocaleString('pt-BR')}</span>{item.optional_date && <span>{new Date(`${item.optional_date}T00:00:00`).toLocaleDateString('pt-BR')}</span>}{item.optional_time && <span>{item.optional_time.slice(0, 5)}</span>}{item.subject_id && <span>{subjects.find(s => s.id === item.subject_id)?.name ?? 'Matéria'}</span>}</div>{item.note && <p>{item.note}</p>}
       <div className="capture-actions"><button onClick={() => { setEditing(item.id); setConverting(null) }}>Editar</button><button onClick={() => void remove(item)}>Excluir</button>{!item.converted_type && <button onClick={() => setConverting(item.id)}>Organizar</button>}{item.converted_type && destinations[item.converted_type] && <Link to={destinations[item.converted_type]}>Abrir {targets[item.converted_type as Target]}</Link>}</div></>}
       {converting === item.id && <Conversion item={item} onSaved={updated} onCancel={() => setConverting(null)} />}
-    </article>)}</div>
+    </article></ReceiptPaper>)}</div>
   </section>
 }

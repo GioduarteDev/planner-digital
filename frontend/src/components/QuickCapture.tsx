@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import ReceiptPaper from './ReceiptPaper'
 import { apiRequest } from '../services/api'
 import './QuickCapture.css'
 
@@ -37,18 +38,20 @@ export function CaptureForm({ item, onSaved, onCancel }: {
     } catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível salvar.') }
     finally { pending.current = false; setSaving(false) }
   }
-  return <form className="capture-form" onSubmit={save}>
-    <label>O que você quer guardar?<textarea autoFocus required maxLength={300} rows={3} value={text} placeholder="Uma ideia, uma entrega, algo para lembrar…" onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit() } }} /></label>
-    <details open={item ? true : undefined}><summary>Data, matéria e observação (opcional)</summary><div className="capture-fields">
-      <label>Data<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
-      <label>Horário<input type="time" value={time} onChange={e => setTime(e.target.value)} /></label>
-      <label>Matéria<select value={subject} onChange={e => setSubject(e.target.value)}><option value="">Sem matéria</option>{subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
-      <label>Observação<textarea maxLength={2000} value={note} onChange={e => setNote(e.target.value)} /></label>
-    </div></details>
-    {error && <p role="alert">{error}</p>}
-    <div className="capture-actions"><button type="submit" disabled={saving || !text.trim()}>{saving ? 'Salvando…' : 'Salvar'}</button>{onCancel && <button type="button" onClick={onCancel} disabled={saving}>Cancelar</button>}</div>
-    <small>Enter salva · Shift+Enter quebra a linha</small>
-  </form>
+  return <ReceiptPaper className="receipt-paper--capture" label={item ? 'Atualização de entrada' : 'Captura rápida'}>
+    <form className="capture-form" onSubmit={save}>
+      <label>O que você quer guardar?<textarea autoFocus required maxLength={300} rows={3} value={text} placeholder="Uma ideia, uma entrega, algo para lembrar…" onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); e.currentTarget.form?.requestSubmit() } }} /></label>
+      <details open={item ? true : undefined}><summary>Data, matéria e observação (opcional)</summary><div className="capture-fields">
+        <label>Data<input type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
+        <label>Horário<input type="time" value={time} onChange={e => setTime(e.target.value)} /></label>
+        <label>Matéria<select value={subject} onChange={e => setSubject(e.target.value)}><option value="">Sem matéria</option>{subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+        <label>Observação<textarea maxLength={2000} value={note} onChange={e => setNote(e.target.value)} /></label>
+      </div></details>
+      {error && <p role="alert">{error}</p>}
+      <div className="capture-actions"><button type="submit" disabled={saving || !text.trim()}>{saving ? 'Salvando…' : 'Salvar'}</button>{onCancel && <button type="button" onClick={onCancel} disabled={saving}>Cancelar</button>}</div>
+      <small>Enter salva · Shift+Enter quebra a linha</small>
+    </form>
+  </ReceiptPaper>
 }
 
 export default function QuickCapture() {

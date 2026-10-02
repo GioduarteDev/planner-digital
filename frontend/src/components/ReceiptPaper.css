@@ -1,0 +1,741 @@
+.receipt-paper {
+  --receipt-paper: #fff9f0;
+  --receipt-ink: #31435f;
+  --receipt-line: rgba(111, 127, 91, 0.28);
+  --receipt-accent: #6f7f5b;
+
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 680px);
+  margin: 18px auto;
+  padding: 26px clamp(18px, 5vw, 42px) 30px;
+  color: var(--receipt-ink);
+}
+
+.receipt-paper::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      transparent 0 31px,
+      rgba(111, 127, 91, 0.055) 31px 32px
+    ),
+    linear-gradient(145deg, #fffdf8, var(--receipt-paper) 68%, #fff6e8);
+  clip-path: polygon(
+    0 12px, 2% 0, 4% 12px, 6% 0, 8% 12px, 10% 0, 12% 12px, 14% 0,
+    16% 12px, 18% 0, 20% 12px, 22% 0, 24% 12px, 26% 0, 28% 12px, 30% 0,
+    32% 12px, 34% 0, 36% 12px, 38% 0, 40% 12px, 42% 0, 44% 12px, 46% 0,
+    48% 12px, 50% 0, 52% 12px, 54% 0, 56% 12px, 58% 0, 60% 12px, 62% 0,
+    64% 12px, 66% 0, 68% 12px, 70% 0, 72% 12px, 74% 0, 76% 12px, 78% 0,
+    80% 12px, 82% 0, 84% 12px, 86% 0, 88% 12px, 90% 0, 92% 12px, 94% 0,
+    96% 12px, 98% 0, 100% 12px,
+    100% calc(100% - 12px), 98% 100%, 96% calc(100% - 12px),
+    94% 100%, 92% calc(100% - 12px), 90% 100%, 88% calc(100% - 12px),
+    86% 100%, 84% calc(100% - 12px), 82% 100%, 80% calc(100% - 12px),
+    78% 100%, 76% calc(100% - 12px), 74% 100%, 72% calc(100% - 12px),
+    70% 100%, 68% calc(100% - 12px), 66% 100%, 64% calc(100% - 12px),
+    62% 100%, 60% calc(100% - 12px), 58% 100%, 56% calc(100% - 12px),
+    54% 100%, 52% calc(100% - 12px), 50% 100%, 48% calc(100% - 12px),
+    46% 100%, 44% calc(100% - 12px), 42% 100%, 40% calc(100% - 12px),
+    38% 100%, 36% calc(100% - 12px), 34% 100%, 32% calc(100% - 12px),
+    30% 100%, 28% calc(100% - 12px), 26% 100%, 24% calc(100% - 12px),
+    22% 100%, 20% calc(100% - 12px), 18% 100%, 16% calc(100% - 12px),
+    14% 100%, 12% calc(100% - 12px), 10% 100%, 8% calc(100% - 12px),
+    6% 100%, 4% calc(100% - 12px), 2% 100%, 0 calc(100% - 12px)
+  );
+  content: '';
+  filter: drop-shadow(0 12px 14px rgba(71, 83, 63, 0.16));
+}
+
+.receipt-paper-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 0 0 10px;
+  border-bottom: 1px dashed var(--receipt-line);
+  color: var(--receipt-accent);
+  font-family: 'DM Mono', Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.receipt-paper-label {
+  text-align: right;
+}
+
+.receipt-paper--capture {
+  width: min(100%, 500px);
+  margin: 0 auto;
+  padding: 25px clamp(18px, 4vw, 34px) 28px;
+}
+
+.receipt-paper--inbox-entry {
+  width: 100%;
+  margin: 0;
+  padding: 18px 24px 22px;
+}
+
+.receipt-paper--inbox-entry .receipt-paper-heading {
+  margin-bottom: 10px;
+}
+
+.premium-page--inbox {
+  --receipt-paper: #fff9f2;
+  --receipt-accent: #9a6d7e;
+  --receipt-line: rgba(111, 127, 91, 0.25);
+}
+
+.premium-page--inbox .receipt-paper {
+  --receipt-accent: #9a6d7e;
+  --receipt-line: rgba(111, 127, 91, 0.25);
+}
+
+.premium-page--tasks {
+  --receipt-paper: #fff9f0;
+  --receipt-accent: #6f7f5b;
+  --receipt-line: rgba(111, 127, 91, 0.3);
+}
+
+.premium-page--tasks .receipt-paper--tasks {
+  width: min(100%, 760px);
+  margin: 0 auto;
+  padding: 28px clamp(20px, 5vw, 48px) 32px;
+}
+
+.premium-page--tasks .tasks-heading {
+  display: block;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--receipt-line);
+}
+
+.premium-page--tasks .tasks-heading h1 {
+  margin: 6px 0;
+  font-size: clamp(32px, 5vw, 48px);
+  text-transform: none;
+}
+
+.premium-page--tasks .tasks-heading p {
+  max-width: 42ch;
+  margin: 0;
+}
+
+.premium-page--tasks .tasks-eyebrow,
+.premium-page--tasks .tasks-card-kicker,
+.premium-page--tasks .tasks-receipt-kicker {
+  color: var(--receipt-accent);
+  font-family: 'DM Mono', Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-receipt-banner {
+  border-right: 0;
+  border-left: 0;
+  border-top: 1px solid var(--receipt-line);
+  border-bottom: 1px dashed var(--receipt-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-receipt-banner strong {
+  color: var(--receipt-ink);
+  font-family: 'Lora', Georgia, serif;
+  font-size: clamp(19px, 3vw, 26px);
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-receipt-stamp {
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--receipt-accent);
+  background: #f6ebd4;
+  color: var(--receipt-ink);
+  transform: rotate(4deg);
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-summary-strip {
+  padding: 13px 0 18px;
+  border-bottom: 1px dashed var(--receipt-line);
+  color: #5f6f58;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-summary-strip b {
+  color: var(--receipt-ink);
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-progress-bar {
+  height: 7px;
+  border: 1px solid var(--receipt-accent);
+  background: #f1eadc;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-progress-bar i {
+  background: var(--receipt-accent);
+}
+
+.premium-page--tasks .receipt-paper--tasks :is(.tasks-form-card, .tasks-empty) {
+  margin: 18px 0 24px;
+  padding: 18px 0 22px;
+  border: 0;
+  border-bottom: 1px dashed var(--receipt-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.premium-page--tasks .premium-window-content .receipt-paper--tasks .tasks-form-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.premium-page--tasks .premium-window-content .tasks-page .receipt-paper--tasks .tasks-form-grid :is(
+  input:not([type='checkbox']):not([type='radio']):not([type='color']),
+  textarea,
+  select
+) {
+  border: 0;
+  border-bottom: 1px solid var(--receipt-line);
+  border-radius: 0;
+  background-color: rgba(255, 255, 255, 0.38);
+  box-shadow: none;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-card-heading {
+  margin-bottom: 14px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--receipt-line);
+}
+
+.premium-page--tasks .receipt-paper--tasks :is(.tasks-card-heading h2, .tasks-list-header h2) {
+  color: var(--receipt-ink);
+  font-family: 'Lora', Georgia, serif;
+  font-size: 22px;
+  text-transform: none;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-form-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 13px;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-full {
+  grid-column: auto;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-form-grid label {
+  gap: 5px;
+  color: #56694f;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.premium-page--tasks .receipt-paper--tasks :is(
+  .tasks-form-grid input:not([type='checkbox']),
+  .tasks-form-grid textarea,
+  .tasks-form-grid select,
+  .tasks-search input
+) {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--receipt-line);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.38);
+  box-shadow: none;
+  color: var(--receipt-ink);
+  font-weight: 500;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-form-grid textarea {
+  min-height: 86px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 26px,
+    rgba(111, 127, 91, 0.14) 26px 27px
+  );
+  line-height: 27px;
+}
+
+.premium-page--tasks .receipt-paper--tasks :is(
+  .tasks-form-grid input:focus-visible,
+  .tasks-form-grid textarea:focus-visible,
+  .tasks-form-grid select:focus-visible,
+  .tasks-search input:focus-visible
+) {
+  outline: 2px solid rgba(111, 127, 91, 0.45);
+  outline-offset: 2px;
+  border-bottom-color: var(--receipt-accent);
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-calendar-option {
+  padding: 11px 12px;
+  border: 1px dashed var(--receipt-line);
+  background: rgba(230, 238, 219, 0.42);
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-calendar-option input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--receipt-accent);
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-calendar-option small {
+  color: #66725f;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-form-actions {
+  margin-top: 16px;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-primary-button {
+  border-radius: 10px;
+  background: #6f7f5b;
+  box-shadow: 0 4px 10px rgba(71, 83, 63, 0.16);
+  color: #fff;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-list-header {
+  align-items: flex-end;
+  margin: 18px 0 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--receipt-line);
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-list-header p {
+  color: #66725f;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-list-tools {
+  align-items: flex-end;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-search {
+  width: min(260px, 100%);
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-filters {
+  justify-content: flex-end;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-filters button {
+  min-height: 30px;
+  border: 1px solid var(--receipt-line);
+  background: #fffdf8;
+  color: #56694f;
+  font-size: 10px;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-filters button.active {
+  border-color: var(--receipt-accent);
+  background: #e7eedc;
+  color: #344638;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-list-columns {
+  display: grid;
+  grid-template-columns: 30px 26px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 9px 4px;
+  border-top: 1px solid var(--receipt-line);
+  border-bottom: 1px solid var(--receipt-line);
+  color: #6b7c61;
+  font-family: 'DM Mono', Consolas, monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-list {
+  border-top: 0;
+}
+
+.premium-page--tasks .premium-window-content .receipt-paper--tasks .task-card {
+  grid-template-columns: 30px 26px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 15px 4px;
+  border: 0;
+  border-bottom: 1px dashed var(--receipt-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-card.overdue:not(.done) {
+  background: linear-gradient(90deg, rgba(241, 184, 217, 0.15), transparent 60%);
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-item-number {
+  color: #9a6d7e;
+  font-family: 'DM Mono', Consolas, monospace;
+  font-size: 13px;
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-check {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--receipt-accent);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.6);
+  color: #fff;
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-check.checked {
+  border-color: var(--receipt-accent);
+  background: var(--receipt-accent);
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-card-title-row h3 {
+  color: var(--receipt-ink);
+  font-family: 'Lora', Georgia, serif;
+  font-size: 16px;
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-card.done .task-card-title-row h3 {
+  text-decoration-color: #9a6d7e;
+  text-decoration-thickness: 1px;
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-priority,
+.premium-page--tasks .receipt-paper--tasks .task-tag,
+.premium-page--tasks .receipt-paper--tasks .task-deadline-badge {
+  min-height: 22px;
+  border-width: 1px;
+  border-radius: 3px;
+  font-size: 9px;
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-description {
+  color: #596b59;
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-meta {
+  gap: 6px 10px;
+  color: #596b59;
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-status-label {
+  color: #647b55;
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-calendar-toggle {
+  min-height: 27px;
+  border: 1px solid var(--receipt-line);
+  color: #5d7054;
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-calendar-toggle.active {
+  border-color: var(--receipt-accent);
+  background: #e7eedc;
+  color: #344638;
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-actions button {
+  min-height: 29px;
+  border: 1px solid var(--receipt-line);
+  background: rgba(255, 255, 255, 0.55);
+  color: #52644b;
+}
+
+.premium-page--tasks .receipt-paper--tasks .task-actions button.delete {
+  border-color: #e5c7c2;
+  background: #fff3ef;
+  color: #8e4842;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-receipt-total {
+  grid-template-columns: 1fr auto;
+  margin-top: 18px;
+  padding-top: 15px;
+  border-top: 3px double var(--receipt-accent);
+  color: var(--receipt-ink);
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-receipt-total strong {
+  color: var(--receipt-accent);
+  font-family: 'Lora', Georgia, serif;
+  font-size: 30px;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-receipt-total small {
+  color: #66725f;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-receipt-breakdown {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 14px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--receipt-line);
+  color: #617258;
+  font-size: 11px;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-receipt-breakdown b {
+  margin-left: 4px;
+  color: var(--receipt-ink);
+  font-family: 'DM Mono', Consolas, monospace;
+}
+
+.premium-page--tasks .receipt-paper--tasks .tasks-empty {
+  min-height: 110px;
+  color: #66725f;
+}
+
+.premium-page--inbox .inbox-page {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.premium-page--inbox .premium-window-content .inbox-page > header {
+  padding: 0 0 15px;
+  border: 0;
+  border-bottom: 1px solid var(--receipt-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.premium-page--inbox .premium-window-content .inbox-page > header h1 {
+  font-family: 'Lora', Georgia, serif;
+}
+
+.premium-page--inbox .premium-window-content .inbox-page > details {
+  margin: 16px 0;
+  padding: 12px 16px;
+  border: 1px dashed var(--receipt-line);
+  border-radius: 12px;
+  background: rgba(255, 249, 242, 0.56);
+}
+
+.premium-page--inbox .premium-window-content .inbox-page > details > summary {
+  color: #617258;
+  font-family: 'DM Mono', Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.premium-page--inbox .premium-window-content .inbox-page > .capture-actions {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin: 16px 0;
+  padding: 10px 12px;
+  border-block: 1px dashed var(--receipt-line);
+}
+
+.premium-page--inbox .premium-window-content .inbox-page > .capture-actions label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #617258;
+  font-size: 12px;
+}
+
+.premium-page--inbox .premium-window-content .inbox-list {
+  gap: 12px;
+}
+
+.premium-page--inbox .premium-window-content .inbox-page .receipt-paper--inbox-entry .inbox-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.premium-page--inbox .premium-window-content .inbox-page .receipt-paper--inbox-entry .inbox-card.processed {
+  background: transparent;
+}
+
+.premium-page--inbox .premium-window-content .inbox-page .receipt-paper--inbox-entry .inbox-card h2 {
+  margin: 12px 0;
+  color: var(--receipt-ink);
+  font-family: 'Lora', Georgia, serif;
+}
+
+.premium-page--inbox .premium-window-content .inbox-page .receipt-paper--inbox-entry .inbox-meta {
+  gap: 7px 12px;
+  padding: 9px 0;
+  border-block: 1px dashed var(--receipt-line);
+  color: #617258;
+}
+
+.premium-page--inbox .premium-window-content .inbox-page .receipt-paper--inbox-entry .inbox-status {
+  border: 1px solid var(--receipt-line);
+  background: #edf2e5;
+  color: #52644b;
+  font-family: 'DM Mono', Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.premium-page--inbox .premium-window-content .inbox-page .receipt-paper--capture .capture-form :is(
+  input:not([type='checkbox']):not([type='radio']):not([type='color']),
+  textarea,
+  select
+) {
+  border: 0;
+  border-bottom: 1px solid var(--receipt-line);
+  border-radius: 0;
+  background-color: rgba(255, 255, 255, 0.26);
+  box-shadow: none;
+}
+
+.premium-page--inbox .premium-window-content .inbox-page .receipt-paper--capture .capture-form details {
+  border: 0;
+  border-block: 1px dashed var(--receipt-line);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.premium-page--inbox .premium-window-content .inbox-page .receipt-paper--capture .capture-form summary {
+  color: #647858;
+  font-family: 'DM Mono', Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.receipt-paper--capture .capture-form {
+  gap: 14px;
+}
+
+.receipt-paper--capture .capture-form label {
+  color: #586b50;
+  font-family: 'DM Mono', Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.receipt-paper--capture .capture-form :is(input, textarea, select) {
+  min-height: 38px;
+  padding: 8px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--receipt-line);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.26);
+  color: #31435f;
+  font-family: Inter, 'DM Sans', system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.receipt-paper--capture .capture-form textarea {
+  min-height: 84px;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 27px,
+    rgba(111, 127, 91, 0.15) 27px 28px
+  );
+  line-height: 28px;
+  resize: vertical;
+}
+
+.receipt-paper--capture .capture-form :is(input, textarea, select):focus-visible {
+  outline: 2px solid rgba(111, 127, 91, 0.48);
+  outline-offset: 2px;
+  border-bottom-color: #6f7f5b;
+}
+
+.receipt-paper--capture .capture-form details {
+  padding: 11px 0;
+  border-block: 1px dashed var(--receipt-line);
+}
+
+.receipt-paper--capture .capture-form summary {
+  margin: 0;
+  color: #647858;
+  font-family: 'DM Mono', Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.receipt-paper--capture .capture-fields {
+  margin-top: 14px;
+}
+
+.receipt-paper--capture .capture-actions {
+  margin: 4px 0 0;
+}
+
+.receipt-paper--capture .capture-actions button:first-child {
+  background: #6f7f5b;
+  box-shadow: 0 4px 10px rgba(71, 83, 63, 0.16);
+}
+
+.receipt-paper--capture .capture-form small {
+  color: #66725f;
+  font-size: 11px;
+}
+
+.capture-dialog {
+  box-sizing: border-box;
+  width: min(480px, calc(100vw - 28px));
+  border-color: #e4d9c6;
+  background: #fffaf2;
+}
+
+.capture-dialog .receipt-paper--capture {
+  margin-top: 8px;
+}
+
+@media (max-width: 640px) {
+  .receipt-paper--inbox-entry {
+    padding: 18px 17px 21px;
+  }
+
+  .premium-page--tasks .receipt-paper--tasks {
+    padding: 26px 18px 28px;
+  }
+
+  .premium-page--tasks .tasks-list-columns {
+    grid-template-columns: 24px 22px minmax(0, 1fr);
+  }
+
+  .premium-page--tasks .tasks-list-columns span:last-child {
+    display: none;
+  }
+
+  .premium-page--tasks .premium-window-content .receipt-paper--tasks .task-card {
+    grid-template-columns: 24px 22px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .premium-page--tasks .task-actions {
+    grid-column: 1 / -1;
+  }
+
+  .premium-page--tasks .task-card-title-row {
+    flex-wrap: wrap;
+  }
+
+  .premium-page--tasks .tasks-receipt-breakdown {
+    justify-content: flex-start;
+  }
+
+  .receipt-paper-heading {
+    font-size: 9px;
+  }
+}

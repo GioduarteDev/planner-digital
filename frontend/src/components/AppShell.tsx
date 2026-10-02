@@ -26,6 +26,7 @@ import {
   getStoredUser,
 } from '../services/api'
 import './AppShell.css'
+import './PageDesignSystem.css'
 import QuickCapture from './QuickCapture'
 
 
@@ -121,6 +122,41 @@ function AppShell({
 
   const isLibrary =
     location.pathname === '/'
+
+  const pageTheme = (() => {
+    if (location.pathname.startsWith('/agenda/')) return 'agenda'
+    const routeThemes: Record<string, string> = {
+      '/calendar': 'calendar',
+      '/inbox': 'inbox',
+      '/deadlines': 'deadlines',
+      '/weekly-review': 'weekly-review',
+      '/tasks': 'tasks',
+      '/studies': 'studies',
+      '/data': 'data',
+      '/search': 'search',
+      '/organization': 'organization',
+      '/profile': 'profile',
+      '/stationery': 'stationery',
+    }
+    return routeThemes[location.pathname]
+  })()
+  const windowTitle = (() => {
+    const windowTitles: Record<string, string> = {
+      calendar: 'calendar.exe',
+      inbox: 'inbox.exe',
+      deadlines: 'little deadlines.exe',
+      'weekly-review': 'weekly reflection.exe',
+      tasks: 'task garden.exe',
+      studies: 'study room.exe',
+      data: 'matcha metrics.exe',
+      search: 'find & gather.exe',
+      organization: 'planner desk.exe',
+      profile: 'my little profile.exe',
+      stationery: 'paper & stickers.exe',
+      agenda: 'my little day.exe',
+    }
+    return pageTheme ? windowTitles[pageTheme] : ''
+  })()
 
   useEffect(() => {
     let cancelled = false
@@ -572,8 +608,28 @@ function AppShell({
         </header>
       )}
 
-      <main className="app-shell-content">
-        {children}
+      <main className={[
+        'app-shell-content',
+        pageTheme ? `premium-page premium-page--${pageTheme}` : '',
+      ].filter(Boolean).join(' ')}>
+        {pageTheme
+          ? (
+            <section className="premium-window" aria-label="Janela do Matcha Planner">
+              <header className="premium-window-bar">
+                <div className="premium-window-controls" aria-hidden="true">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+                <span className="premium-window-title">{windowTitle}</span>
+                <span className="premium-window-brand">MATCHA PLANNER</span>
+              </header>
+              <div className="premium-window-content">
+                {children}
+              </div>
+            </section>
+          )
+          : children}
       </main>
 
       <footer className="app-shell-footer">
