@@ -346,7 +346,7 @@ function CalendarPage() {
   const [isSavingCreative, setIsSavingCreative] =
     useState(false)
   const creativeDragRef =
-    useRef<{ kind: 'text' | 'sticker'; id: string; startX: number; startY: number; x: number; y: number } | null>(null)
+    useRef<{ kind: 'text' | 'sticker'; id: string; offsetX: number; offsetY: number; x: number; y: number } | null>(null)
 
 
   const [
@@ -1005,7 +1005,7 @@ function CalendarPage() {
   }, [focusedCreativeId])
 
   function writeAtCalendarPoint(event: ReactMouseEvent<HTMLDivElement>) {
-    if (!freeWriting || (event.target as Element).closest('.calendar-creative-note, .calendar-creative-sticker button')) return
+    if (!freeWriting || (event.target as Element).closest('.calendar-creative-note, .calendar-creative-sticker')) return
     event.preventDefault()
     event.stopPropagation()
     if (creativePress.current && Math.hypot(event.clientX - creativePress.current.x, event.clientY - creativePress.current.y) > 5) return
@@ -1074,33 +1074,95 @@ function CalendarPage() {
 
   function startCreativeDrag(kind: 'text' | 'sticker', id: string, event: ReactPointerEvent<HTMLElement>) {
     event.stopPropagation()
+    if ((event.target as Element).closest('button')) return
+
     const item = kind === 'text'
       ? currentCreative.texts.find(candidate => candidate.id === id)
       : currentCreative.stickers.find(candidate => candidate.id === id)
-    if (!item) return
-    creativeDragRef.current = { kind, id, startX: event.clientX, startY: event.clientY, x: item.x, y: item.y }
+
+    const layer = event.currentTarget.parentElement
+    if (!item || !layer) return
+
+    const rect = layer.getBoundingClientRect()
+    if (!rect.width || !rect.height) return
+
+    const pointerX = ((event.clientX - rect.left) / rect.width) * 100
+    const pointerY = ((event.clientY - rect.top) / rect.height) * 100
+
+    creativeDragRef.current = {
+      kind,
+      id,
+      offsetX: pointerX - item.x,
+      offsetY: pointerY - item.y,
+      x: item.x,
+      y: item.y,
+    }
+
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
   function moveCreative(event: ReactPointerEvent<HTMLElement>) {
     const drag = creativeDragRef.current
     if (!drag) return
-    const layer = event.currentTarget
-    const rect = layer.getBoundingClientRect()
-    const x = Math.max(0, Math.min(94, drag.x + ((event.clientX - drag.startX) / rect.width) * 100))
-    const y = Math.max(0, Math.min(94, drag.y + ((event.clientY - drag.startY) / rect.height) * 100))
+
+    const rect = event.currentTarget.getBoundingClientRect()
+    if (!rect.width || !rect.height) return
+
+    const pointerX = ((event.clientX - rect.left) / rect.width) * 100
+    const pointerY = ((event.clientY - rect.top) / rect.height) * 100
+    const x = Math.max(0, Math.min(94, pointerX - drag.offsetX))
+    const y = Math.max(0, Math.min(94, pointerY - drag.offsetY))
+
     drag.x = x
     drag.y = y
-    setCreativeByMonth(current => ({ ...current, [monthKey]: { ...current[monthKey] ?? emptyMonthCreative(), ...(drag.kind === 'text' ? { texts: currentCreative.texts.map(item => item.id === drag.id ? { ...item, x, y } : item) } : { stickers: currentCreative.stickers.map(item => item.id === drag.id ? { ...item, x, y } : item) }) } }))
+
+    setCreativeByMonth(current => {
+      const monthData = current[monthKey] ?? emptyMonthCreative()
+
+      return {
+        ...current,
+        [monthKey]: {
+          ...monthData,
+          ...(drag.kind === 'text'
+            ? {
+                texts: monthData.texts.map(item =>
+                  item.id === drag.id ? { ...item, x, y } : item,
+                ),
+              }
+            : {
+                stickers: monthData.stickers.map(item =>
+                  item.id === drag.id ? { ...item, x, y } : item,
+                ),
+              }),
+        },
+      }
+    })
   }
 
   function finishCreativeDrag(event: ReactPointerEvent<HTMLElement>) {
     const drag = creativeDragRef.current
     if (!drag) return
+
     creativeDragRef.current = null
+
     const next = drag.kind === 'text'
-      ? { ...currentCreative, texts: currentCreative.texts.map(item => item.id === drag.id ? { ...item, x: drag.x, y: drag.y } : item) }
-      : { ...currentCreative, stickers: currentCreative.stickers.map(item => item.id === drag.id ? { ...item, x: drag.x, y: drag.y } : item) }
+      ? {
+          ...currentCreative,
+          texts: currentCreative.texts.map(item =>
+            item.id === drag.id
+              ? { ...item, x: drag.x, y: drag.y }
+              : item,
+          ),
+        }
+      : {
+          ...currentCreative,
+          stickers: currentCreative.stickers.map(item =>
+            item.id === drag.id
+              ? { ...item, x: drag.x, y: drag.y }
+              : item,
+          ),
+        }
+
     void persistCreative(next)
     event.stopPropagation()
   }
@@ -1838,7 +1900,7 @@ function CalendarPage() {
             onClickCapture={writeAtCalendarPoint}
             onPointerDownCapture={event => {
               creativePress.current = { x: event.clientX, y: event.clientY }
-              if (freeWriting && !(event.target as Element).closest('.calendar-creative-note, .calendar-creative-sticker button')) {
+              if (freeWriting && !(event.target as Element).closest('.calendar-creative-note, .calendar-creative-sticker')) {
                 event.preventDefault()
                 event.stopPropagation()
               }
@@ -2058,7 +2120,7 @@ function CalendarPage() {
                   style={{ left: `${item.x}%`, top: `${item.y}%`, width: `${item.width}px`, height: `${item.height}px`, zIndex: item.zIndex }}
                   onPointerDown={event => startCreativeDrag('sticker', item.id, event)}
                 >
-                  <img src={mediaUrl(item.fileUrl)} alt="" />
+                  <img src={mediaUrl(item.fileUrl)} alt="" draggable={false} />
                   <button type="button" aria-label="Reduzir sticker" onClick={event => { event.stopPropagation(); void persistCreative({ ...currentCreative, stickers: currentCreative.stickers.map(candidate => candidate.id === item.id ? { ...candidate, width: Math.max(28, candidate.width - 12), height: Math.max(28, candidate.height - 12) } : candidate) }) }}>−</button>
                   <button type="button" aria-label="Aumentar sticker" onClick={event => { event.stopPropagation(); void persistCreative({ ...currentCreative, stickers: currentCreative.stickers.map(candidate => candidate.id === item.id ? { ...candidate, width: Math.min(120, candidate.width + 12), height: Math.min(120, candidate.height + 12) } : candidate) }) }}>+</button>
                   <button type="button" aria-label="Excluir sticker" onClick={event => { event.stopPropagation(); removeSticker(item.id) }}>×</button>

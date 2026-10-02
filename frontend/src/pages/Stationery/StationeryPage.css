@@ -514,3 +514,21 @@
 
   .sticker-picker-tools { grid-template-columns: 1fr; }
 }
+/* Biblioteca visual simplificada */
+.stationery-simple-library {
+  display: flex;
+  max-width: 1240px;
+  margin: 0 auto;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.stationery-template-action {
+  margin-top: 18px;
+}
+
+.stationery-template-action button {
+  padding: 10px 16px;
+  border-radius: 11px;
+  cursor: pointer;
+}
