@@ -44,9 +44,6 @@ import TasksPage
 import DataPage
   from './pages/Data/DataPage'
 
-import StationeryPage
-  from './pages/Stationery/StationeryPage'
-
 import ReminderWatcher
   from './components/ReminderWatcher'
 
@@ -239,9 +236,7 @@ function App() {
         <Route
           path="/stationery"
           element={
-            <ProtectedRoute>
-              <StationeryPage />
-            </ProtectedRoute>
+            <Navigate to="/" replace />
           }
         />
 

@@ -64,7 +64,6 @@ const navigation = [
   { to: '/tasks', label: 'Tarefas' },
   { to: '/studies', label: 'Estudos' },
   { to: '/organization', label: 'Organização' },
-  { to: '/stationery', label: 'Papelaria' },
   { to: '/data', label: 'Dados' },
   { to: '/profile', label: 'Perfil' },
 ]
@@ -136,7 +135,6 @@ function AppShell({
       '/search': 'search',
       '/organization': 'organization',
       '/profile': 'profile',
-      '/stationery': 'stationery',
     }
     return routeThemes[location.pathname]
   })()
@@ -152,7 +150,6 @@ function AppShell({
       search: 'find & gather.exe',
       organization: 'planner desk.exe',
       profile: 'my little profile.exe',
-      stationery: 'paper & stickers.exe',
       agenda: 'my little day.exe',
     }
     return pageTheme ? windowTitles[pageTheme] : ''

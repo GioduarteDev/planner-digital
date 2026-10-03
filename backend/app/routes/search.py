@@ -295,7 +295,7 @@ def search_planner(
                         "tasks": "/tasks",
                         "studies": "/studies",
                         "organization": "/organization",
-                        "stationery": "/stationery",
+                        "stationery": "/",
                         "library": "/",
                     }.get(element.surface_type, "/")
                     if page is None

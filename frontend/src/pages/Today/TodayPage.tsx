@@ -13,7 +13,6 @@ import {
   Focus,
   GraduationCap,
   Heart,
-  LibraryBig,
   Moon,
   Music2,
   Droplets,
@@ -1214,15 +1213,6 @@ function TodayPage() {
               />
               <span>
                 Estudos
-              </span>
-            </Link>
-
-            <Link to="/stationery">
-              <LibraryBig
-                size={18}
-              />
-              <span>
-                Papelaria
               </span>
             </Link>
 
@@ -2668,8 +2658,8 @@ function TodayPage() {
                   </label>
 
                   {!media.length && (
-                    <Link to="/stationery">
-                      Explorar Papelaria
+                    <Link to="/">
+                      Abrir Biblioteca
 
                       <ChevronRight
                         size={

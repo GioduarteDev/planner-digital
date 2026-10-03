@@ -320,7 +320,7 @@ function SearchPage() {
         return
       }
 
-      navigate('/stationery')
+      navigate('/')
       return
     }
 

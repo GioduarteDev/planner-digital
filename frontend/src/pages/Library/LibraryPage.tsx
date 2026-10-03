@@ -23,7 +23,6 @@ import {
   ListChecks,
   LogOut,
   Menu,
-  Palette,
   Plus,
   Search,
   Sparkles,
@@ -1670,11 +1669,6 @@ function LibraryPage() {
                 Organização
               </button>
 
-              <button type="button" onClick={() => navigate('/stationery')}>
-                <Palette size={18} aria-hidden="true" />
-                Papelaria
-              </button>
-
               <button type="button" onClick={() => navigate('/data')}>
                 <Database size={18} aria-hidden="true" />
                 Dados
@@ -1816,7 +1810,6 @@ function LibraryPage() {
         <button onClick={() => navigate('/calendar')}><CalendarDays /><span>Calendário</span></button>
         <button onClick={() => navigate('/tasks')}><ListChecks /><span>Tarefas</span></button>
         <button onClick={() => recentAgenda ? handleOpenAgenda(recentAgenda.id) : openCreateModal()}><BookOpen /><span>Agenda</span></button>
-        <button onClick={() => navigate('/stationery')}><Palette /><span>Papelaria</span></button>
       </nav>
 
       {modalMode !== null && (
