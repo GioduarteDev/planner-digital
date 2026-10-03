@@ -394,7 +394,7 @@ try:
     print("6. Testando protecao da assinatura push...")
 
     endpoint = (
-        "https://example.invalid/push/"
+        "https://fcm.googleapis.com/fcm/send/"
         + suffix
     )
 

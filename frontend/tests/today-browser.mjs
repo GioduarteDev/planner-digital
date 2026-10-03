@@ -12,7 +12,7 @@ let settings = {
   today_v2: { [key]: { waterMl: 750 } },
 }
 let dailyEntry = null
-const tasks = [{ id: 1, page_id: 1, text: 'Cuidar das plantas', due_date: key, done: false }]
+const tasks = [{ id: 1, page_id: 1, text: 'Cuidar das plantas <b data-security-fixture>benign markup</b>', due_date: key, done: false }]
 const events = [{ id: 1, title: 'Café com amiga', starts_at: new Date(Date.now() + 86400000).toISOString() }]
 const studies = [{ id: 1, subject: 'Coreano', study_date: key, duration_minutes: 45 }]
 const errors = []
@@ -50,8 +50,8 @@ const server = createServer(async (req, res) => {
       : []
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(value)); return
   }
-  const asset = url.pathname.startsWith('/assets/') || url.pathname === '/matcha-planner-icon.png' ? url.pathname.slice(1) : 'index.html'
-  try { const bytes = await readFile(resolve('dist', asset)); res.writeHead(200, { 'Content-Type': ({ '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png' })[extname(asset)] ?? 'application/octet-stream' }); res.end(bytes) }
+  const asset = url.pathname.startsWith('/assets/') || ['/matcha-planner-icon.png', '/matcha-planner-favicon.jpg'].includes(url.pathname) ? url.pathname.slice(1) : 'index.html'
+  try { const bytes = await readFile(resolve('dist', asset)); res.writeHead(200, { 'Content-Type': ({ '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg' })[extname(asset)] ?? 'application/octet-stream' }); res.end(bytes) }
   catch { res.writeHead(404); res.end() }
 })
 await new Promise(done => server.listen(0, '127.0.0.1', done))
@@ -76,6 +76,8 @@ try {
   await cdp('Page.navigate', { url: `${origin}/today` })
   await until(() => evaluate('document.querySelector(".today-social-panel header b")?.textContent.includes("Giovanna")'), 'Profile name did not load')
   assert(await evaluate('document.querySelector(".today-receipt-lines")?.textContent.includes("Cuidar das plantas")'))
+  assert(await evaluate('document.querySelector(".today-receipt-lines")?.textContent.includes("<b data-security-fixture>benign markup</b>")'), 'Task markup was not escaped')
+  assert.equal(await evaluate('document.querySelector("[data-security-fixture]")'), null, 'Task markup became HTML')
   assert(await evaluate('document.querySelector(".today-upcoming")?.textContent.includes("Café com amiga")'))
   assert(await evaluate('document.querySelector(".today-studies")?.textContent.includes("45 min")'))
   await evaluate(`(() => { const input=document.querySelector('[aria-label="Cidade para o clima"]'); const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set; setter.call(input,'Campinas'); input.dispatchEvent(new Event('input',{bubbles:true})); })()`)

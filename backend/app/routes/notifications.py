@@ -1,18 +1,26 @@
 import asyncio
 import hashlib
 import json
+import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from pywebpush import WebPushException, webpush
+from requests.exceptions import RequestException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import engine, get_db
 from app.dependencies import get_current_user
+from app.push_security import (
+    InvalidPushEndpoint,
+    PUSH_TIMEOUT_SECONDS,
+    SafePushSession,
+    validate_push_endpoint,
+)
 from app.models import (
     Event,
     EventReminderDelivery,
@@ -24,6 +32,7 @@ from app.models import (
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 REMINDER_CHECK_SECONDS = 30
+logger = logging.getLogger(__name__)
 
 
 class PushKeys(BaseModel):
@@ -73,23 +82,30 @@ def send_push(subscription: PushSubscription, payload: dict) -> str:
         return "error"
 
     try:
-        webpush(
-            subscription_info={
-                "endpoint": subscription.endpoint,
-                "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
-            },
-            data=json.dumps(payload, ensure_ascii=False),
-            vapid_private_key=private_key_path,
-            vapid_claims={"sub": get_vapid_subject()},
-            ttl=60 * 60,
-        )
+        destination = validate_push_endpoint(subscription.endpoint)
+        with SafePushSession(destination) as session:
+            webpush(
+                subscription_info={
+                    "endpoint": subscription.endpoint,
+                    "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
+                },
+                data=json.dumps(payload, ensure_ascii=False),
+                vapid_private_key=private_key_path,
+                vapid_claims={"sub": get_vapid_subject()},
+                ttl=60 * 60,
+                timeout=PUSH_TIMEOUT_SECONDS,
+                requests_session=session,
+            )
         return "sent"
     except WebPushException as error:
         response = getattr(error, "response", None)
         status_code = getattr(response, "status_code", None)
         if status_code in {404, 410}:
             return "expired"
-        print("Erro ao enviar Web Push:", error)
+        logger.warning("Falha na entrega Web Push (HTTP %s).", status_code)
+        return "error"
+    except (InvalidPushEndpoint, RequestException, ValueError):
+        logger.warning("Entrega Web Push bloqueada ou indisponível.")
         return "error"
 
 
@@ -303,8 +319,12 @@ def subscribe(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if payload.endpoint.strip() == "":
-        raise HTTPException(status_code=400, detail="Endpoint de push inválido.")
+    try:
+        validate_push_endpoint(payload.endpoint)
+    except InvalidPushEndpoint:
+        raise HTTPException(
+            status_code=400, detail="Endpoint de push inválido ou não permitido."
+        ) from None
 
     existing = db.scalar(
         select(PushSubscription).where(PushSubscription.endpoint == payload.endpoint)

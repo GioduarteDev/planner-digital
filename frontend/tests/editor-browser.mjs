@@ -137,10 +137,10 @@ const server = createServer(async (req, res) => {
     }
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(result)); return
   }
-  const asset = url.pathname.startsWith('/assets/') || url.pathname === '/matcha-planner-icon.png' ? url.pathname.slice(1) : 'index.html'
+  const asset = url.pathname.startsWith('/assets/') || ['/matcha-planner-icon.png', '/matcha-planner-favicon.jpg'].includes(url.pathname) ? url.pathname.slice(1) : 'index.html'
   try {
     const bytes = await readFile(resolve('dist', asset))
-    res.writeHead(200, { 'Content-Type': ({ '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png' })[extname(asset)] ?? 'application/octet-stream' })
+    res.writeHead(200, { 'Content-Type': ({ '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg' })[extname(asset)] ?? 'application/octet-stream' })
     res.end(bytes)
   } catch { res.writeHead(404); res.end() }
 })

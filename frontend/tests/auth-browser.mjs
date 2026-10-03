@@ -37,10 +37,10 @@ const server = createServer(async (req, res) => {
       }
     res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify([])); return
   }
-  const asset = url.pathname.startsWith('/assets/') || url.pathname === '/matcha-planner-icon.png' ? url.pathname.slice(1) : 'index.html'
+  const asset = url.pathname.startsWith('/assets/') || ['/matcha-planner-icon.png', '/matcha-planner-favicon.jpg'].includes(url.pathname) ? url.pathname.slice(1) : 'index.html'
   try {
     const bytes = await readFile(resolve('dist', asset))
-    res.writeHead(200, { 'Content-Type': ({ '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png' })[extname(asset)] ?? 'application/octet-stream' })
+    res.writeHead(200, { 'Content-Type': ({ '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg' })[extname(asset)] ?? 'application/octet-stream' })
     res.end(bytes)
   } catch { res.writeHead(404); res.end() }
 })
@@ -59,11 +59,11 @@ try {
   await new Promise(done => socket.addEventListener('open', done, { once: true }))
   let nextId = 0; const pending = new Map()
   socket.addEventListener('message', event => { const message = JSON.parse(event.data); if (message.method === 'Runtime.exceptionThrown') errors.push(message.params.exceptionDetails.text); if (message.id && pending.has(message.id)) { const { done, fail } = pending.get(message.id); pending.delete(message.id); message.error ? fail(new Error(JSON.stringify(message.error))) : done(message.result) } })
-  const cdp = (method, params = {}) => new Promise((done, fail) => { const id = ++nextId; pending.set(id, { done, fail }); socket.send(JSON.stringify({ id, method, params })) })
+  const cdp = (method, params = {}) => new Promise((done, fail) => { const id = ++nextId; const timer = setTimeout(() => { pending.delete(id); fail(new Error('CDP timeout: ' + method)) }, 20000); pending.set(id, { done: value => { clearTimeout(timer); done(value) }, fail: error => { clearTimeout(timer); fail(error) } }); socket.send(JSON.stringify({ id, method, params })) })
   const evaluate = async expression => { const result = await cdp('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }); if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails)); return result.result.value }
   const setInput = (selector, value) => evaluate(`(() => { const input=document.querySelector(${JSON.stringify(selector)}); const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set; setter.call(input,${JSON.stringify(value)}); input.dispatchEvent(new Event('input',{bubbles:true})); })()`)
   await cdp('Runtime.enable'); await cdp('Page.enable')
-  await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `const realFetch=window.fetch;window.fetch=(url,options)=>{const target=new URL(typeof url==='string'?url:url.url,location.href);if(target.port==='8000')return realFetch('/__api'+target.pathname+target.search,options);return realFetch(url,options)};` })
+  await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `const realFetch=window.fetch;window.fetch=(url,options)=>{const target=new URL(typeof url==='string'?url:url.url,location.href);if(target.port==='8000')return realFetch('/__api'+target.pathname+target.search,options);return realFetch(url,options)};window.confirm=()=>true;` })
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false })
   await cdp('Page.navigate', { url: `${origin}/login` })
   await until(() => evaluate('!!document.querySelector(".auth-editorial-shell")'), 'Login did not render')

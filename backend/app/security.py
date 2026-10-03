@@ -47,15 +47,17 @@ def decode_access_token_payload(token: str) -> dict[str, int | str | None] | Non
             token,
             settings.jwt_secret,
             algorithms=[settings.jwt_algorithm],
+            options={"require": ["exp", "sub", "sid"]},
         )
         if payload.get("kind") not in (None, "access"):
             return None
         user_id = payload.get("sub")
-        if user_id is None:
+        session_key = payload.get("sid")
+        if user_id is None or not isinstance(session_key, str) or not session_key:
             return None
         return {
             "user_id": int(user_id),
-            "session_key": payload.get("sid"),
+            "session_key": session_key,
         }
     except (InvalidTokenError, ValueError, TypeError):
         return None

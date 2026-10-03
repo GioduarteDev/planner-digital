@@ -2,13 +2,13 @@ from datetime import datetime, timezone
 import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from sqlalchemy import func, select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_session_key, get_current_user
-from app.models import Agenda, AuthSession, User
+from app.models import AuthSession, User
 from app.rate_limit import (
     login_rate_limiter,
     register_rate_limiter,
@@ -145,9 +145,6 @@ def register(data: UserCreate, request: Request, response: Response, db: Session
         if existing_username:
             raise HTTPException(status_code=409, detail="Este username já está em uso.")
 
-    user_count = db.scalar(select(func.count()).select_from(User))
-    is_first_user = user_count == 0
-
     user = User(
         email=data.email,
         password_hash=hash_password(data.password),
@@ -156,9 +153,6 @@ def register(data: UserCreate, request: Request, response: Response, db: Session
     )
     db.add(user)
     db.flush()
-
-    if is_first_user:
-        db.execute(update(Agenda).where(Agenda.user_id.is_(None)).values(user_id=user.id))
 
     auth_session = _create_session(user, request, db)
     db.commit()
@@ -273,8 +267,7 @@ def logout(
     current_user: User = Depends(get_current_user),
     current_key: str | None = Depends(get_current_session_key),
 ):
-    # Tokens antigos, criados antes do controle de sessões, continuam válidos
-    # até expirarem. Novos logins possuem sid e podem ser encerrados de verdade.
+    # Every accepted token carries a revocable session identifier.
     if current_key:
         item = db.scalar(
             select(AuthSession).where(

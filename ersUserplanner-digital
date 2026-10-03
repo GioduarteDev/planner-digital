@@ -1,0 +1,20 @@
+warning: in the working copy of 'backend/app/routes/auth.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/routes/notifications.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/routes/profile.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'backend/app/security.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/tests/auth-browser.mjs', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/tests/today-browser.mjs', LF will be replaced by CRLF the next time Git touches it
+ backend/app/routes/auth.py          |  13 [32m+++[m[31m-------[m
+ backend/app/routes/notifications.py |  46 [32m++++++++++++++++++++++++++[m[31m----------[m
+ backend/app/routes/profile.py       |  27 [32m++++++++++++++[m[31m-------[m
+ backend/app/security.py             |   6 [32m+++[m[31m--[m
+ backend/requirements.txt            | Bin [31m1236[m -> [32m679[m bytes
+ backend/test_user_isolation.py      |   2 [32m+[m[31m-[m
+ frontend/index.html                 |   6 [32m++[m[31m---[m
+ frontend/tests/academic-browser.mjs |   4 [32m++[m[31m--[m
+ frontend/tests/auth-browser.mjs     |   8 [32m+++[m[31m----[m
+ frontend/tests/editor-browser.mjs   |   4 [32m++[m[31m--[m
+ frontend/tests/library-browser.mjs  |   4 [32m++[m[31m--[m
+ frontend/tests/today-browser.mjs    |   8 [32m++++[m[31m---[m
+ 12 files changed, 78 insertions(+), 50 deletions(-)
