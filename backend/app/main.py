@@ -1,7 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
@@ -36,6 +36,8 @@ from app.routes.tasks import router as tasks_router
 from app.routes.habits import router as habits_router
 from app.routes.inbox import router as inbox_router
 from app.routes.weekly_reviews import router as weekly_reviews_router
+from pathlib import Path
+from fastapi.responses import FileResponse
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -136,11 +138,18 @@ async def add_security_headers(
             "max-age=31536000; "
             "includeSubDomains"
         )
-
-        response.headers[
+    response.headers[
             "Content-Security-Policy"
         ] = (
-            "default-src 'none'; "
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' https: data: blob:; "
+            "font-src 'self' data:; "
+            "connect-src 'self'; "
+            "media-src 'self' blob:; "
+            "worker-src 'self' blob:; "
+            "object-src 'none'; "
             "frame-ancestors 'none'; "
             "base-uri 'none'"
         )
@@ -177,9 +186,23 @@ app.include_router(daily_entries_router)
 app.include_router(search_router)
 
 
+FRONTEND_DIST = (
+    Path(__file__).resolve().parents[2]
+    / "frontend"
+    / "dist"
+)
+
+
 @app.get("/")
 def root():
-    return {"message": "Planner Digital API funcionando!"}
+    if is_production:
+        return FileResponse(
+            FRONTEND_DIST / "index.html"
+        )
+
+    return {
+        "message": "Planner Digital API funcionando!"
+    }
 
 
 @app.get("/health")
@@ -194,4 +217,27 @@ if not is_production:
             connection.execute(
                 text("SELECT 1")
             )
-        return {"database": "ok"}
+        return {"database":"ok"}  
+
+if is_production:
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_frontend(full_path: str, request: Request):
+        static_root = FRONTEND_DIST.resolve()
+        file_path = (static_root / full_path).resolve()
+
+        if not file_path.is_relative_to(static_root):
+            raise HTTPException(status_code=404)
+
+        if file_path.is_file():
+            return FileResponse(file_path)
+
+        if (
+            "text/html" in request.headers.get("accept", "")
+            and not Path(full_path).suffix
+        ):
+            return FileResponse(
+                static_root / "index.html"
+            )
+
+        raise HTTPException(status_code=404)

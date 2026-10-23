@@ -6,7 +6,11 @@ const DEV_API_HOST =
 
 export const API_URL =
   import.meta.env.VITE_API_URL
-  || `http://${DEV_API_HOST}:8000`
+  || (
+    import.meta.env.PROD
+      ? ''
+      : `http://${DEV_API_HOST}:8000`
+  )
 
 
 const USER_KEY =
