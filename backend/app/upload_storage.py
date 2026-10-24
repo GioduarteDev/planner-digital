@@ -52,6 +52,7 @@ def use_cloud():
 def s3_client():
     try:
         boto3 = import_module("boto3")
+        from botocore.config import Config
     except ModuleNotFoundError as error:
         raise RuntimeError(
             "O armazenamento em nuvem requer a dependência boto3."
@@ -61,8 +62,11 @@ def s3_client():
         "s3",
         endpoint_url=os.environ["AWS_ENDPOINT_URL_S3"],
         region_name=os.getenv("AWS_REGION", "us-east-2"),
+        config=Config(
+            signature_version="s3v4",
+            s3={"addressing_style": "path"},
+        ),
     )
-
 
 def bucket_name():
     return os.getenv("UPLOADS_S3_BUCKET", "matcha-uploads")
