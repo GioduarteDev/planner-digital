@@ -7,11 +7,12 @@ from fastapi import (
     HTTPException,
     status,
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.upload_storage import file_exists, open_file, use_cloud
 from app.dependencies import get_current_user
 from app.models import (
     Agenda,
@@ -285,8 +286,41 @@ def get_private_upload(
         stored_name,
     )
 
-    if not file_path.is_file():
+    if not file_exists(file_path):
         _not_found()
+
+    headers = {
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+    }
+
+    if not use_cloud():
+        return FileResponse(
+            path=file_path,
+            media_type=mime_type,
+            headers=headers,
+        )
+
+    try:
+        stream = open_file(file_path)
+    except FileNotFoundError:
+        _not_found()
+
+    def chunks():
+        try:
+            while True:
+                data = stream.read(64 * 1024)
+                if not data:
+                    break
+                yield data
+        finally:
+            stream.close()
+
+    return StreamingResponse(
+        chunks(),
+        media_type=mime_type,
+        headers=headers,
+    )
 
     return FileResponse(
         path=file_path,

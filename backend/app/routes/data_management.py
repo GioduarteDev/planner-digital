@@ -7,6 +7,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.upload_storage import file_exists, file_size
 from app.dependencies import get_current_user
 from app.models import (
     Agenda,
@@ -62,10 +63,10 @@ def _profile_file_bytes(url: str | None) -> int:
         path = (UPLOAD_ROOT / relative).resolve()
         path.relative_to(root)
 
-        if not path.is_file():
+        if not file_exists(path):
             return 0
 
-        return path.stat().st_size
+        return file_size(path)
     except (OSError, ValueError):
         return 0
 

@@ -1,5 +1,4 @@
 from pathlib import Path
-from shutil import copy2
 from uuid import uuid4
 
 from fastapi import (
@@ -15,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.upload_storage import copy_file, delete_file, file_exists, write_file
 from app.dependencies import get_current_user
 from app.models import (
     Agenda,
@@ -162,8 +162,6 @@ def list_page_media(
     ).all()
 
     return media_items
-
-
 @router.post(
     "/pages/{page_id}/media",
     response_model=PageMediaResponse,
@@ -249,7 +247,7 @@ async def upload_page_media(
     total_size = 0
 
     try:
-        with destination.open("wb") as output:
+        with write_file(destination, content_type=detected_mime) as output:
             chunk = first_chunk
 
             while chunk:
@@ -268,8 +266,8 @@ async def upload_page_media(
                 )
 
     except Exception:
-        if destination.exists():
-            destination.unlink()
+        if file_exists(destination):
+            delete_file(destination)
 
         raise
 
@@ -322,14 +320,12 @@ async def upload_page_media(
     except Exception:
         db.rollback()
 
-        if destination.exists():
-            destination.unlink()
+        if file_exists(destination):
+            delete_file(destination)
 
         raise
 
     return media
-
-
 @router.patch(
     "/media/{media_id}",
     response_model=PageMediaResponse,
@@ -409,7 +405,7 @@ def duplicate_page_media(
         / media.stored_name
     )
 
-    if not source_path.exists():
+    if not file_exists(source_path):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=(
@@ -444,7 +440,7 @@ def duplicate_page_media(
         else 0
     )
 
-    copy2(
+    copy_file(
         source_path,
         destination,
     )
@@ -477,8 +473,8 @@ def duplicate_page_media(
     except Exception:
         db.rollback()
 
-        if destination.exists():
-            destination.unlink()
+        if file_exists(destination):
+            delete_file(destination)
 
         raise
 
@@ -510,5 +506,7 @@ def delete_page_media(
     db.delete(media)
     db.commit()
 
-    if file_path.exists():
-        file_path.unlink()
+    if file_exists(file_path):
+        delete_file(file_path)
+
+    return None

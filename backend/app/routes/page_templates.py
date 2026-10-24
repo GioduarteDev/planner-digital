@@ -1,6 +1,5 @@
 from datetime import datetime
 from pathlib import Path
-from shutil import copy2
 from uuid import uuid4
 
 from fastapi import (
@@ -14,6 +13,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.upload_storage import copy_file, delete_file, file_exists
 from app.dependencies import get_current_user
 from app.models import (
     Agenda,
@@ -233,14 +233,14 @@ def snapshot_canvas_elements(
             template_asset_stored_name = None
             if element.asset_stored_name:
                 source = CANVAS_MEDIA_DIRECTORY / element.asset_stored_name
-                if not source.exists():
+                if not file_exists(source):
                     raise HTTPException(
                         status_code=status.HTTP_409_CONFLICT,
                         detail="Um arquivo do canvas não foi encontrado.",
                     )
                 template_asset_stored_name = f"{uuid4().hex}{source.suffix.lower()}"
                 destination = TEMPLATE_CANVAS_MEDIA_DIRECTORY / template_asset_stored_name
-                copy2(source, destination)
+                copy_file(source, destination)
                 created_files.append(destination)
 
             snapshots.append({
@@ -260,8 +260,8 @@ def snapshot_canvas_elements(
             })
     except Exception:
         for path in created_files:
-            if path.exists():
-                path.unlink()
+            if file_exists(path):
+                delete_file(path)
         raise
 
     return snapshots, created_files
@@ -282,14 +282,14 @@ def build_canvas_for_page(
             template_stored = element.get("template_asset_stored_name")
             if template_stored:
                 source = TEMPLATE_CANVAS_MEDIA_DIRECTORY / template_stored
-                if not source.exists():
+                if not file_exists(source):
                     raise HTTPException(
                         status_code=status.HTTP_409_CONFLICT,
                         detail="Um arquivo de canvas do template não foi encontrado.",
                     )
                 stored_name = f"{uuid4().hex}{source.suffix.lower()}"
                 destination = CANVAS_MEDIA_DIRECTORY / stored_name
-                copy2(source, destination)
+                copy_file(source, destination)
                 created_files.append(destination)
                 asset_url = f"/uploads/canvas_media/{stored_name}"
 
@@ -317,8 +317,8 @@ def build_canvas_for_page(
             )
     except Exception:
         for path in created_files:
-            if path.exists():
-                path.unlink()
+            if file_exists(path):
+                delete_file(path)
         raise
 
     return rows, created_files
@@ -349,7 +349,7 @@ def snapshot_media(
                 / media.stored_name
             )
 
-            if not source.exists():
+            if not file_exists(source):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=(
@@ -369,7 +369,7 @@ def snapshot_media(
                 / template_stored_name
             )
 
-            copy2(
+            copy_file(
                 source,
                 destination,
             )
@@ -400,8 +400,8 @@ def snapshot_media(
 
     except Exception:
         for path in created_files:
-            if path.exists():
-                path.unlink()
+            if file_exists(path):
+                delete_file(path)
 
         raise
 
@@ -436,8 +436,8 @@ def remove_template_files(
             / stored_name
         )
 
-        if path.exists():
-            path.unlink()
+        if file_exists(path):
+            delete_file(path)
 
 
 def build_media_for_page(
@@ -463,7 +463,7 @@ def build_media_for_page(
                 / template_stored_name
             )
 
-            if not source.exists():
+            if not file_exists(source):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=(
@@ -481,7 +481,7 @@ def build_media_for_page(
                 / stored_name
             )
 
-            copy2(
+            copy_file(
                 source,
                 destination,
             )
@@ -563,8 +563,8 @@ def build_media_for_page(
 
     except Exception:
         for path in created_files:
-            if path.exists():
-                path.unlink()
+            if file_exists(path):
+                delete_file(path)
 
         raise
 
@@ -692,8 +692,8 @@ def save_page_as_template(
         db.rollback()
 
         for path in created_files:
-            if path.exists():
-                path.unlink()
+            if file_exists(path):
+                delete_file(path)
 
         raise
 
@@ -787,8 +787,8 @@ def delete_page_template(
     db.commit()
 
     for path in template_files:
-        if path.exists():
-            path.unlink()
+        if file_exists(path):
+            delete_file(path)
 
     return None
 
@@ -933,14 +933,14 @@ def apply_template_to_page(
         db.rollback()
 
         for path in new_media_paths + new_canvas_paths:
-            if path.exists():
-                path.unlink()
+            if file_exists(path):
+                delete_file(path)
 
         raise
 
     for path in old_paths + old_canvas_paths:
-        if path.exists():
-            path.unlink()
+        if file_exists(path):
+            delete_file(path)
 
     return page
 
@@ -1080,8 +1080,8 @@ def create_page_from_template(
         db.rollback()
 
         for path in new_media_paths + new_canvas_paths:
-            if path.exists():
-                path.unlink()
+            if file_exists(path):
+                delete_file(path)
 
         raise
 

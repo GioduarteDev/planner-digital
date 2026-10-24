@@ -15,6 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.upload_storage import delete_file, file_exists
 from app.dependencies import (
     get_current_user,
 )
@@ -321,8 +322,8 @@ def delete_agenda(
     db.commit()
 
     for path in file_paths:
-        if path.exists():
-            path.unlink()
+        if file_exists(path):
+            delete_file(path)
 
 @router.put(
     "/{agenda_id}/pin",

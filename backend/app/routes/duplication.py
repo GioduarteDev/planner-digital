@@ -1,6 +1,5 @@
 from copy import deepcopy
 from pathlib import Path
-from shutil import copy2
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -8,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.upload_storage import copy_file, delete_file, file_exists
 from app.dependencies import get_current_user
 from app.models import (
     Agenda,
@@ -51,7 +51,7 @@ def _remap_task_receipt_data(
 
 def _copy_media_row(source: PageMedia, new_page_id: int) -> tuple[PageMedia, Path]:
     source_path = PAGE_MEDIA_DIRECTORY / source.stored_name
-    if not source_path.exists():
+    if not file_exists(source_path):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"A mídia '{source.original_name}' não foi encontrada no disco.",
@@ -59,7 +59,7 @@ def _copy_media_row(source: PageMedia, new_page_id: int) -> tuple[PageMedia, Pat
 
     stored_name = f"{uuid4().hex}{source_path.suffix.lower()}"
     destination = PAGE_MEDIA_DIRECTORY / stored_name
-    copy2(source_path, destination)
+    copy_file(source_path, destination)
 
     row = PageMedia(
         page_id=new_page_id,
@@ -164,14 +164,14 @@ def _copy_page_children(
         asset_url = None
         if element.asset_stored_name:
             source_asset = CANVAS_MEDIA_DIRECTORY / element.asset_stored_name
-            if not source_asset.exists():
+            if not file_exists(source_asset):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Um arquivo de elemento do canvas não foi encontrado.",
                 )
             asset_stored_name = f"{uuid4().hex}{source_asset.suffix.lower()}"
             destination_asset = CANVAS_MEDIA_DIRECTORY / asset_stored_name
-            copy2(source_asset, destination_asset)
+            copy_file(source_asset, destination_asset)
             created_files.append(destination_asset)
             asset_url = f"/uploads/canvas_media/{asset_stored_name}"
 
@@ -264,8 +264,8 @@ def duplicate_page(
     except Exception:
         db.rollback()
         for path in created_files:
-            if path.exists():
-                path.unlink()
+            if file_exists(path):
+                delete_file(path)
         raise
 
     return new_page
@@ -360,8 +360,8 @@ def duplicate_agenda(
     except Exception:
         db.rollback()
         for path in created_files:
-            if path.exists():
-                path.unlink()
+            if file_exists(path):
+                delete_file(path)
         raise
 
     return new_agenda

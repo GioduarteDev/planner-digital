@@ -7,6 +7,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.upload_storage import delete_file, file_exists, write_file
 from app.dependencies import get_current_session_key, get_current_user
 from app.json_utils import deep_merge_json
 from app.models import (
@@ -94,8 +95,8 @@ def _path_from_upload_url(url: str | None) -> Path | None:
 def _delete_paths(paths: set[Path]) -> None:
     for path in paths:
         try:
-            if path.is_file():
-                path.unlink()
+            if file_exists(path):
+                delete_file(path)
         except OSError:
             pass
 
@@ -122,7 +123,7 @@ async def _save_image(file: UploadFile) -> str:
     total_size = 0
 
     try:
-        with destination.open("wb") as output:
+        with write_file(destination, content_type=detected_mime) as output:
             chunk = first_chunk
             while chunk:
                 total_size += len(chunk)
@@ -134,13 +135,11 @@ async def _save_image(file: UploadFile) -> str:
                 output.write(chunk)
                 chunk = await file.read(1024 * 1024)
     except Exception:
-        if destination.exists():
-            destination.unlink()
+        if file_exists(destination):
+            delete_file(destination)
         raise
 
     return f"/uploads/profile/{stored_name}"
-
-
 def _collect_user_upload_paths(db: Session, user: User) -> set[Path]:
     paths: set[Path] = set()
 
@@ -259,8 +258,6 @@ def update_settings(
     db.commit()
     db.refresh(current_user)
     return current_user
-
-
 @router.post("/photo", response_model=UserResponse)
 async def upload_profile_photo(
     file: UploadFile = File(...),

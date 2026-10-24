@@ -1,5 +1,4 @@
 from pathlib import Path
-from shutil import copy2
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -7,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.upload_storage import copy_file, delete_file, file_exists
 from app.dependencies import get_current_user
 from app.models import CanvasElement, MediaLibraryItem, Task, User
 from app.routes.helpers import get_user_page_or_404
@@ -125,11 +125,11 @@ def same_surface_query(
 
 
 def copy_canvas_asset(source_path: Path) -> tuple[str, Path]:
-    if not source_path.exists():
+    if not file_exists(source_path):
         raise HTTPException(status_code=409, detail="Arquivo do elemento não foi encontrado.")
     stored_name = f"{uuid4().hex}{source_path.suffix.lower()}"
     destination = CANVAS_MEDIA_DIRECTORY / stored_name
-    copy2(source_path, destination)
+    copy_file(source_path, destination)
     return stored_name, destination
 
 
@@ -137,10 +137,8 @@ def delete_canvas_asset(element: CanvasElement) -> None:
     if not element.asset_stored_name:
         return
     path = CANVAS_MEDIA_DIRECTORY / element.asset_stored_name
-    if path.exists():
-        path.unlink()
-
-
+    if file_exists(path):
+        delete_file(path)
 @router.get("/elements", response_model=list[CanvasElementResponse])
 def list_elements(
     surface_type: str = Query(...),
@@ -278,13 +276,11 @@ def create_element_from_library(
         db.refresh(element)
     except Exception:
         db.rollback()
-        if destination.exists():
-            destination.unlink()
+        if file_exists(destination):
+            delete_file(destination)
         raise
 
     return element
-
-
 @router.patch("/elements/{element_id}", response_model=CanvasElementResponse)
 def update_element(
     element_id: int,
@@ -364,8 +360,8 @@ def duplicate_element(
         db.refresh(copy)
     except Exception:
         db.rollback()
-        if destination is not None and destination.exists():
-            destination.unlink()
+        if destination is not None and file_exists(destination):
+            delete_file(destination)
         raise
 
     return copy
@@ -383,6 +379,6 @@ def delete_element(
     db.commit()
     if stored_name:
         path = CANVAS_MEDIA_DIRECTORY / stored_name
-        if path.exists():
-            path.unlink()
+        if file_exists(path):
+            delete_file(path)
     return None
