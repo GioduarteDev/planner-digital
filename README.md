@@ -4,6 +4,14 @@
 
 # Matcha Planner
 
+### Acesse o projeto online
+
+O Matcha Planner está disponível na internet!
+
+**[CLIQUE AQUI PARA ACESSAR O MATCHA PLANNER](https://matcha-planner-digital.onrender.com/login)**
+
+> O projeto utiliza hospedagem gratuita. O primeiro acesso pode levar alguns segundos enquanto
+
 ### your little digital corner for plans, studies & slow productivity
 
 **Um planner digital full stack criado para transformar organização em uma experiência visual, pessoal e acolhedora.**
