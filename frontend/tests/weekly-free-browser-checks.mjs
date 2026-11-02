@@ -1,0 +1,106 @@
+import assert from 'node:assert/strict'
+import { mkdir, writeFile } from 'node:fs/promises'
+
+export async function verifyWeeklyFree({ cdp, evaluate, click, until, delay, pages, elements, getSettings, getMedia }) {
+  const id = 'weekly-free-spread'
+  const oldPages = structuredClone(pages)
+  elements.push({ id: 2000, user_id: 1, page_id: 2, surface_type: 'page', element_type: 'template:weekly-open-journal', x: 0, y: 0, width: 886, height: 1253, rotation: 0, z_index: -20, locked: true, data: { templateId: 'weekly-open-journal', spreadSide: 'left', existing: 'preserve' } })
+  const oldBase = structuredClone(elements[0])
+  await click('[aria-label="Templates"]')
+  assert.equal(await evaluate(`document.querySelectorAll('[data-template-id="${id}"] .built-in-template-actions button').length`), 1, 'New model must not apply to old pages')
+  assert.equal(await evaluate('document.querySelectorAll("[data-template-id=weekly-open-journal] .built-in-template-actions button").length'), 2, 'Existing template actions changed')
+  await click(`[data-template-id="${id}"] .built-in-template-actions button`)
+  await until(() => pages.length===oldPages.length+2, 'Two new pages were not created')
+  await until(() => evaluate('!!document.querySelector(".weekly-free-spread.is-left") && !!document.querySelector(".weekly-free-spread.is-right")'), 'Spread sides missing')
+  const [left, right] = pages.slice(-2)
+  assert.equal(left.paper_type, 'blank'); assert.equal(right.paper_type, 'grid')
+  assert.equal(left.paper_settings.orientation, 'portrait'); assert.equal(right.paper_settings.orientation, 'portrait')
+  assert.deepEqual(pages.slice(0,oldPages.length), oldPages, 'Creating the model modified old pages')
+  assert.deepEqual(elements.find(item=>item.id===2000), oldBase, 'Existing template was replaced')
+  const bases = elements.filter(item=>item.element_type===`template:${id}`)
+  assert.equal(bases.length, 2)
+  assert(bases.every(item=>item.width===886 && item.height===1253 && item.locked && item.z_index===-20))
+  assert.equal(await evaluate('document.querySelectorAll(".weekly-free-spread.is-left [data-week-note]").length'), 7)
+  assert.equal(await evaluate('document.querySelectorAll(".weekly-free-spread.is-right :is(button,input,textarea)").length'), 0)
+  assert.equal(await evaluate('getComputedStyle(document.querySelector(".weekly-free-grid")).pointerEvents'), 'none')
+  const originalWeek = await evaluate('document.querySelector(".weekly-free-spread.is-left").dataset.weekStart')
+  const firstDate = await evaluate('document.querySelector("[data-week-note]").dataset.weekNote')
+  const notes = '  Reunião às 10h\n\nCafé & planos ♡  '
+  const typeNote = async value => {
+    await evaluate(`(() => { const field=document.querySelector('[data-week-note]'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(field,${JSON.stringify(value)}); field.dispatchEvent(new Event('input',{bubbles:true})); })()`)
+  }
+  await typeNote(notes)
+  await until(() => bases[0].data[`free-week:day:${firstDate}`]===notes, 'Day notes did not autosave')
+  await click('[aria-label="Próxima semana do modelo livre"]')
+  await until(() => getSettings().weekly_open_journal_week!==originalWeek && getSettings().weekly_open_journal_week, 'Week navigation not saved')
+  const nextDate = await evaluate('document.querySelector("[data-week-note]").dataset.weekNote')
+  assert.notEqual(nextDate, firstDate)
+  assert.equal(await evaluate('document.querySelector("[data-week-note]").value'), '')
+  await typeNote('Planos da próxima semana')
+  await until(() => bases[0].data[`free-week:day:${nextDate}`]==='Planos da próxima semana', 'Second week did not save')
+  await until(() => evaluate('!document.querySelector(\'[aria-label="Semana anterior do modelo livre"]\').disabled'), 'Week controls busy')
+  await click('[aria-label="Semana anterior do modelo livre"]')
+  await until(() => evaluate(`document.querySelector('[data-week-note]').value === ${JSON.stringify(notes)}`), 'Returning to the week lost notes')
+
+  const photo = async name => {
+    await mkdir('test-results', { recursive: true })
+    await writeFile(`test-results/weekly-free-${name}.png`, Buffer.from((await cdp('Page.captureScreenshot', { format: 'png' })).data,'base64'))
+  }
+  for (const width of [1920,1440,1024,768,390]) {
+    await cdp('Emulation.setDeviceMetricsOverride', { width, height: width<600?844:1100, deviceScaleFactor: 1, mobile: width<600 })
+    await delay(180)
+    const layout = await evaluate(`(() => { const sheets=[...document.querySelectorAll('.planner-sheet')]; const visible=sheets.filter(item=>item.checkVisibility()).map(item=>item.getBoundingClientRect()); return { count:visible.length, aligned:visible.length===1||Math.abs(visible[0].top-visible[1].top)<3, heights:visible.length===1||Math.abs(visible[0].height-visible[1].height)<3, fits:visible.every(item=>item.width<=innerWidth) }; })()`)
+    assert.equal(layout.count, width<=1023?1:2, `Unexpected sheets at ${width}`)
+    assert(layout.aligned&&layout.heights&&layout.fits, `Misaligned/overflow at ${width}: ${JSON.stringify(layout)}`)
+    if (width===1440||width===390) await photo(`${width}-light`)
+  }
+  await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false })
+  await click('[aria-label="Ativar tema escuro"]')
+  await until(() => evaluate('getComputedStyle(document.querySelector(".weekly-free-grid")).backgroundColor === "rgb(36, 43, 41)"'), 'Dark template palette failed')
+  await photo('1440-dark')
+  await click('[aria-label="Ativar tema claro"]')
+
+  // A real click through the inert grid must focus the right page and create text.
+  await evaluate(`(() => { const sheet=document.querySelector('.workspace-companion .planner-sheet'); const r=sheet.getBoundingClientRect(); const scale=r.width/sheet.offsetWidth; window.scrollBy(0,r.top+360*scale-550); })()`)
+  const point = await evaluate(`(() => { const sheet=document.querySelector('.workspace-companion .planner-sheet'); const r=sheet.getBoundingClientRect(); const scale=r.width/sheet.offsetWidth; return {x:r.left+80*scale,y:r.top+360*scale}; })()`)
+  for (const type of ['mousePressed','mouseReleased']) await cdp('Input.dispatchMouseEvent', { type, ...point, button:'left',clickCount:1 })
+  await until(() => evaluate('document.activeElement?.matches(".workspace-companion .canvas-inline-text")'), 'Grid blocked writing/focus')
+  await cdp('Input.insertText', { text: 'Minha página livre ♡' })
+  await until(() => elements.some(item=>item.page_id===right.id&&item.data.text==='Minha página livre ♡'), 'Right-page text did not save')
+  const tool = label => click(`.is-focused [aria-label="${label}"]`)
+  const elementsRoot = async () => {
+    const open = await evaluate('document.querySelector(\'.is-focused [aria-label="Elementos"]\').getAttribute("aria-expanded")==="true"')
+    if (open) await click('.is-focused .element-library-back'); else await tool('Elementos')
+  }
+  await tool('Símbolos & Charminhos'); await click('.is-focused [data-symbol-id="coquette-orbit"] .symbol-card-insert')
+  await until(() => elements.some(item=>item.page_id===right.id&&item.data.variant==='coquette-orbit'), 'Right-page symbol failed')
+  await tool('Washi tapes')
+  await click('.is-focused [data-washi-id="strawberries-cream"]')
+  await until(() => elements.some(item=>item.page_id===right.id&&item.element_type==='washi'), 'Right-page washi failed')
+  await elementsRoot(); await click('.is-focused .torn-papers-entry'); await click('.is-focused [data-torn-format="scrap"]')
+  await until(() => elements.some(item=>item.page_id===right.id&&item.data.paperieKind==='torn-paper-v1'), 'Right-page torn paper failed')
+  await tool('Fotos'); await click('.is-focused .tool-media-preview')
+  await until(() => getMedia().some(item=>item.page_id===right.id&&item.media_type==='image'), 'Right-page photo failed')
+  await tool('Stickers'); await click('.is-focused .tool-media-preview')
+  await until(() => getMedia().some(item=>item.page_id===right.id&&item.media_type==='sticker'), 'Right-page sticker failed')
+  // Existing drawing layer and canvas persistence stay available above the base.
+  await tool('Desenhar')
+  assert(await evaluate('!!document.querySelector(".is-focused .drawing-input-layer")'), 'Drawing tool unavailable')
+  await cdp('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'})
+  const sheetPoint = await evaluate(`(() => { const sheet=document.querySelector('.is-focused .planner-sheet'); const r=sheet.getBoundingClientRect(); const scale=r.width/sheet.offsetWidth; return {x:r.left+200*scale,y:r.top+500*scale}; })()`)
+  await cdp('Input.dispatchMouseEvent',{type:'mousePressed',...sheetPoint,button:'left',clickCount:1})
+  await cdp('Input.dispatchMouseEvent',{type:'mouseMoved',x:sheetPoint.x+30,y:sheetPoint.y+15,button:'left',buttons:1})
+  await cdp('Input.dispatchMouseEvent',{type:'mouseReleased',x:sheetPoint.x+30,y:sheetPoint.y+15,button:'left',clickCount:1})
+  await until(() => elements.some(item=>item.page_id===right.id&&item.element_type.startsWith('drawing:')), 'Right-page drawing failed')
+  const freeCount = elements.filter(item=>item.page_id===right.id&&!item.element_type.startsWith('template:')).length
+  await cdp('Page.reload')
+  await until(() => evaluate('!!document.querySelector("[data-week-note]")'), 'Planning page did not reload')
+  assert.equal(await evaluate('document.querySelector("[data-week-note]").value'), notes)
+  await click('.workspace-mode-switch button:nth-child(2)')
+  await until(() => evaluate('document.querySelectorAll(".planner-sheet").length===2'), 'Spread did not reopen')
+  await until(() => evaluate('!!document.querySelector(".workspace-companion .torn-paper-art") && !!document.querySelector(".workspace-companion .paperie-washi-art")'), 'Free decorations lost on reload')
+  assert.equal(elements.filter(item=>item.page_id===right.id&&!item.element_type.startsWith('template:')).length,freeCount)
+  assert.deepEqual(pages.slice(0,oldPages.length),oldPages)
+  assert.deepEqual(elements.find(item=>item.id===2000),oldBase)
+  console.log('PASS: optional weekly planning/grid spread, unchanged old pages/templates, dates and notes per week, autosave/reload, aligned responsive pages, dark mode and unobstructed text/symbols/washi/torn paper/photo/sticker/drawing on the right.')
+}

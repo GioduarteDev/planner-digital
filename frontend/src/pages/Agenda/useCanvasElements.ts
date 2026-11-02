@@ -1,9 +1,11 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useRef, useState, type PointerEvent as ReactPointerEvent, type SetStateAction } from 'react'
 import { apiRequest } from '../../services/api'
 import type { CanvasElementFromApi, CanvasElementPatch, CanvasElementDragState, CanvasElementResizeState, SaveStatus } from './editorModel'
 import { POSTIT_OPTIONS, WASHI_OPTIONS, STAMP_OPTIONS } from './editorCatalog'
 import type { EditorHistoryEntry } from './useEditorHistory'
 import { reorderLayers, type LayerAction } from './canvasGeometry'
+import { agendaStyleChanges, restoreTextStyleKeys, TEXT_STYLE_KEYS, type AgendaTextStyle } from './agendaTypography'
+import { plainTextFromRichHtml, sanitizeRichTextHtml } from './richTextDocument'
 
 /** Shared DOM canvas controller. CanvasElement remains the sole persistence contract. */
 export function useCanvasElements({ activePageId, scale, stampColor, onInsert, onCreated, onError: setDrawingError, history }: {
@@ -20,8 +22,16 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
 }) {
   const [
     pageCanvasElements,
-    setPageCanvasElements,
+    setPageCanvasElementsState,
   ] = useState<CanvasElementFromApi[]>([])
+  const elementsRef = useRef<CanvasElementFromApi[]>([])
+  // Resolve consecutive typing/style updates against the same current snapshot,
+  // even when React batches several controls before the next render.
+  const setPageCanvasElements = useCallback((action: SetStateAction<CanvasElementFromApi[]>) => {
+    const next = typeof action === 'function' ? action(elementsRef.current) : action
+    elementsRef.current = next
+    setPageCanvasElementsState(next)
+  }, [])
   const [
     selectedCanvasElementId,
     setSelectedCanvasElementId,
@@ -57,38 +67,55 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
     }
   }
 
-  function pushCreatedElementHistory(payload: Record<string, unknown>, created: CanvasElementFromApi) {
+  function pushCreatedElementHistory(payload: Record<string, unknown>, created: CanvasElementFromApi, localId = created.id) {
     let entityId = created.id
+    let visibleId = localId
+    let redoPayload = payload
     history.push({
       undo: async () => {
+        const current = elementsRef.current.find(element => element.id === visibleId)
+        if (current) redoPayload = historyPayload(current) ?? redoPayload
         await apiRequest<void>(`/canvas/elements/${entityId}`, { method: 'DELETE' })
-        setPageCanvasElements(current => current.filter(element => element.id !== entityId))
-        setSelectedCanvasElementId(current => current === entityId ? null : current)
+        setPageCanvasElements(current => current.filter(element => element.id !== visibleId))
+        setSelectedCanvasElementId(current => current === visibleId ? null : current)
+        setEditingTextElementId(current => current === visibleId ? null : current)
       },
       redo: async () => {
-        const previousId = entityId
+        const previousId = visibleId
+        const previousPersistedId = entityId
         const restored = await apiRequest<CanvasElementFromApi>('/canvas/elements', {
           method: 'POST',
-          body: JSON.stringify(payload),
+          body: JSON.stringify(redoPayload),
         })
         entityId = restored.id
+        visibleId = restored.id
         history.remapEntityId('canvas', previousId, entityId)
+        if (previousPersistedId !== previousId) history.remapEntityId('canvas', previousPersistedId, entityId)
         setPageCanvasElements(current => [...current, restored])
         setSelectedCanvasElementId(restored.id)
       },
       remapEntityId: (entityType, previousId, nextId) => {
         if (entityType === 'canvas' && entityId === previousId) entityId = nextId
+        if (entityType === 'canvas' && visibleId === previousId) visibleId = nextId
       },
     })
   }
 
-  function createInlineText(x: number, y: number, width: number) {
+  function createInlineText(x: number, y: number, width: number, style?: AgendaTextStyle, initialHtml = '') {
     if (activePageId === null) return
     const id = draftSequence.current--
+    const richHtml = sanitizeRichTextHtml(initialHtml)
     const payload = {
       surface_type: 'page', page_id: activePageId, element_type: 'text',
       x, y, width, height: 36, rotation: 0, z_index: Math.max(0, ...pageCanvasElements.map(element => element.z_index)) + 1, locked: false,
-      data: { text: '', fontSize: 18, color: '#403a35' },
+      data: {
+        text: plainTextFromRichHtml(richHtml),
+        richTextVersion: 1,
+        richHtml,
+        fontSize: 18,
+        color: '#403a35',
+        ...(style ? { ...style, textStyleVersion: 1 } : {}),
+      },
     }
     const draft: CanvasElementFromApi = { ...payload, id, user_id: 0, surface_key: '', created_at: new Date().toISOString(), updated_at: null }
     draftPayloads.current[id] = payload
@@ -102,7 +129,7 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
     createdIds.current[id] = apiRequest<CanvasElementFromApi>('/canvas/elements', {
       method: 'POST', body: JSON.stringify(payload),
     }).then(created => {
-      pushCreatedElementHistory(payload, created)
+      pushCreatedElementHistory(payload, created, id)
       return created.id
     })
     void createdIds.current[id].catch(error => {
@@ -113,7 +140,7 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
       setCanvasSaveStatus(Object.keys(failedElementWrites.current).length ? 'error' : canvasPendingCount.current ? 'saving' : 'saved')
     })
   }
-  async function createStructuredElement(elementType: string, data: Record<string, unknown>, width: number, height: number, targetPageId = activePageId, x = 64, y = 100, zIndex = 2, locked = false, select = true) {
+  async function createStructuredElement(elementType: string, data: Record<string, unknown>, width: number, height: number, targetPageId = activePageId, x = 64, y = 100, zIndex = 2, locked = false, select = true, keepPanelOpen = false) {
     if (targetPageId === null) return
     try {
       const created = await apiRequest<CanvasElementFromApi>('/canvas/elements', {
@@ -138,7 +165,7 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
           data,
         }, created)
       }
-      onCreated()
+      if (!keepPanelOpen) onCreated()
       return created
     } catch (error) {
       setDrawingError(error instanceof Error ? error.message : 'Não foi possível inserir o elemento.')
@@ -270,8 +297,10 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
     )
   }
 
-  async function patchPageCanvasElement(elementId: number, patch: CanvasElementPatch, recordHistory = true, historyBefore?: CanvasElementFromApi): Promise<boolean> {
-    const before = historyBefore ?? pageCanvasElements.find(element => element.id === elementId)
+  async function patchPageCanvasElement(elementId: number, input: CanvasElementPatch | ((current: CanvasElementFromApi) => CanvasElementPatch), recordHistory = true, historyBefore?: CanvasElementFromApi): Promise<boolean> {
+    const before = historyBefore ?? elementsRef.current.find(element => element.id === elementId)
+    if (typeof input === 'function' && !before) return false
+    const patch = typeof input === 'function' ? input(before!) : input
     const trackedPatch: CanvasElementPatch = {}
     if (recordHistory && !('data' in patch) && before) {
       if (patch.x !== undefined && patch.x !== before.x) trackedPatch.x = patch.x
@@ -337,6 +366,27 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
     elementWrites.current[elementId] = write
     await write
     return succeeded
+  }
+
+  function patchCanvasTextStyle(elementId: number, input: Partial<AgendaTextStyle>) {
+    const before = elementsRef.current.find(element => element.id === elementId)
+    if (!before || before.element_type !== 'text' || before.locked || before.data.templateField) return
+    const changes = agendaStyleChanges(input)
+    const keys = TEXT_STYLE_KEYS.filter(key => Object.hasOwn(changes, key) && changes[key] !== before.data[key])
+    if (!keys.length) return
+    const after = { ...before.data, ...changes, textStyleVersion: 1 }
+    let targetId = elementId
+    // Queue the optimistic update now, then preserve only changed style keys in
+    // history. Undo never restores an obsolete copy of the user's typed text.
+    void patchPageCanvasElement(elementId, { data: after }, false)
+    const apply = async (saved: Record<string, unknown>) => {
+      const savedOk = await patchPageCanvasElement(targetId, current => ({ data: restoreTextStyleKeys(current.data, saved, keys) }), false)
+      if (!savedOk) throw new Error('Não foi possível salvar o estilo do texto.')
+    }
+    history.push({
+      undo: () => apply(before.data), redo: () => apply(after),
+      remapEntityId: (entityType, previousId, nextId) => { if (entityType === 'canvas' && targetId === previousId) targetId = nextId },
+    })
   }
 
   async function reorderPageCanvasElements(elementId: number, action: LayerAction) {
@@ -736,26 +786,11 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
   function rotatePageCanvasElement(
     element: CanvasElementFromApi,
   ) {
-    const nextRotation =
-      element.rotation + 15
-
-    setPageCanvasElements(
-      (current) =>
-        current.map(
-          (currentElement) =>
-            currentElement.id ===
-              element.id
-              ? {
-                  ...currentElement,
-                  rotation: nextRotation,
-                }
-              : currentElement,
-        ),
-    )
-
+    // Let the shared patch capture the pre-rotation snapshot before its
+    // optimistic update, so rotation remains a distinct undo/redo operation.
     void patchPageCanvasElement(
       element.id,
-      { rotation: nextRotation },
+      current => ({ rotation: current.rotation + 15 }),
     )
   }
 
@@ -789,5 +824,5 @@ export function useCanvasElements({ activePageId, scale, stampColor, onInsert, o
     )
   }
 
-  return { editingTextElementId, setEditingTextElementId, pageCanvasElements, setPageCanvasElements, selectedCanvasElementId, setSelectedCanvasElementId, canvasSaveStatus, failedElementWrites, createInlineText, createStructuredElement, createPageCanvasElement, patchPageCanvasElement, handleCanvasElementPointerDown, handleCanvasElementPointerMove, finishCanvasElementDrag, handleCanvasElementResizeStart, handleCanvasElementResizeMove, finishCanvasElementResize, duplicatePageCanvasElement, deletePageCanvasElement, rotatePageCanvasElement, reorderPageCanvasElements, handlePostItTextBlur }
+  return { editingTextElementId, setEditingTextElementId, pageCanvasElements, setPageCanvasElements, selectedCanvasElementId, setSelectedCanvasElementId, canvasSaveStatus, failedElementWrites, createInlineText, createStructuredElement, createPageCanvasElement, patchPageCanvasElement, patchCanvasTextStyle, handleCanvasElementPointerDown, handleCanvasElementPointerMove, finishCanvasElementDrag, handleCanvasElementResizeStart, handleCanvasElementResizeMove, finishCanvasElementResize, duplicatePageCanvasElement, deletePageCanvasElement, rotatePageCanvasElement, reorderPageCanvasElements, handlePostItTextBlur }
 }

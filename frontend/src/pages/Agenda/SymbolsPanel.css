@@ -1,0 +1,29 @@
+/* Extend the existing Paperie palette and panel; all rules stay inside this library. */
+.editor-workspace-v6 .editor-tool-drawer:has(.symbol-library) { z-index: 131; }
+.editor-workspace-v6 :is(.workspace-book-stage, .workspace-book):has(.symbol-library) { z-index: auto; }
+.symbol-library { min-width: 0; }
+.symbol-library .symbol-category-list { flex-wrap: wrap; max-height: 114px; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; padding: 3px; }
+.symbol-library .symbol-category-list button { font-size: 10px; }
+.symbol-library .symbol-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: max-content; max-height: min(45dvh, 490px); align-items: start; overscroll-behavior: contain; scrollbar-width: thin; scroll-behavior: smooth; padding: 4px; }
+.symbol-library .symbol-card { min-height: 112px; display: flex; flex-direction: column; }
+.symbol-library .symbol-card-wide { grid-column: span 2; }
+.symbol-library :is(.symbol-card-full, .symbol-card-kaomoji, .symbol-card-separator) { grid-column: 1 / -1; }
+.symbol-library .symbol-card-insert { flex: none; height: auto; min-height: 0; padding: 31px 9px 7px; gap: 8px; }
+.symbol-library .symbol-card-value { display: block; width: 100%; height: 34px; min-width: 0; overflow-wrap: normal; white-space: pre; }
+.symbol-preview-glyph { display: block; width: 100%; height: 100%; overflow: visible; }
+.symbol-library :is(.symbol-card-kaomoji, .symbol-card-separator, .symbol-card-full) .symbol-card-value { height: 38px; }
+.symbol-library .symbol-card-kaomoji .symbol-card-insert { padding-inline: 18px; }
+.symbol-library .symbol-card-separator { background: var(--paperie-soft); }
+.symbol-library .symbol-card-name { overflow-wrap: anywhere; line-height: 1.5; }
+.symbol-card-actions { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 1px 7px 7px; }
+.symbol-library .symbol-card-actions button, .symbol-preview-heading button { display: grid; place-items: center; width: 27px; height: 25px; padding: 0; border: 1px solid var(--paperie-line); border-radius: 7px; background: var(--paperie-soft); color: var(--paperie-muted); cursor: pointer; }
+.symbol-library :is(button, textarea):focus-visible { outline: 2px solid var(--paperie-matcha); outline-offset: -2px; }
+.symbol-detail-preview { padding: 12px; border: 1px solid var(--paperie-line); border-radius: 12px; background: var(--paperie-paper); min-width: 0; }
+.symbol-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; }
+.symbol-preview-heading strong { overflow-wrap: anywhere; }
+.symbol-preview-art { height: 62px; padding: 14px 4px; }
+.symbol-preview-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.symbol-preview-actions button { display: flex; justify-content: center; align-items: center; gap: 5px; padding: 8px; border: 1px solid var(--paperie-line); border-radius: 7px; background: var(--paperie-soft); color: var(--paperie-ink); font: inherit; font-size: 11px; cursor: pointer; }
+.symbol-manual-copy { display: grid; gap: 5px; font-size: 11px; color: var(--paperie-muted); }
+.symbol-manual-copy textarea { box-sizing: border-box; width: 100%; min-height: 65px; padding: 9px; border: 1px solid var(--paperie-line); border-radius: 8px; background: var(--paperie-paper); color: var(--paperie-ink); white-space: pre; }
+@media (prefers-reduced-motion: reduce) { .symbol-library .symbol-gallery { scroll-behavior: auto; } }

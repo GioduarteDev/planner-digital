@@ -8,6 +8,7 @@ import './TemplateReferences.css'
 import './TemplateReferences2.css'
 import './WeeklyOpenJournal.css'
 import { WeeklyOpenJournal } from './WeeklyOpenJournal'
+import { WeeklyFreeSpread } from './WeeklyFreeSpread'
 
 const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 const Lines = ({ count = 4 }: { count?: number }) => <div className="tpl-lines">{Array.from({ length: count }, (_, index) => <i key={index} />)}</div>
@@ -37,6 +38,11 @@ export function TemplateBackground({ templateId, spreadSide, data = {}, onChange
   const template = getBuiltInTemplate(templateId)
   if (!template) return null
   const layout = template.layout
+  if (layout === 'weekly-free-spread') return <TemplateEditingContext.Provider value={onChange ? { data, update, duplicate: onDuplicateSection } : null}>
+    <div className="planner-template-base template-weekly-free-spread">
+      <WeeklyFreeSpread spreadSide={spreadSide} anchor={data.templateDate} weekStart={weekStart} onWeeklyWeekChange={onWeeklyWeekChange} />
+    </div>
+  </TemplateEditingContext.Provider>
   const now = templateDate(data)
   const currentMonthIndex = now.getMonth()
   const currentMonth = now.toLocaleDateString('pt-BR', { month: 'long' }).toLocaleUpperCase('pt-BR')

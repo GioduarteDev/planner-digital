@@ -2579,6 +2579,325 @@
     0 0 0 4px var(--editor-tone-9);
 }
 
+.symbol-library {
+  --paperie-ink: #51483f;
+  --paperie-muted: #776d63;
+  --paperie-paper: #fffaf2;
+  --paperie-soft: #f7efe5;
+  --paperie-line: #eadfd4;
+  --paperie-matcha: #68754f;
+  --paperie-rose: #a9687a;
+  display: grid;
+  gap: 10px;
+  color: var(--paperie-ink);
+}
+
+.symbol-library-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 3px 1px;
+}
+
+.symbol-library-heading > span {
+  color: var(--paperie-rose);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.symbol-library-heading h4 {
+  margin: 0;
+  font: 600 16px/1.25 Georgia, serif;
+}
+
+.symbol-library-heading p,
+.symbol-mode-hint {
+  margin: 4px 0 0;
+  color: var(--paperie-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.symbol-insert-mode {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--paperie-line);
+  border-radius: 12px;
+  background: var(--paperie-soft);
+}
+
+.symbol-insert-mode button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--paperie-muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.symbol-insert-mode button[aria-pressed='true'] {
+  background: var(--paperie-paper);
+  color: var(--paperie-matcha);
+  box-shadow: 0 0 0 1px var(--paperie-line);
+}
+
+.symbol-search {
+  display: grid;
+  gap: 5px;
+  color: var(--paperie-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.symbol-search input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--paperie-line);
+  border-radius: 10px;
+  outline-color: var(--paperie-matcha);
+  background: var(--paperie-paper);
+  color: var(--paperie-ink);
+  font: inherit;
+  font-size: 11px;
+}
+
+.symbol-category-list {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 1px 1px 5px;
+  scrollbar-width: thin;
+}
+
+.symbol-category-list button {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid var(--paperie-line);
+  border-radius: 999px;
+  background: var(--paperie-paper);
+  color: var(--paperie-muted);
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.symbol-category-list button.is-active {
+  border-color: #b6bea0;
+  background: #edf0e3;
+  color: #536044;
+}
+
+.symbol-gallery-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  color: var(--paperie-ink);
+  font: 600 12px/1.3 Georgia, serif;
+}
+
+.symbol-gallery-heading small {
+  color: var(--paperie-muted);
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.symbol-gallery {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  max-height: min(36vh, 370px);
+  overflow-y: auto;
+  padding: 2px 3px 5px 1px;
+}
+
+.symbol-card {
+  position: relative;
+  min-width: 0;
+  min-height: 91px;
+  overflow: hidden;
+  border: 1px solid var(--paperie-line);
+  border-radius: 12px;
+  background: var(--paperie-paper);
+  transition: border-color 130ms ease, background-color 130ms ease;
+}
+
+.symbol-card:hover,
+.symbol-card.is-selected {
+  border-color: #c89ba5;
+  background: #fff6f5;
+}
+
+.symbol-card.is-selected {
+  box-shadow: inset 0 0 0 1px #c89ba5;
+}
+
+.symbol-card-insert {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  padding: 12px 5px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--paperie-ink);
+  cursor: pointer;
+}
+
+.symbol-card-insert:disabled {
+  cursor: wait;
+}
+
+.symbol-card-insert:focus-visible {
+  outline: 2px solid var(--paperie-matcha);
+  outline-offset: -3px;
+  border-radius: 10px;
+}
+
+.symbol-card-value {
+  display: block;
+  max-width: 100%;
+  color: var(--paperie-matcha);
+  font-size: clamp(18px, 2vw, 25px);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  text-align: center;
+  white-space: pre-wrap;
+}
+
+.canvas-paperie-symbol {
+  display: block;
+  overflow: hidden;
+}
+
+.symbol-card-name {
+  max-width: 100%;
+  color: var(--paperie-muted);
+  font-size: 9px;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.symbol-favorite-button {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--paperie-soft);
+  color: var(--paperie-muted);
+  cursor: pointer;
+}
+
+.symbol-favorite-button.is-favorite {
+  color: var(--paperie-rose);
+}
+
+.symbol-favorite-button:focus-visible {
+  outline: 2px solid var(--paperie-matcha);
+  outline-offset: 2px;
+}
+
+.symbol-favorite-button:disabled {
+  opacity: .5;
+  cursor: wait;
+}
+
+.symbol-favorites-status,
+.symbol-favorites-error {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--paperie-muted);
+}
+
+.symbol-favorites-error {
+  color: var(--paperie-ink);
+}
+
+.symbol-card-pending {
+  position: absolute;
+  inset: auto 5px 3px auto;
+  color: var(--paperie-matcha);
+  font-size: 13px;
+}
+
+.symbol-empty-state {
+  margin: 0;
+  padding: 16px 10px;
+  border: 1px dashed var(--paperie-line);
+  border-radius: 12px;
+  color: var(--paperie-muted);
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.symbol-insert-status {
+  min-height: 14px;
+  margin: 0;
+  color: var(--paperie-matcha);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.symbol-library-entry strong {
+  color: var(--paperie-rose, #bd8290);
+}
+
+.editor-workspace-v6[data-agenda-theme='dark'] .symbol-library {
+  --paperie-ink: #e8dfd3;
+  --paperie-muted: #b9aea3;
+  --paperie-paper: #293231;
+  --paperie-soft: #333d3a;
+  --paperie-line: #4a5650;
+  --paperie-matcha: #c2cf9a;
+  --paperie-rose: #e0a7b3;
+}
+
+.editor-workspace-v6[data-agenda-theme='dark'] .symbol-category-list button.is-active {
+  border-color: #758366;
+  background: #3a473b;
+  color: #e3edc4;
+}
+
+.editor-workspace-v6[data-agenda-theme='dark'] .symbol-card:hover,
+.editor-workspace-v6[data-agenda-theme='dark'] .symbol-card.is-selected {
+  border-color: #9c737e;
+  background: #382f33;
+}
+
+.editor-workspace-v6[data-agenda-theme='dark'] .symbol-insert-mode button[aria-pressed='true'] {
+  background: #293231;
+}
+
+@media (max-width: 420px) {
+  .symbol-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: min(34vh, 330px);
+  }
+
+  .symbol-card {
+    min-height: 84px;
+  }
+}
+
 
 /* =========================================================
    RECORTE DE STICKERS

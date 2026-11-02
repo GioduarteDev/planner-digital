@@ -1,7 +1,7 @@
 import type { PaperType } from './editorModel'
 
 export type TemplateCategory = 'Study' | 'Weekly' | 'Daily' | 'Monthly' | 'Projects' | 'Journal' | 'Productivity' | 'Habits' | 'Goals'
-export type TemplateLayout = 'dashboard-blue' | 'dashboard-kawaii' | 'roadmap' | 'project-month' | 'study-grid' | 'weekly-clean' | 'weekly-dots' | 'weekly-cute' | 'daily-focus' | 'monthly-focus' | 'weekly-scrapbook' | 'weekly-open-journal' | 'daily-time-block'
+export type TemplateLayout = 'dashboard-blue' | 'dashboard-kawaii' | 'roadmap' | 'project-month' | 'study-grid' | 'weekly-clean' | 'weekly-dots' | 'weekly-cute' | 'daily-focus' | 'monthly-focus' | 'weekly-scrapbook' | 'weekly-open-journal' | 'daily-time-block' | 'weekly-free-spread'
 
 export type BuiltInTemplate = {
   id: string
@@ -14,6 +14,9 @@ export type BuiltInTemplate = {
   layout: TemplateLayout
   supportedMode: 'single' | 'spread' | 'both'
   orientation: 'portrait' | 'landscape'
+  createOnly?: boolean
+  spreadTitles?: readonly [string, string]
+  rightPaperType?: PaperType
 }
 
 export type TemplateFieldDefinition = {
@@ -80,6 +83,7 @@ export const BUILT_IN_TEMPLATES: BuiltInTemplate[] = [
   { id: 'weekly-scrapbook', name: 'Weekly Scrapbook Journal', category: 'Journal', type: 'page', description: 'Semana livre com post-its, humor, notas e colagem.', paperType: 'blank', accent: 'var(--apricot-jam)', layout: 'weekly-scrapbook', supportedMode: 'both', orientation: 'landscape' },
   { id: 'weekly-open-journal', name: 'Weekly Open Journal', category: 'Weekly', type: 'page', description: 'Diário semanal aberto para intenções, planos diários e memórias.', paperType: 'blank', accent: 'var(--apricot-jam)', layout: 'weekly-open-journal', supportedMode: 'spread', orientation: 'landscape' },
   { id: 'daily-time-block-study', name: 'Daily Time-Block Study', category: 'Study', type: 'page', description: 'Metas, prioridades, mood, color code e time blocking.', paperType: 'grid', accent: 'var(--seafoam)', layout: 'daily-time-block', supportedMode: 'single', orientation: 'portrait' },
+  { id: 'weekly-free-spread', name: 'Semana & Página Livre', category: 'Weekly', type: 'page', description: 'Duas folhas novas: planejamento por datas à esquerda e quadriculado livre à direita.', paperType: 'blank', rightPaperType: 'grid', accent: 'var(--matcha)', layout: 'weekly-free-spread', supportedMode: 'spread', orientation: 'landscape', createOnly: true, spreadTitles: ['Planejamento', 'Página livre'] },
 ]
 
 export const SECTION_TEMPLATES: SectionTemplate[] = [

@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { BookOpen, File, ChevronLeft, ChevronRight, Eye, Moon, Sun } from 'lucide-react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { apiRequest } from '../../services/api'
 import PageEditor from './PageEditor'
+import { enqueueAgendaSettingsWrite } from './agendaSettingsQueue'
+import { createSymbolFavorites, SYMBOL_FAVORITES_KEY } from './symbolFavorites'
+import { SYMBOL_CATALOG } from './symbolCatalog'
 import { BindingRings } from './BindingRings'
 import { PageTabs } from './PageTabs'
 import type { PlannerPage } from './editorModel'
@@ -34,6 +37,13 @@ export default function AgendaPage() {
   const { id } = useParams()
   const [, setSearchParams] = useSearchParams()
   const agendaId = Number(id)
+  const favorites = useMemo(() => createSymbolFavorites(
+    ids => enqueueAgendaSettingsWrite(agendaId, () => apiRequest(`/agendas/${agendaId}`, {
+      method: 'PATCH', body: JSON.stringify({ settings: { [SYMBOL_FAVORITES_KEY]: ids } }),
+    })),
+    new Set(SYMBOL_CATALOG.map(symbol => symbol.id)),
+  ), [agendaId])
+  const favoriteState = useSyncExternalStore(favorites.subscribe, favorites.getSnapshot)
   const [mode, setMode] = useState<'single' | 'spread'>('single')
   const [previewMode, setPreviewMode] = useState(false)
   const [focused, setFocused] = useState<'first' | 'second'>('first')
@@ -68,6 +78,7 @@ export default function AgendaPage() {
     let cancelled = false
     apiRequest<AgendaWorkspaceResponse>(`/agendas/${agendaId}`).then(({ settings }) => {
       if (cancelled) return
+      favorites.load(settings[SYMBOL_FAVORITES_KEY])
       setAgendaTheme(settings.editor_theme === 'dark' ? 'dark' : 'light')
       if (isMondayDate(settings.weekly_open_journal_week)) {
         setWeeklyStart(settings.weekly_open_journal_week)
@@ -79,17 +90,17 @@ export default function AgendaPage() {
     })
 
     return () => { cancelled = true }
-  }, [agendaId])
+  }, [agendaId, favorites])
 
   const saveAgendaSetting = useCallback(async (key: 'editor_theme' | 'weekly_open_journal_week', value: string) => {
-    if (settingsSaving) throw new Error('Aguarde a conclusão da gravação das preferências.')
+    if (!favoriteState.ready) throw new Error('Aguarde o carregamento das preferências.')
     setSettingsSaving(true)
     setSettingsError('')
     try {
-      await apiRequest<AgendaWorkspaceResponse>(`/agendas/${agendaId}`, {
+      await enqueueAgendaSettingsWrite(agendaId, () => apiRequest<AgendaWorkspaceResponse>(`/agendas/${agendaId}`, {
         method: 'PATCH',
         body: JSON.stringify({ settings: { [key]: value } }),
-      })
+      }))
       if (key === 'editor_theme' && (value === 'light' || value === 'dark')) {
         setAgendaTheme(value)
       } else if (key === 'weekly_open_journal_week' && isMondayDate(value)) {
@@ -102,7 +113,7 @@ export default function AgendaPage() {
     } finally {
       setSettingsSaving(false)
     }
-  }, [agendaId, settingsSaving])
+  }, [agendaId, favoriteState.ready])
   const changeWeeklyStart = useCallback(
     (value: string) => saveAgendaSetting('weekly_open_journal_week', value),
     [saveAgendaSetting],
@@ -186,10 +197,10 @@ export default function AgendaPage() {
   return <div className={`editor-workspace-v6 mode-${mode}${compactScreen ? ' is-compact' : ''}${previewMode ? ' is-preview' : ''}`} data-agenda-theme={agendaTheme} ref={workspaceRef}>
     <header className="workspace-view-controls">
       <div><span className="workspace-eyebrow">AGENDA · CADERNO DIGITAL</span><h1>Seu caderno</h1></div>
-      <div className="workspace-mode-switch" role="group" aria-label="Visualização e tema da Agenda">
+      <div className="workspace-mode-switch" role="group" aria-label="Configurações de visualização e tema da Agenda">
         <button type="button" aria-pressed={mode === 'single'} onClick={() => { setMode('single'); setFocused('first') }}><File size={16} /> Folha única</button>
         <button type="button" aria-pressed={mode === 'spread'} onClick={() => { setHasOpenedSpread(true); setMode('spread') }}><BookOpen size={16} /> Agenda aberta</button>
-        <button type="button" aria-pressed={agendaTheme === 'dark'} aria-label={`Ativar tema ${agendaTheme === 'dark' ? 'claro' : 'escuro'}`} disabled={settingsLoading || settingsSaving} onClick={() => { void saveAgendaSetting('editor_theme', agendaTheme === 'dark' ? 'light' : 'dark').catch(() => undefined) }}>
+        <button type="button" aria-pressed={agendaTheme === 'dark'} aria-label={`Ativar tema ${agendaTheme === 'dark' ? 'claro' : 'escuro'}`} disabled={settingsLoading || settingsSaving || !favoriteState.ready} onClick={() => { void saveAgendaSetting('editor_theme', agendaTheme === 'dark' ? 'light' : 'dark').catch(() => undefined) }}>
           {agendaTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}{agendaTheme === 'dark' ? 'Tema claro' : 'Tema escuro'}
         </button>
       </div>
@@ -201,9 +212,9 @@ export default function AgendaPage() {
     <div className="workspace-book-stage">
       <button className="book-page-arrow book-page-arrow-previous" type="button" aria-label="Página anterior" disabled={index <= 0} onClick={() => navigate(-1)}><ChevronLeft size={20} aria-hidden="true" /></button>
       <div className="workspace-book" ref={bookRef}>
-        <PageEditor scale={scale} initialPageId={firstPage} focused={focused === 'first'} agendaTheme={agendaTheme} weeklyStart={weeklyStart} onWeeklyWeekChange={changeWeeklyStart} previewMode={previewMode} onExitPreview={() => setPreviewMode(false)} onTogglePreview={() => setPreviewMode(current => !current)} onFocus={() => setFocused('first')} onPageChange={updateContext} onPreferredMode={nextMode => { setHasOpenedSpread(nextMode === 'spread' || hasOpenedSpread); setMode(nextMode) }} />
+        <PageEditor scale={scale} initialPageId={firstPage} focused={focused === 'first'} agendaTheme={agendaTheme} symbolFavorites={favoriteState} onToggleSymbolFavorite={favorites.toggle} weeklyStart={weeklyStart} onWeeklyWeekChange={changeWeeklyStart} previewMode={previewMode} onExitPreview={() => setPreviewMode(false)} onTogglePreview={() => setPreviewMode(current => !current)} onFocus={() => setFocused('first')} onPageChange={updateContext} onPreferredMode={nextMode => { setHasOpenedSpread(nextMode === 'spread' || hasOpenedSpread); setMode(nextMode) }} />
         {hasOpenedSpread && companion && <div className="workspace-companion" hidden={mode !== 'spread'}>
-          <PageEditor scale={scale} key={companion.id} initialPageId={companion.id} focused={focused === 'second'} agendaTheme={agendaTheme} weeklyStart={weeklyStart} onWeeklyWeekChange={changeWeeklyStart}
+          <PageEditor scale={scale} key={companion.id} initialPageId={companion.id} focused={focused === 'second'} agendaTheme={agendaTheme} symbolFavorites={favoriteState} onToggleSymbolFavorite={favorites.toggle} weeklyStart={weeklyStart} onWeeklyWeekChange={changeWeeklyStart}
             previewMode={previewMode} onExitPreview={() => setPreviewMode(false)} onTogglePreview={() => setPreviewMode(current => !current)}
             onFocus={() => setFocused('second')} onNavigate={navigateTo} onPageChange={updateCompanion} onPreferredMode={nextMode => { setHasOpenedSpread(nextMode === 'spread' || hasOpenedSpread); setMode(nextMode) }} />
         </div>}

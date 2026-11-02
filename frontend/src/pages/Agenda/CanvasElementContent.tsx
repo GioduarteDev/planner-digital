@@ -1,16 +1,31 @@
 import { Shapes } from 'lucide-react'
 import { useLayoutEffect, useRef } from 'react'
 import type { CanvasElementFromApi } from './editorModel'
+import { SYMBOL_CATALOG } from './symbolCatalog'
+import { PaperieSymbol } from './PaperieSymbol'
+import { TornPaperArt } from './TornPaperArt'
+import { ScrapbookArt } from './ScrapbookArt'
+import { getScrapbook } from './scrapbookCatalog'
+import './Scrapbook.css'
+import { getTornPaper } from './tornPaperCatalog'
+import { getPaperieWashi } from './washiCatalog'
+import { WashiArt } from './WashiArt'
+import { LegacyWashi } from './LegacyWashi'
+import './AgendaFontFaces.css'
 import type { PlannerTask } from './editorModel'
 import { DailyPlanner, KoreanStudyPlanner, TaskReceipt } from './PlannerWidgets'
+import { HabitWidgetContent } from './HabitWidgets'
 import { TemplateBackground } from './TemplateBackground'
 import { SectionTemplateContent } from './SectionTemplates'
-export function CanvasElementContent({ element, editing, onTextBlur, onTextInput, onSelect, onDataChange, onDuplicateSection, tasks, onToggleTask, weekStart, onWeeklyWeekChange }: {
+import { CanvasRichTextEditor } from './CanvasRichTextEditor'
+import { readAgendaTextStyle } from './agendaTypography'
+export function CanvasElementContent({ element, editing, onTextBlur, onTextInput, onTextResize, onSelect, onDataChange, onDuplicateSection, tasks, onToggleTask, weekStart, onWeeklyWeekChange }: {
   element: CanvasElementFromApi
   editing?: boolean
   onDuplicateSection?: (title: string, text: string) => void
-  onTextBlur: (element: CanvasElementFromApi, text: string) => void
-  onTextInput: (element: CanvasElementFromApi, text: string) => void
+  onTextBlur: (element: CanvasElementFromApi, text: string, richHtml?: string) => void
+  onTextInput: (element: CanvasElementFromApi, text: string, richHtml?: string) => void
+  onTextResize?: (element: CanvasElementFromApi, height: number) => void
   onSelect: (id: number) => void
   onDataChange: (element: CanvasElementFromApi, data: Record<string, unknown>) => void
   tasks: PlannerTask[]
@@ -22,6 +37,24 @@ export function CanvasElementContent({ element, editing, onTextBlur, onTextInput
     useLayoutEffect(() => {
       if (editing && textRef.current && document.activeElement !== textRef.current) textRef.current.focus()
     }, [editing])
+    // Only explicitly styled/new texts opt into font-aware growth. Legacy text
+    // keeps its original dimensions until the user chooses to format it.
+    useLayoutEffect(() => {
+      if (element.element_type !== 'text' || element.data.textStyleVersion !== 1) return
+      let cancelled = false
+      const measure = () => {
+        const input = element.element_type === 'text'
+          ? document.querySelector<HTMLElement>(`[data-element-id="${element.id}"] .canvas-inline-text`)
+          : textRef.current
+        if (cancelled || !input) return
+        const available = (input.closest('.planner-sheet')?.clientHeight ?? 1253) - element.y
+        const height = Math.min(available, Math.max(element.height, input.scrollHeight))
+        if (height > element.height + 1) onTextResize?.(element, height)
+      }
+      measure()
+      void document.fonts.ready.then(measure)
+      return () => { cancelled = true }
+    }, [element, onTextResize])
     if (element.element_type.startsWith('template:')) {
       const spreadSide = element.data.spreadSide === 'left' || element.data.spreadSide === 'right'
         ? element.data.spreadSide
@@ -35,12 +68,19 @@ export function CanvasElementContent({ element, editing, onTextBlur, onTextInput
       const props = { element, tasks, onDataChange: (data: Record<string, unknown>) => onDataChange(element, data), onToggleTask }
       return element.element_type === 'section:study-planner' ? <KoreanStudyPlanner {...props} /> : element.element_type === 'section:daily-planner' ? <DailyPlanner {...props} /> : <TaskReceipt {...props} />
     }
+    if (['widget:water-tracker', 'widget:habit-tracker', 'widget:mood-tracker', 'widget:progress-bar', 'widget:star-rating', 'widget:time-control'].includes(element.element_type)) {
+      return <HabitWidgetContent element={element} tasks={tasks} onDataChange={data => onDataChange(element, data)} />
+    }
     const color =
       typeof element.data.color === 'string'
         ? element.data.color
         : '#FDD0D0'
 
     if (element.element_type === 'shape') {
+      const scrapbook = getScrapbook(element.data)
+      if (scrapbook) return <ScrapbookArt {...scrapbook} />
+      const tornPaper = getTornPaper(element.data)
+      if (tornPaper) return <TornPaperArt {...tornPaper} />
       const fill =
         typeof element.data.fill === 'string'
           ? element.data.fill
@@ -310,9 +350,18 @@ export function CanvasElementContent({ element, editing, onTextBlur, onTextInput
     }
 
     if (element.element_type === 'text') {
+      if (element.data.richTextVersion === 1) {
+        const richHtml = typeof element.data.richHtml === 'string' ? element.data.richHtml : ''
+        return <CanvasRichTextEditor html={richHtml} editing={!!editing} locked={element.locked}
+          style={readAgendaTextStyle(element.data)}
+          onChange={(html, text) => onTextInput(element, text, html)}
+          onBlur={(html, text) => onTextBlur(element, text, html)}
+          onActivate={() => onSelect(element.id)} />
+      }
       return <textarea
         ref={textRef}
         className="canvas-inline-text"
+        wrap="soft"
         aria-label="Texto da página"
         defaultValue={typeof element.data.text === 'string' ? element.data.text : ''}
         placeholder={typeof element.data.placeholder === 'string' ? element.data.placeholder : ''}
@@ -375,27 +424,14 @@ export function CanvasElementContent({ element, editing, onTextBlur, onTextInput
     }
 
     if (element.element_type === 'washi') {
+      const paperieWashi = getPaperieWashi(element.data)
+      if (paperieWashi) return <WashiArt {...paperieWashi} width={element.width} height={element.height} />
       const pattern =
         typeof element.data.pattern === 'string'
           ? element.data.pattern
           : 'dots'
 
-      return (
-        <div
-          className={`canvas-washi-element washi-${pattern}`}
-          style={{
-            backgroundColor: color,
-          }}
-        >
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
-        </div>
-      )
+      return <LegacyWashi pattern={pattern} color={color} />
     }
 
     if (element.element_type === 'stamp') {
@@ -403,6 +439,9 @@ export function CanvasElementContent({ element, editing, onTextBlur, onTextInput
         typeof element.data.symbol === 'string'
           ? element.data.symbol
           : '✦'
+
+      const paperieSymbol = SYMBOL_CATALOG.find(item => item.id === element.data.variant && item.value === symbol)
+      if (paperieSymbol) return <PaperieSymbol value={symbol} name={paperieSymbol.name} color={color} />
 
       return (
         <div

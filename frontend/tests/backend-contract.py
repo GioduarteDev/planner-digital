@@ -41,6 +41,12 @@ def expect(condition: bool, message: str) -> None:
         raise AssertionError(message)
 
 
+from app.database import engine as configured_engine
+
+@event.listens_for(configured_engine, "do_connect")
+def forbid_configured_database(*_args, **_kwargs):
+    raise AssertionError("Configured database connections are forbidden in this isolated test")
+
 TEST_OUTPUT = ROOT / "frontend" / "test-results"
 TEST_OUTPUT.mkdir(exist_ok=True)
 with nullcontext():
@@ -129,6 +135,19 @@ with nullcontext():
         pages = request("GET", f"/agendas/{agenda_id}/pages")
         expect(len(pages) == 5, "New agenda did not contain five pages")
         page_id = pages[0]["id"]
+
+        checkbox = request("POST", f"/pages/{page_id}/blocks", {"block_type": "checkbox", "data": {"text": "Revisar", "checked": False}}, expected=201)
+        bullet_list = request("POST", f"/pages/{page_id}/blocks", {"block_type": "list", "data": {"items": ["Primeiro"]}}, expected=201)
+        expect(checkbox["page_id"] == page_id and checkbox["block_type"] == "checkbox", "Checkbox creation contract mismatch")
+        request("PATCH", f"/blocks/{checkbox['id']}", {"data": {"text": "Revisado", "checked": True}})
+        request("PATCH", f"/blocks/{bullet_list['id']}", {"data": {"items": ["Primeiro", "Segundo"]}})
+        saved_blocks = request("GET", f"/pages/{page_id}/blocks")
+        expect(any(b["id"] == checkbox["id"] and b["data"]["checked"] for b in saved_blocks), "Checkbox did not persist through real routes")
+        expect(any(b["id"] == bullet_list["id"] and b["data"]["items"] == ["Primeiro", "Segundo"] for b in saved_blocks), "List did not persist through real routes")
+
+        if "--blocks-only" in sys.argv:
+            print("PASS: real FastAPI checkbox/list creation, updates and reload on isolated in-memory SQLite; configured PostgreSQL engine forbidden.")
+            raise SystemExit(0)
 
         tab = {"id": "tab-test", "label": "Estudos", "color": "#E6E3F7", "target": f"page:{page_id}", "order": 0}
         request("PATCH", f"/agendas/{agenda_id}", {"settings": {"page_tabs_v1": [tab]}})

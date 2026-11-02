@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { enqueueAgendaSettingsWrite } from './agendaSettingsQueue'
 import { apiRequest } from '../../services/api'
 import type { PlannerPage } from './editorModel'
 
@@ -73,11 +74,10 @@ export function PageTabs({ agendaId, pages, onNavigate, left, top, previewMode =
     setSaving(true)
     setError('')
     writes.current = writes.current.catch(() => undefined).then(async () => {
-      const agenda = await apiRequest<AgendaSettings>(`/agendas/${agendaId}`)
-      await apiRequest(`/agendas/${agendaId}`, {
+      await enqueueAgendaSettingsWrite(agendaId, () => apiRequest(`/agendas/${agendaId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ settings: { ...agenda.settings, page_tabs_v1: next } }),
-      })
+        body: JSON.stringify({ settings: { page_tabs_v1: next } }),
+      }))
     }).then(() => { if (tabsRef.current === next) setSaving(false) }).catch(caught => {
       setSaving(false)
       setError(caught instanceof Error ? caught.message : 'Não foi possível salvar os marcadores.')

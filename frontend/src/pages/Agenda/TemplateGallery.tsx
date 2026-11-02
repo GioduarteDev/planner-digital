@@ -20,7 +20,7 @@ export function TemplateGallery({ busy, onApply, onCreate }: {
         <div className={`built-in-template-preview ${template.orientation === 'landscape' ? 'is-landscape' : ''}`} aria-hidden="true"><span className="built-in-template-preview-sheet"><TemplateBackground templateId={template.id} /></span></div>
         <span className="built-in-template-category">{template.category.toUpperCase()} · {template.orientation === 'landscape' ? 'PAISAGEM' : 'RETRATO'}</span>
         <strong>{template.name}</strong><p>{template.description}</p>
-        <div className="built-in-template-actions"><button type="button" disabled={busy} onClick={() => onApply(template)}>Aplicar</button><button type="button" disabled={busy} onClick={() => onCreate(template)}><FilePlus2 size={12} /> Nova página</button></div>
+        <div className="built-in-template-actions">{!template.createOnly && <button type="button" disabled={busy} onClick={() => onApply(template)}>Aplicar</button>}<button type="button" disabled={busy} onClick={() => onCreate(template)}><FilePlus2 size={12} /> {template.createOnly ? 'Adicionar duas folhas' : 'Nova página'}</button></div>
       </article>)}
     </div>
   </>

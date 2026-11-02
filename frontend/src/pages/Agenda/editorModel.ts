@@ -16,6 +16,9 @@ export type EditorTool =
   | 'stickers'
   | 'photos'
   | 'elements'
+  | 'symbols'
+  | 'washi'
+  | 'habits'
   | 'templates'
   | 'tasks'
   | 'more'
@@ -36,6 +39,9 @@ export type ElementLibraryCategory =
   | 'postits'
   | 'washi'
   | 'stamps'
+  | 'symbols'
+  | 'torn-papers'
+  | 'scrapbook'
   | null
 
 export type PaperSettings = Record<string, unknown>
