@@ -1,0 +1,30 @@
+.drawing-panel { color: var(--editor-ink); gap: 16px; }
+.drawing-intro { margin: 0; color: var(--editor-muted); font-size: 12px; }
+.drawing-instruments { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.drawing-panel button { font: inherit; cursor: pointer; }
+.drawing-panel :is(.drawing-instruments, .drawing-widths, .drawing-levels) button { color: inherit; }
+.drawing-instruments button { display: grid; justify-items: center; padding: 5px 2px 9px; border: 1px solid var(--editor-border); border-radius: 12px; background: var(--editor-surface); font-size: 11px; }
+.ink-instrument { width: 72px; max-width: 100%; height: 60px; transition: transform .15s; }
+.drawing-instruments button:hover .ink-instrument { transform: translateY(-3px); }
+.drawing-panel button[aria-pressed='true'] { outline: 2px solid var(--editor-focus); outline-offset: 1px; }
+.drawing-instruments button[aria-pressed='true'] { background: color-mix(in srgb, var(--matcha) 18%, var(--editor-surface)); }
+.drawing-panel fieldset { padding: 0; margin: 0; border: 0; min-width: 0; }
+.drawing-panel legend { margin-bottom: 10px; font-size: 12px; font-weight: 600; }
+.drawing-swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; justify-items: center; padding: 3px; }
+.drawing-swatches button { width: 27px; height: 27px; border: 1px solid var(--editor-border); border-radius: 50%; }
+.drawing-custom-color { display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-top: 12px; }
+.drawing-custom-color span { display: flex; align-items: center; gap: 7px; color: var(--editor-muted); }
+.drawing-custom-color input { width: 30px; height: 30px; border: 0; background: transparent; padding: 0; cursor: pointer; }
+.drawing-widths, .drawing-levels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; padding: 3px; }
+.drawing-widths button, .drawing-levels button { min-height: 35px; padding: 3px; background: var(--editor-surface); border: 1px solid var(--editor-border); border-radius: 9px; font-size: 11px; }
+.drawing-widths svg { display: block; width: 100%; height: 32px; }
+.drawing-hold { display: flex; gap: 9px; align-items: flex-start; font-size: 12px; cursor: pointer; }
+.drawing-hold input { accent-color: var(--editor-focus); margin: 2px 0; }
+.drawing-hold small { display: block; margin-top: 5px; font-size: 11px; color: var(--editor-muted); line-height: 1.5; }
+.drawing-panel :is(button, input):focus-visible { outline: 2px solid var(--editor-focus); outline-offset: 3px; }
+.editor-workspace-v6 .editor-tool-drawer.drawing-tool-drawer { display: flex; flex-direction: column; bottom: auto; max-height: calc(100dvh - 174px); }
+.drawing-tool-drawer .tool-drawer-header { flex-shrink: 0; }
+.drawing-tool-drawer .tool-drawer-content { height: auto; min-height: 0; overflow-y: auto; }
+.drawing-pin { margin-left: auto; }
+@media (max-width: 900px) { .editor-workspace-v6 .editor-tool-drawer.drawing-tool-drawer { top: auto; bottom: 66px; max-height: min(68dvh, calc(100dvh - 140px)); } }
+@media (prefers-reduced-motion: reduce) { .ink-instrument { transition: none; } }

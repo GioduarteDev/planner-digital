@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import type { EditorTool } from './editorModel'
 
 export function useTransientPanels(tool: EditorTool, navigation: boolean,
-  setTool: (tool: EditorTool) => void, setNavigation: (open: boolean) => void) {
+  setTool: (tool: EditorTool) => void, setNavigation: (open: boolean) => void, pinned = false) {
   useEffect(() => {
     if (!tool && !navigation) return
     const close = () => { setTool(null); setNavigation(false) }
@@ -15,7 +15,7 @@ export function useTransientPanels(tool: EditorTool, navigation: boolean,
     const outside = (event: PointerEvent) => {
       if (event.target instanceof Element && !event.target.closest(
         '.editor-tool-drawer, .editor-tool-rail, .agenda-navigation-drawer, .workspace-menu-button',
-      )) close()
+      )) { if (!pinned) setTool(null); setNavigation(false) }
     }
     document.addEventListener('keydown', key)
     document.addEventListener('pointerdown', outside)
@@ -23,5 +23,5 @@ export function useTransientPanels(tool: EditorTool, navigation: boolean,
       document.removeEventListener('keydown', key)
       document.removeEventListener('pointerdown', outside)
     }
-  }, [tool, navigation, setTool, setNavigation])
+  }, [tool, navigation, setTool, setNavigation, pinned])
 }

@@ -1,0 +1,26 @@
+.washi-library { --washi-ink: #55483f; --washi-muted: #75695f; --washi-paper: #fffaf3; --washi-line: #e7dcd1; --washi-tray: #eee9df; display: grid; gap: 13px; color: var(--washi-ink); }
+.washi-library h4 { margin: 5px 0 7px; font: 600 23px/1.15 Georgia, serif; }
+.washi-library header p, .washi-original-heading p { margin: 0; font-size: 11px; line-height: 1.5; color: var(--washi-muted); }
+.washi-eyebrow { font-size: 8px; letter-spacing: .12em; color: var(--washi-muted); font-weight: 700; }
+.washi-categories { display: flex; flex-wrap: wrap; gap: 5px; }
+.washi-categories button { padding: 6px 8px; min-height: 29px; border: 1px solid var(--washi-line); border-radius: 20px; background: var(--washi-paper); color: var(--washi-ink); font: inherit; font-size: 10px; cursor: pointer; }
+.washi-categories button[aria-pressed='true'] { border-color: #7f8d69; background: #e7eddb; color: #48583a; }
+.washi-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 8px; margin: 0; padding: 10px; border: 1px solid var(--washi-line); border-radius: 10px; }
+.washi-options legend { padding: 0 5px; font: 600 12px Georgia, serif; }
+.washi-options label { display: grid; align-content: start; gap: 6px; min-width: 0; font-size: 10px; color: var(--washi-ink); }
+.washi-options select { min-width: 0; width: 100%; min-height: 34px; padding: 5px 3px; border: 1px solid var(--washi-line); border-radius: 6px; background: var(--washi-paper); color: var(--washi-ink); font: inherit; }
+.washi-options input { width: 100%; margin: 8px 0; accent-color: #6d8054; }
+.washi-count { margin: 0; color: var(--washi-muted); font-size: 10px; }
+.washi-library .washi-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.washi-library .washi-card { min-width: 0; min-height: 110px; display: grid; align-content: start; gap: 9px; padding: 8px 7px 10px; border: 1px solid var(--washi-line); border-radius: 9px; background: var(--washi-paper); color: var(--washi-ink); font: inherit; font-size: 10px; line-height: 1.4; text-align: center; cursor: pointer; }
+.washi-library .washi-card:hover { border-color: #a48a92; }
+.washi-library .washi-card:disabled { opacity: .6; cursor: wait; }
+.washi-tray { display: grid; place-items: center; height: 52px; padding: 6px; min-width: 0; border-radius: 4px; background: var(--washi-tray); }
+.washi-legacy-thumbnail { display: block; width: 100%; height: 22px; }
+.paperie-washi-art { display: block; filter: drop-shadow(0 1px 1px #59463720); }
+.washi-original-heading h5 { margin: 8px 0 5px; font: 600 17px Georgia, serif; }
+.washi-status { margin: 0; min-height: 16px; font-size: 11px; line-height: 1.5; }
+.washi-library button:focus-visible, .washi-library select:focus-visible, .washi-library input:focus-visible { outline: 2px solid #66774f; outline-offset: 2px; }
+.editor-workspace-v6[data-agenda-theme='dark'] .washi-library { --washi-ink: #eee2d4; --washi-muted: #bfb1a2; --washi-paper: #293231; --washi-line: #4d5750; --washi-tray: #202724; }
+.editor-workspace-v6[data-agenda-theme='dark'] .washi-categories button[aria-pressed='true'] { background: #3a473b; color: #e3edc4; }
+.editor-workspace-v6[data-agenda-theme='dark'] .washi-library :is(button, select, input):focus-visible { outline-color: #c2cf9a; }

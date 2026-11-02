@@ -1,14 +1,35 @@
+import { verifyBlocks } from './blocks-browser-checks.mjs'
+import { verifyRichText } from './rich-text-browser-checks.mjs'
+import { verifyRichSymbols } from './symbols-rich-browser-checks.mjs'
+import { verifyToolbarTools } from './toolbar-tools-browser-checks.mjs'
 ﻿// Browser regression against an isolated in-memory API fixture. Never contacts user data.
 // Run after npm run build: node tests/editor-browser.mjs
+// Add --symbols-only to stop after the symbol/favorites persistence checks.
+// Use --paperie-review for focused geometry, Unicode rendering and keyboard checks.
+// Use --torn-papers for paper cutouts and legacy post-it regression checks.
+// Use --washis for new and legacy tape regression checks.
+// --calendar-baseline uses a HEAD-only build in test-results/paperie-review-baseline/dist.
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { readFile, mkdtemp, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve, extname } from 'node:path'
 import { spawn } from 'node:child_process'
+import { verifyCalendarWriting, verifyPaperie } from './paperie-browser-checks.mjs'
+import { verifyTornPapers } from './torn-papers-browser-checks.mjs'
+import { verifyWashis } from './washi-browser-checks.mjs'
+import { verifyTypography } from './typography-browser-checks.mjs'
+import { verifyWeeklyFree } from './weekly-free-browser-checks.mjs'
+import { verifyDrawing } from './drawing-browser-checks.mjs'
+import { verifyScrapbook } from './scrapbook-browser-checks.mjs'
+const baselineCalendar = process.argv.includes('--calendar-baseline')
 
 const pages = [1, 2, 3, 4, 5].map(id => ({ id, agenda_id: 1, title: `Página ${id}`, content: '',
   favorite: id === 2, folder_id: null, position: id, paper_type: 'blank', paper_settings: {} }))
+const pageBlocks = [{ id: 101, page_id: 1, block_type: 'heading', data: { text: 'Anota\u00e7\u00f5es preservadas' }, position: 1 }, { id: 102, page_id: 2, block_type: 'paragraph', data: { text: 'Segunda folha' }, position: 1 }]
+let nextBlockId = 103
+let failNextBlockCreate = false
+let failNextBlockSave = false
 const elements = []
 const thisMonday = new Date()
 thisMonday.setDate(thisMonday.getDate() - ((thisMonday.getDay() + 6) % 7))
@@ -18,7 +39,9 @@ const habits = [{ id: 501, name: 'Leitura', active: true, days_of_week: [0, 1, 2
 const habitCompletions = []
 const dailyEntries = []
 const weeklyReviews = new Map()
-let agendaSettings = {}
+let agendaSettings = { unrelated_preference: { preserved: true } }
+let failNextFavorites = false
+const settingsWrites = []
 let profileSettings = {}
 let mediaVisible = false
 let pageMedia = []
@@ -26,6 +49,7 @@ let nextMediaId = 703
 const writes = []
 const runtimeErrors = []
 let failNextWrite = false
+let failNextScrapbookCreate = false
 let nextElementId = 1
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost')
@@ -39,9 +63,24 @@ const server = createServer(async (req, res) => {
     if (path === '/profile') result.settings = profileSettings
     if (path === '/profile/settings') { profileSettings = { ...profileSettings, ...body.settings }; result = { settings: profileSettings } }
     if (path === '/library/media') result = [{ id: 900, name: 'Sticker', file_url: `${origin}/matcha-planner-icon.png` }]
+    if (path === '/library/media' && (process.argv.includes('--weekly-free') || process.argv.includes('--scrapbook'))) result = [
+      { id: 900, name: 'Sticker de teste', media_type: 'sticker', file_url: `${origin}/matcha-planner-icon.png` },
+      { id: 901, name: 'Foto de teste', media_type: 'image', file_url: `${origin}/matcha-planner-icon.png` },
+    ]
     if (path === '/agendas/1') result = { id: 1, title: 'Meu diário', cover_color: '#9CA362' }
     if (path === '/agendas/1') {
-      if (req.method === 'PATCH') agendaSettings = body.settings ?? agendaSettings
+      if (req.method === 'PATCH') {
+        if (body.settings?.symbol_favorites_v1) {
+          await new Promise(done => setTimeout(done, 80))
+          if (failNextFavorites) {
+            failNextFavorites = false
+            res.writeHead(503, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ detail: 'Falha de favoritos no teste' })); return
+          }
+        }
+        settingsWrites.push(body.settings)
+        agendaSettings = { ...agendaSettings, ...body.settings }
+      }
       result.settings = agendaSettings
     }
     if (path === '/tasks') result = tasks
@@ -92,6 +131,11 @@ const server = createServer(async (req, res) => {
       }))
       result = pageMedia
     }
+    if ((process.argv.includes('--weekly-free') || process.argv.includes('--scrapbook')) && /^\/pages\/\d+\/media$/.test(path) && req.method === 'GET') result = pageMedia.filter(item=>item.page_id===Number(path.split('/')[2]))
+    if ((process.argv.includes('--weekly-free') || process.argv.includes('--scrapbook')) && /^\/pages\/\d+\/media\/from-library\/\d+$/.test(path) && req.method === 'POST') {
+      result = { id: nextMediaId++, page_id: Number(path.split('/')[2]), media_type: path.endsWith('/901') ? 'image' : 'sticker', original_name: 'Mídia local de teste', file_url: `${origin}/matcha-planner-icon.png`, mime_type: 'image/png', size_bytes: 100, x: 60, y: 600, width: 120, height: 120, rotation: 0, z_index: 3, locked: false, created_at: '2026-11-02T12:00:00Z' }
+      pageMedia.push(result)
+    }
     if (/^\/media\/\d+$/.test(path)) {
       const mediaId = Number(path.split('/').at(-1))
       const item = pageMedia.find(media => media.id === mediaId)
@@ -111,11 +155,35 @@ const server = createServer(async (req, res) => {
         pages.push(result)
       } else result = pages
     }
-    if (path === '/pages/1/blocks') result = [{ id: 101, page_id: 1, block_type: 'heading', data: { text: 'Anotações preservadas' }, position: 1 }]
-    if (path === '/pages/2/blocks') result = [{ id: 102, page_id: 2, block_type: 'paragraph', data: { text: 'Segunda folha' }, position: 1 }]
+    if (/^\/pages\/\d+\/blocks$/.test(path)) {
+      const pageId = Number(path.split('/')[2])
+      if (req.method === 'POST') {
+        if (failNextBlockCreate) {
+          failNextBlockCreate = false
+          res.writeHead(503, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ detail: 'API indisponivel: conexao PostgreSQL recusada (5432)' })); return
+        }
+        result = { ...body, id: nextBlockId++, page_id: pageId, position: Math.max(0, ...pageBlocks.filter(item=>item.page_id===pageId).map(item=>item.position)) + 1 }
+        pageBlocks.push(result)
+      } else result = pageBlocks.filter(item=>item.page_id===pageId)
+    }
+    if (/^\/blocks\/\d+$/.test(path)) {
+      result = pageBlocks.find(item=>item.id===Number(path.split('/')[2]))
+      if (req.method === 'PATCH') {
+        if (failNextBlockSave) {
+          failNextBlockSave = false
+          res.writeHead(503, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ detail: 'Falha isolada ao salvar bloco' })); return
+        }
+        Object.assign(result, body)
+      }
+      if (req.method === 'DELETE') pageBlocks.splice(pageBlocks.indexOf(result), 1)
+    }
     if (/^\/pages\/\d+$/.test(path) && req.method === 'PATCH') { result = pages.find(page => page.id === Number(path.split('/').at(-1))); Object.assign(result, body) }
     if (path === '/canvas/elements') {
       if (req.method === 'POST') {
+        if (failNextScrapbookCreate) {
+          failNextScrapbookCreate = false
+          res.writeHead(503, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ detail: 'Falha isolada ao inserir recorte' })); return
+        }
         result = { ...body, id: nextElementId++, user_id: 1 }
         elements.push(result)
       } else result = elements.filter(item => item.page_id === Number(url.searchParams.get('page_id')))
@@ -139,7 +207,7 @@ const server = createServer(async (req, res) => {
   }
   const asset = url.pathname.startsWith('/assets/') || ['/matcha-planner-icon.png', '/matcha-planner-favicon.jpg'].includes(url.pathname) ? url.pathname.slice(1) : 'index.html'
   try {
-    const bytes = await readFile(resolve('dist', asset))
+    const bytes = await readFile(resolve(baselineCalendar ? 'test-results/paperie-review-baseline/dist' : 'dist', asset))
     res.writeHead(200, { 'Content-Type': ({ '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.jpg': 'image/jpeg' })[extname(asset)] ?? 'application/octet-stream' })
     res.end(bytes)
   } catch { res.writeHead(404); res.end() }
@@ -193,17 +261,46 @@ try {
   }
   await cdp('Runtime.enable')
   await cdp('Page.enable')
+  await cdp('Emulation.setFocusEmulationEnabled', { enabled: true })
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1100, deviceScaleFactor: 1, mobile: false })
   await cdp('Page.addScriptToEvaluateOnNewDocument', { source: `
     const realFetch = window.fetch;
     window.fetch = (url, options) => {
       const target = new URL(typeof url === 'string' ? url : url.url, location.href);
-      return realFetch(target.port === '8000' ? '/__api' + target.pathname + target.search : url, options);
+      if (target.origin !== location.origin && target.port !== '8000') throw new Error('External fetch blocked by isolated editor fixture');
+      const localApi = target.origin === location.origin && !target.pathname.startsWith('/assets/') && !/\\.(png|jpg)$/.test(target.pathname);
+      return realFetch(target.port === '8000' || localApi ? '/__api' + target.pathname + target.search : url, options);
     };
   ` })
+  if (baselineCalendar || process.argv.includes('--calendar-review')) {
+    await verifyCalendarWriting({ cdp, evaluate, click, until, origin })
+  } else {
   await cdp('Page.navigate', { url: `${origin}/agenda/1` })
   await until(() => evaluate('document.querySelectorAll(".planner-sheet").length === 1'), 'Editor did not load')
   await until(() => evaluate('document.querySelector(".block-heading-input")?.value === "Anotações preservadas"'), 'Existing text blocks did not load')
+  if (process.argv.includes('--blocks')) {
+    await verifyBlocks({ cdp, evaluate, click, until, delay, pageBlocks, elements, origin, failCreate: () => { failNextBlockCreate = true }, failSave: () => { failNextBlockSave = true } })
+  } else if (process.argv.includes('--rich-text')) {
+    await verifyRichText({ cdp, evaluate, click, until, delay, pageBlocks, elements })
+  } else if (process.argv.includes('--toolbar-tools')) {
+    await verifyToolbarTools({ cdp, evaluate, click, until, elements })
+  } else if (process.argv.includes('--symbols-rich')) {
+    await verifyRichSymbols({ cdp, evaluate, click, until, delay, elements, origin, getSettings: () => agendaSettings, pressShortcut })
+  } else if (process.argv.includes('--drawing')) {
+    await verifyDrawing({ cdp, evaluate, click, until, delay, elements })
+  } else if (process.argv.includes('--scrapbook')) {
+    await verifyScrapbook({ cdp, evaluate, click, until, delay, elements, pressShortcut, getMedia: () => pageMedia, failNextWrite: () => { failNextScrapbookCreate = true } })
+  } else if (process.argv.includes('--weekly-free')) {
+    await verifyWeeklyFree({ cdp, evaluate, click, until, delay, pages, elements, getSettings: () => agendaSettings, getMedia: () => pageMedia })
+  } else if (process.argv.includes('--typography')) {
+    await verifyTypography({ cdp, evaluate, click, until, elements, pressShortcut, failNextWrite: () => { failNextWrite = true } })
+  } else if (process.argv.includes('--washis')) {
+    await verifyWashis({ cdp, evaluate, click, until, elements, pressShortcut })
+  } else if (process.argv.includes('--torn-papers')) {
+    await verifyTornPapers({ cdp, evaluate, click, until, elements, pressShortcut })
+  } else if (process.argv.includes('--paperie-review')) {
+    await verifyPaperie({ cdp, evaluate, click, until, delay, pressShortcut, elements, pages, getSettings: () => agendaSettings, origin })
+  } else {
   await click('[aria-label="Elementos"]')
   await evaluate(`Array.from(document.querySelectorAll('.editor-tool-drawer button')).find(b => b.textContent.includes('Post-its')).click()`)
   await delay(100)
@@ -552,6 +649,27 @@ try {
       await until(() => evaluate(`!document.querySelector('.tpl-open-review > button')?.disabled`), 'Weekly Review edit was not recognized')
       await click('.tpl-open-review > button')
       await until(() => weeklyReviews.get(currentWeekStart)?.reflection === 'Revisão registrada no teste', 'Weekly Review stopped persisting')
+      await click('[aria-label="Elementos"]')
+      await evaluate(`Array.from(document.querySelectorAll('.element-action-grid button')).find(button => button.textContent.includes('Símbolos & Charminhos')).click()`)
+      await click('[data-symbol-category="kaomojis"]')
+      const kaomojiId = await evaluate('document.querySelector(".symbol-card").dataset.symbolId')
+      const favoriteSelector = `[data-symbol-id="${kaomojiId}"] .symbol-favorite-button`
+      const canvasBeforeFavorite = elements.length
+      await evaluate(`(() => { const heart=document.querySelector(${JSON.stringify(favoriteSelector)}); heart.click(); heart.click(); heart.click(); })()`)
+      await until(() => evaluate('document.querySelector(".symbol-favorites-status")?.textContent.includes("Favoritos salvos.")'), 'Rapid kaomoji favorites did not finish saving')
+      assert.deepEqual(agendaSettings.symbol_favorites_v1, [kaomojiId])
+      assert.equal(elements.length, canvasBeforeFavorite, 'Favoriting inserted a symbol')
+      assert.equal(await evaluate(`document.querySelector(${JSON.stringify(favoriteSelector)}).getAttribute('aria-pressed')`), 'true')
+      const preservedTabs = structuredClone(agendaSettings.page_tabs_v1)
+      await click('[aria-label="Próxima semana"]')
+      await until(() => agendaSettings.weekly_open_journal_week && agendaSettings.weekly_open_journal_week !== currentWeekStart, 'Week did not persist')
+      assert.deepEqual(agendaSettings.symbol_favorites_v1, [kaomojiId])
+      await until(() => evaluate(`!document.querySelector('[aria-label="Semana anterior"]').disabled`), 'Week is still loading')
+      await click('[aria-label="Semana anterior"]')
+      await until(() => agendaSettings.weekly_open_journal_week === currentWeekStart, 'Original week did not return')
+      assert.deepEqual(agendaSettings.page_tabs_v1, preservedTabs)
+      assert.deepEqual(agendaSettings.unrelated_preference, { preserved: true })
+      assert.equal(agendaSettings.editor_theme, 'light')
       continue
     }
     await until(() => evaluate(`document.querySelector(".minimal-page-title-input")?.value === ${JSON.stringify(title)}`), `${title} page was not created`)
@@ -665,13 +783,18 @@ try {
     rotation: photo.rotation, z_index: photo.z_index, locked: photo.locked,
   }, savedPhotoState, 'Media editing state did not survive reload')
   for (const [category, expectedType] of [['Formas', 'shape'], ['Washi', 'washi'], ['Carimbos', 'stamp']]) {
-    await click('[aria-label="Elementos"]')
+    // Paperie collections can remain open after insertion; return to the root.
+    if (await evaluate('document.querySelector(\'[aria-label="Elementos"]\').getAttribute("aria-expanded") === "true"')) {
+      await click('.element-library-back')
+    } else {
+      await click('[aria-label="Elementos"]')
+    }
     await evaluate(`Array.from(document.querySelectorAll('.element-action-grid button')).find(button => button.textContent.includes(${JSON.stringify(category)})).click()`)
     await delay(100)
     await click('.element-library-grid button')
     await until(() => elements.some(item => item.element_type === expectedType), `${category} was not inserted above template`)
   }
-  await click('[aria-label="Canetas"]')
+  await click('[aria-label="Desenhar"]')
   await until(() => evaluate('!!document.querySelector(".drawing-input-layer")'), 'Drawing layer did not open')
   await evaluate(`fetch('http://localhost:8000/canvas/elements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ surface_type: 'page', page_id: 1, element_type: 'drawing:fineliner', x: 0, y: 0, width: 886, height: 1253, rotation: 0, z_index: 0, locked: false, data: { tool: 'fineliner', color: '#3f3934', width: 3, opacity: 1, points: [{x:220,y:480},{x:260,y:500},{x:300,y:475}] } }) })`)
   await until(() => elements.some(item => item.element_type.startsWith('drawing:')), 'Drawing was not persisted above template')
@@ -723,6 +846,36 @@ try {
   await evaluate(`Array.from(document.querySelectorAll('.element-action-grid button')).find(button => button.textContent.includes('Carimbos')).click()`)
   await click('.element-library-grid button')
   await until(() => elements.some(item => item.page_id === 3 && item.element_type === 'stamp'), 'Decoration insertion failed')
+  await click('[aria-label="Elementos"]')
+  await evaluate(`Array.from(document.querySelectorAll('.element-action-grid button')).find(button => button.textContent.includes('Símbolos & Charminhos')).click()`)
+  await until(() => evaluate('!!document.querySelector(".symbol-library")'), 'Symbol library did not open')
+  await click('[data-symbol-mode="text"]')
+  await click('[data-symbol-category="hearts"]')
+  await typeInto('[aria-label="Buscar símbolos"]', 'coração')
+  await until(() => evaluate('!!document.querySelector("[data-symbol-id=soft-heart]")'), 'Accent-insensitive symbol search failed')
+  await click('[data-symbol-id="soft-heart"] .symbol-card-insert')
+  await until(() => elements.some(item => item.page_id === 3 && item.element_type === 'text' && item.data.text === 'ᰔ'), 'Symbol was not inserted as text')
+  assert.equal(elements.find(item => item.page_id === 3 && item.data.text === 'ᰔ').data.fontFamily.includes('Noto Color Emoji'), true)
+  await click('[data-symbol-mode="decorative"]')
+  await click('[data-symbol-category="aesthetic"]')
+  await typeInto('[aria-label="Buscar símbolos"]', 'orbita')
+  await until(() => evaluate('!!document.querySelector("[data-symbol-id=coquette-orbit]")'), 'Category and keyword filtering failed')
+  await click('[data-symbol-id="coquette-orbit"] .symbol-favorite-button')
+  await until(() => agendaSettings.symbol_favorites_v1?.includes('coquette-orbit'), 'Favorite did not persist')
+  const favoriteSnapshot = [...agendaSettings.symbol_favorites_v1]
+  failNextFavorites = true
+  await click('[data-symbol-id="coquette-orbit"] .symbol-favorite-button')
+  await until(() => evaluate('!!document.querySelector(".symbol-favorites-error")'), 'Favorite failure was not reported')
+  assert.equal(await evaluate('document.querySelector("[data-symbol-id=coquette-orbit] .symbol-favorite-button").getAttribute("aria-pressed")'), 'true', 'Failed removal was not restored')
+  assert.deepEqual(agendaSettings.symbol_favorites_v1, favoriteSnapshot)
+  await click('[data-symbol-id="coquette-orbit"] .symbol-favorite-button')
+  await until(() => !agendaSettings.symbol_favorites_v1.includes('coquette-orbit'), 'Removal did not persist')
+  await click('[data-symbol-id="coquette-orbit"] .symbol-favorite-button')
+  await until(() => agendaSettings.symbol_favorites_v1.includes('coquette-orbit'), 'Re-add after failure did not persist')
+  await click('[data-symbol-category="favorites"]')
+  await until(() => evaluate('!!document.querySelector("[data-symbol-id=coquette-orbit]")'), 'Dynamic favorites category failed')
+  await click('[data-symbol-id="coquette-orbit"] .symbol-card-insert')
+  await until(() => elements.some(item => item.page_id === 3 && item.element_type === 'stamp' && item.data.symbol === '⋆˚꩜｡'), 'Symbol was not inserted as a decorative stamp')
   await paperClick(35, 600)
   assert(await evaluate('!document.querySelector(".canvas-element-toolbar")'), 'Decoration controls remain visible')
   const firstLocal = await evaluate(`Array.from(document.querySelectorAll('.canvas-inline-text')).find(input => input.value === 'teste livre').closest('[data-element-id]').dataset.elementId`)
@@ -739,9 +892,18 @@ try {
   await physicalClick('.minimal-page-title-input')
   await cdp('Page.reload')
   await until(() => evaluate(`Array.from(document.querySelectorAll('.canvas-inline-text')).some(input => input.value === 'teste livre editado')`), 'Week free text lost on reload')
+  await until(() => evaluate(`Array.from(document.querySelectorAll('.canvas-inline-text')).some(input => input.value === 'ᰔ')`), 'Paperie text did not survive reload')
+  await until(() => evaluate(`Array.from(document.querySelectorAll('.canvas-paperie-symbol')).some(item => item.textContent === '⋆˚꩜｡')`), 'Paperie decoration did not survive reload')
   assert.equal(await evaluate('document.querySelector("[data-template-field=priorities]").value'), 'Finalizar o projeto')
+  await click('[aria-label="Elementos"]')
+  await evaluate(`Array.from(document.querySelectorAll('.element-action-grid button')).find(button => button.textContent.includes('Símbolos & Charminhos')).click()`)
+  await click('[data-symbol-category="favorites"]')
+  assert.equal(await evaluate('document.querySelector("[data-symbol-id=coquette-orbit] .symbol-favorite-button").getAttribute("aria-pressed")'), 'true', 'Favorites did not survive reload')
+  assert(settingsWrites.every(patch => Object.keys(patch).length === 1), 'Settings writes must contain only the changed key')
+  assert.deepEqual(agendaSettings.unrelated_preference, { preserved: true })
   await writeFile('test-results/editor-writing-week.png', Buffer.from((await cdp('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).data, 'base64'))
 
+  if (!process.argv.includes('--symbols-only')) {
   await cdp('Page.navigate', { url: `${origin}/agenda/1?page=4` })
   await until(() => evaluate('!!document.querySelector(".planner-sheet")'), 'Monthly route missing')
   await click('[aria-label="Templates"]')
@@ -819,6 +981,12 @@ try {
   assert(await evaluate('document.querySelector(".calendar-days").textContent.includes("Sobre adesivo")'))
   assert.deepEqual(runtimeErrors, [])
   console.log('PASS: direct template gallery, editable template fields, 10 required page templates, 10 section templates, direct text, post-it, photo, sticker, shape, washi, stamp and drawing over templates; persistence, spread, receipt isolation, geometry and runtime verified.')
+  }
+  assert.deepEqual(runtimeErrors, [])
+  console.log('PASS: symbol/kaomoji favorites, rapid toggles, independent insertion, save failure recovery, partial settings writes, theme/tabs preservation, week changes and reload persistence.')
+  }
+  }
+  assert.deepEqual(runtimeErrors, [])
 } finally {
   socket?.close(); browser.kill(); server.close()
 }

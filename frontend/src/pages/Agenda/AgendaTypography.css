@@ -1,0 +1,27 @@
+.agenda-text-controls { --writing-ink: #55483f; --writing-muted: #75695f; --writing-paper: #fffaf3; --writing-line: #e7dcd1; display: grid; gap: 13px; color: var(--writing-ink); }
+.agenda-writing-eyebrow { font-size: 9px; letter-spacing: .12em; color: var(--writing-muted); font-weight: 700; }
+.agenda-text-controls h4 { margin: 5px 0 7px; font: 600 20px/1.2 Georgia, serif; }
+.agenda-text-controls header p, .agenda-writing-target, .agenda-current-font { margin: 0; color: var(--writing-muted); font-size: 11px; line-height: 1.5; overflow-wrap: anywhere; }
+.agenda-writing-target { display: grid; gap: 6px; }
+.agenda-text-controls button { cursor: pointer; color: var(--writing-ink); background: var(--writing-paper); border: 1px solid var(--writing-line); border-radius: 7px; font: inherit; font-size: 11px; padding: 7px; }
+.agenda-text-controls button[aria-pressed='true'] { border-color: #73865d; box-shadow: inset 0 0 0 1px #73865d; }
+.agenda-writing-fieldset { margin: 0; padding: 9px; min-width: 0; border: 1px solid var(--writing-line); border-radius: 10px; }
+.agenda-writing-fieldset legend { padding: 0 4px; font: 600 12px Georgia, serif; }
+.agenda-font-categories { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 9px; }
+.agenda-font-categories button { padding: 6px; font-size: 9px; }
+.agenda-font-gallery { display: grid; gap: 6px; max-height: 260px; overflow-y: auto; padding: 2px; }
+.agenda-text-controls .agenda-font-card { display: grid; min-width: 0; gap: 5px; text-align: left; padding: 9px; }
+.agenda-font-name { font-size: 10px; color: var(--writing-muted); }
+.agenda-font-sample { font-size: 23px; line-height: 1.35; overflow-wrap: anywhere; }
+.agenda-writing-properties { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.agenda-writing-properties label { display: grid; min-width: 0; gap: 5px; font-size: 11px; }
+.agenda-writing-properties :is(input, select) { min-width: 0; width: 100%; min-height: 34px; border: 1px solid var(--writing-line); border-radius: 6px; background: var(--writing-paper); color: var(--writing-ink); box-sizing: border-box; font: inherit; padding: 5px; }
+.agenda-writing-buttons { display: flex; gap: 5px; }
+.agenda-writing-buttons button { flex: 1; }
+.agenda-writing-align { grid-column: 1 / -1; }
+.agenda-writing-align button { padding: 6px 2px; font-size: 9px; }
+.agenda-writing-preview { white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; border: 1px dashed var(--writing-line); border-radius: 8px; background: #fffdf7; }
+.agenda-text-controls :is(button, input, select):focus-visible { outline: 2px solid #68754f; outline-offset: 2px; }
+.agenda-text-controls fieldset:disabled { opacity: .65; }
+.editor-workspace-v6[data-agenda-theme='dark'] .agenda-text-controls { --writing-ink: #eee2d4; --writing-muted: #c0b2a3; --writing-paper: #293231; --writing-line: #4d5750; }
+.editor-workspace-v6[data-agenda-theme='dark'] .agenda-text-controls :is(button, input, select):focus-visible { outline-color: #c2cf9a; }

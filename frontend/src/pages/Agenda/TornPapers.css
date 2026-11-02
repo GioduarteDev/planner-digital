@@ -1,0 +1,27 @@
+.torn-papers-library {
+  --torn-ink: #554d43;
+  --torn-muted: #776e63;
+  --torn-surface: #fffaf2;
+  --torn-line: #e6dccd;
+  --torn-tray: #eee8dd;
+  display: grid;
+  gap: 14px;
+  color: var(--torn-ink);
+}
+.torn-papers-library h4 { margin: 4px 0 7px; font: 600 22px/1.2 Georgia, serif; }
+.torn-papers-library header p, .torn-papers-hint { margin: 0; color: var(--torn-muted); font-size: 11px; line-height: 1.6; }
+.torn-papers-eyebrow { color: var(--torn-muted); font-size: 9px; letter-spacing: .14em; font-weight: 700; }
+.torn-papers-select { display: grid; gap: 7px; font-size: 11px; font-weight: 600; }
+.torn-papers-select select { width: 100%; padding: 9px; border: 1px solid var(--torn-line); border-radius: 9px; background: var(--torn-surface); color: var(--torn-ink); font: inherit; }
+.torn-papers-gallery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.torn-paper-card { min-width: 0; display: grid; gap: 9px; padding: 9px 8px 12px; border: 1px solid var(--torn-line); border-radius: 10px; background: var(--torn-surface); color: var(--torn-ink); font: inherit; font-size: 10px; text-align: center; cursor: pointer; }
+.torn-paper-card:hover { border-color: #9aab82; }
+.torn-paper-card:disabled { opacity: .6; cursor: wait; }
+.torn-paper-thumbnail { display: grid; place-items: center; height: 100px; padding: 8px; background: var(--torn-tray); border-radius: 5px; }
+.torn-paper-art { display: block; filter: drop-shadow(0 1px 1px #372e2429); }
+.torn-paper-thumbnail .torn-paper-art { max-width: 100%; max-height: 100%; }
+.torn-paper-card:focus-visible, .torn-papers-select select:focus-visible { outline: 2px solid #68754f; outline-offset: 2px; }
+.torn-papers-status { min-height: 16px; margin: 0; color: var(--torn-ink); font-size: 11px; line-height: 1.5; }
+.editor-workspace-v6[data-agenda-theme='dark'] .torn-papers-library { --torn-ink: #eee4d5; --torn-muted: #c3b6a5; --torn-surface: #293231; --torn-line: #4a5650; --torn-tray: #202725; }
+.editor-workspace-v6[data-agenda-theme='dark'] .torn-paper-card:focus-visible,
+.editor-workspace-v6[data-agenda-theme='dark'] .torn-papers-select select:focus-visible { outline-color: #c2cf9a; }

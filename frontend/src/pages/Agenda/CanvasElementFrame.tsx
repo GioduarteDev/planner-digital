@@ -2,6 +2,7 @@ import { GripHorizontal } from 'lucide-react'
 import type { PointerEvent, ReactNode } from 'react'
 import type { CanvasElementFromApi } from './editorModel'
 import { clampPosition } from './canvasGeometry'
+import { getScrapbook } from './scrapbookCatalog'
 
 export function CanvasElementFrame({ element, selected, editing, children, onSelect, onMoveStart, onMove, onMoveEnd, onNudge }: {
   element: CanvasElementFromApi; selected: boolean; children: ReactNode
@@ -13,7 +14,9 @@ export function CanvasElementFrame({ element, selected, editing, children, onSel
   onNudge: (x: number, y: number) => void
 }) {
   const isTemplateBase = element.element_type.startsWith('template:')
-  return <article data-element-id={element.id} className={`free-canvas-element ${selected && !editing ? 'is-selected' : ''} ${editing ? 'is-writing' : ''} ${element.locked ? 'is-locked' : ''} ${isTemplateBase ? 'is-template-base' : ''}`}
+  const scrapbook = element.element_type === 'shape' ? getScrapbook(element.data) : null
+  const isScrapbookWindow = scrapbook && 'window' in scrapbook.material
+  return <article data-element-id={element.id} className={`free-canvas-element ${selected && !editing ? 'is-selected' : ''} ${editing ? 'is-writing' : ''} ${element.locked ? 'is-locked' : ''} ${isTemplateBase ? 'is-template-base' : ''} ${isScrapbookWindow ? 'is-scrapbook-window' : ''}`}
     style={{ left: element.x, top: element.y, width: element.width, height: element.height,
       transform: `rotate(${element.rotation}deg)`, zIndex: element.z_index }}
     onContextMenu={isTemplateBase ? undefined : event => { event.preventDefault(); event.stopPropagation(); if (document.activeElement instanceof HTMLElement) document.activeElement.blur(); onSelect() }}

@@ -426,7 +426,7 @@ export function SortableBlock({
                     className="block-list-bullet"
                     aria-hidden="true"
                   >
-                    ?
+                    •
                   </span>
 
                   <input

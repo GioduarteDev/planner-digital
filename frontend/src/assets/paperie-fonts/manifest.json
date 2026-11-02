@@ -1,0 +1,190 @@
+[
+  {
+    "family": "Caveat",
+    "license": "OFL-1.1",
+    "license_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/caveat/OFL.txt",
+    "css_url": "https://fonts.googleapis.com/css2?family=Caveat%3Awght%40400..700&display=swap",
+    "files": [
+      {
+        "subset": "latin-ext",
+        "url": "https://fonts.gstatic.com/s/caveat/v23/Wnz6HAc5bAfYB2Q7aDYYmg8.woff2",
+        "file": "f626b95c1efa95cf.woff2",
+        "sha256": "f626b95c1efa95cf6b7c9b043d3bbe8862b6abbe5f55a082102f33f7de2fd4f9"
+      },
+      {
+        "subset": "latin",
+        "url": "https://fonts.gstatic.com/s/caveat/v23/Wnz6HAc5bAfYB2Q7ZjYY.woff2",
+        "file": "891951df5e8b5b0f.woff2",
+        "sha256": "891951df5e8b5b0f0bc760d31375405e795c666b5add70437de12d4a6482b33f"
+      }
+    ]
+  },
+  {
+    "family": "Kalam",
+    "license": "OFL-1.1",
+    "license_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/kalam/OFL.txt",
+    "css_url": "https://fonts.googleapis.com/css2?family=Kalam%3Awght%40400%3B700&display=swap",
+    "files": [
+      {
+        "subset": "latin-ext",
+        "url": "https://fonts.gstatic.com/s/kalam/v18/YA9dr0Wd4kDdMthfOCfzsw.woff2",
+        "file": "1099e56781c48f97.woff2",
+        "sha256": "1099e56781c48f97dc66c8df2039a640ded07742acd4c6f2c9dc6350c3e3f324"
+      },
+      {
+        "subset": "latin",
+        "url": "https://fonts.gstatic.com/s/kalam/v18/YA9dr0Wd4kDdMthROCc.woff2",
+        "file": "954410601a823f37.woff2",
+        "sha256": "954410601a823f37e219f7930b7446f86afa15621326a7078d56fb9c910135cb"
+      },
+      {
+        "subset": "latin-ext",
+        "url": "https://fonts.gstatic.com/s/kalam/v18/YA9Qr0Wd4kDdMtDqHTLCkiQ4tg.woff2",
+        "file": "1fc176f6b1fbc091.woff2",
+        "sha256": "1fc176f6b1fbc091d4321ef2c9b683a6f512f645b9f22c460c2e2f3d298fcf74"
+      },
+      {
+        "subset": "latin",
+        "url": "https://fonts.gstatic.com/s/kalam/v18/YA9Qr0Wd4kDdMtDqHTLMkiQ.woff2",
+        "file": "252063af6ade8b9a.woff2",
+        "sha256": "252063af6ade8b9a744cde4ddad0fc21ea53b8ba711eed121a0c2e8610ea9c93"
+      }
+    ]
+  },
+  {
+    "family": "Patrick Hand",
+    "license": "OFL-1.1",
+    "license_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/patrickhand/OFL.txt",
+    "css_url": "https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap",
+    "files": [
+      {
+        "subset": "latin-ext",
+        "url": "https://fonts.gstatic.com/s/patrickhand/v25/LDI1apSQOAYtSuYWp8ZhfYe8UMLLq7s.woff2",
+        "file": "c16846bad9501534.woff2",
+        "sha256": "c16846bad9501534b8402172c18f87e927146c4e63af2942f1fa8ad8ba7e6e70"
+      },
+      {
+        "subset": "latin",
+        "url": "https://fonts.gstatic.com/s/patrickhand/v25/LDI1apSQOAYtSuYWp8ZhfYe8XsLL.woff2",
+        "file": "ac5bc9033b2572bf.woff2",
+        "sha256": "ac5bc9033b2572bf84d39f7150c1634e37ed16e8dbee632d6d0bceac0bbf0199"
+      }
+    ]
+  },
+  {
+    "family": "Nunito",
+    "license": "OFL-1.1",
+    "license_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/nunito/OFL.txt",
+    "css_url": "https://fonts.googleapis.com/css2?family=Nunito%3Aital%2Cwght%400%2C200..900%3B1%2C200..900&display=swap",
+    "files": [
+      {
+        "subset": "latin-ext",
+        "url": "https://fonts.gstatic.com/s/nunito/v32/XRXX3I6Li01BKofIMNaNRs71cA.woff2",
+        "file": "1bb48a49c837d76a.woff2",
+        "sha256": "1bb48a49c837d76a727223515b78eb2a14eaab783563be84b0718f338c56c846"
+      },
+      {
+        "subset": "latin",
+        "url": "https://fonts.gstatic.com/s/nunito/v32/XRXX3I6Li01BKofIMNaDRs4.woff2",
+        "file": "6cfcc3786d5ba3b5.woff2",
+        "sha256": "6cfcc3786d5ba3b5c3a41797f95272e57f4290ccbd283a4bfd0033a3d857e64c"
+      },
+      {
+        "subset": "latin-ext",
+        "url": "https://fonts.gstatic.com/s/nunito/v32/XRXV3I6Li01BKofIO-aBXso.woff2",
+        "file": "2c8d792869818ecb.woff2",
+        "sha256": "2c8d792869818ecb253a46bc3c63c7013df7aac2f69291c3c85e5cdc94160960"
+      },
+      {
+        "subset": "latin",
+        "url": "https://fonts.gstatic.com/s/nunito/v32/XRXV3I6Li01BKofINeaB.woff2",
+        "file": "ba344451eab25b21.woff2",
+        "sha256": "ba344451eab25b217a165363b1982048a5e5830a0daf36577973955a04cac793"
+      }
+    ]
+  },
+  {
+    "family": "Quicksand",
+    "license": "OFL-1.1",
+    "license_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/quicksand/OFL.txt",
+    "css_url": "https://fonts.googleapis.com/css2?family=Quicksand%3Awght%40300..700&display=swap",
+    "files": [
+      {
+        "subset": "latin-ext",
+        "url": "https://fonts.gstatic.com/s/quicksand/v37/6xKtdSZaM9iE8KbpRA_hJVQNcOM.woff2",
+        "file": "b5a37861949c4489.woff2",
+        "sha256": "b5a37861949c4489894ff1e76d3657819830e91316b40effa16c5a6923bc0928"
+      },
+      {
+        "subset": "latin",
+        "url": "https://fonts.gstatic.com/s/quicksand/v37/6xKtdSZaM9iE8KbpRA_hK1QN.woff2",
+        "file": "2add7d60b1cd2ab8.woff2",
+        "sha256": "2add7d60b1cd2ab84c9967e23d5ec08eb3fc9635c46855b17d59404dec6b410e"
+      }
+    ]
+  },
+  {
+    "family": "Fraunces",
+    "license": "OFL-1.1",
+    "license_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/fraunces/OFL.txt",
+    "css_url": "https://fonts.googleapis.com/css2?family=Fraunces%3Aital%2Cwght%400%2C100..900%3B1%2C100..900&display=swap",
+    "files": [
+      {
+        "subset": "latin-ext",
+        "url": "https://fonts.gstatic.com/s/fraunces/v38/6NUs8FyLNQOQZAnv9ZwNjucMHVn85Ni7emAe9lKqZTnbB-gzTK0K1ChJdt9vIVYX9G37lvd9mvMiQvTm.woff2",
+        "file": "877bcc2fd1be299c.woff2",
+        "sha256": "877bcc2fd1be299c950d0971578336818ca5818e1e956f12e0d8c6736436ca45"
+      },
+      {
+        "subset": "latin",
+        "url": "https://fonts.gstatic.com/s/fraunces/v38/6NUs8FyLNQOQZAnv9ZwNjucMHVn85Ni7emAe9lKqZTnbB-gzTK0K1ChJdt9vIVYX9G37lvd9mv0iQg.woff2",
+        "file": "bceec2ef4d549efb.woff2",
+        "sha256": "bceec2ef4d549efbc8df0194a8d5280b6a64c3e399244dffccd9ea1bd9ad6db7"
+      },
+      {
+        "subset": "latin-ext",
+        "url": "https://fonts.gstatic.com/s/fraunces/v38/6NUu8FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0K7iN7hzFUPJH58nib14c1qv86Rg.woff2",
+        "file": "a21ecfbf41fbc393.woff2",
+        "sha256": "a21ecfbf41fbc393e24ef9b7e38532a27e8da5e0a074aa7d66802d1b5ccec2f0"
+      },
+      {
+        "subset": "latin",
+        "url": "https://fonts.gstatic.com/s/fraunces/v38/6NUu8FyLNQOQZAnv9bYEvDiIdE9Ea92uemAk_WBq8U_9v0c2Wa0K7iN7hzFUPJH58nib14c7qv8.woff2",
+        "file": "7f9d191d999336d3.woff2",
+        "sha256": "7f9d191d999336d3b9790afa72e1358e50a13b06d4f289341e92a311967a80f9"
+      }
+    ]
+  },
+  {
+    "family": "Cormorant Garamond",
+    "license": "OFL-1.1",
+    "license_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/cormorantgaramond/OFL.txt",
+    "css_url": "https://fonts.googleapis.com/css2?family=Cormorant+Garamond%3Aital%2Cwght%400%2C300..700%3B1%2C300..700&display=swap",
+    "files": [
+      {
+        "subset": "latin-ext",
+        "url": "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3ZmX5slCNuHLi8bLeY9MK7whWMhyjYrEtGmSq17w.woff2",
+        "file": "cd5bf126b2c84ab4.woff2",
+        "sha256": "cd5bf126b2c84ab41b254a6a9a1ffb5c326a0f9f82c22fb4704daa31c9aaa415"
+      },
+      {
+        "subset": "latin",
+        "url": "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3ZmX5slCNuHLi8bLeY9MK7whWMhyjYrEtImSo.woff2",
+        "file": "6f2f5c3b1abc3d0b.woff2",
+        "sha256": "6f2f5c3b1abc3d0bb035a927f66a90ca873f94fc31c4966c8d024142c2036e55"
+      },
+      {
+        "subset": "latin-ext",
+        "url": "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYp3tKgS4.woff2",
+        "file": "cfa9a397d86f66c5.woff2",
+        "sha256": "cfa9a397d86f66c5c51775a2500a712d5f632a04f0c5eca6930dfaf612d4566d"
+      },
+      {
+        "subset": "latin",
+        "url": "https://fonts.gstatic.com/s/cormorantgaramond/v21/co3bmX5slCNuHLi8bLeY9MK7whWMhyjYqXtK.woff2",
+        "file": "d80df8ff5aecd299.woff2",
+        "sha256": "d80df8ff5aecd299a61549f9e29ab1ed0b9b05f4ea71d50fe978e07d5240b235"
+      }
+    ]
+  }
+]

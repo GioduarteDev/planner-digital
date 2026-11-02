@@ -1,5 +1,7 @@
-﻿import { useCanvasElements } from './useCanvasElements'
-import { ArrowDown, ArrowDownRight, ArrowLeft, ArrowUp, BringToFront, Copy, LockKeyhole, LockKeyholeOpen, Menu, Minus, Pencil, Plus, Redo2, RotateCcw, RotateCw, Scissors, SendToBack, Undo2, X } from 'lucide-react'
+import { DrawingPanel } from './DrawingPanel'
+import { recognizeHeldShape, stabilizePoint, SHAPE_HOLD_MS, type Stabilization } from './drawingProcessing'
+import { useCanvasElements } from './useCanvasElements'
+import { ArrowDown, ArrowDownRight, ArrowLeft, ArrowUp, BringToFront, Copy, LockKeyhole, LockKeyholeOpen, Menu, Minus, Pencil, Plus, RotateCcw, RotateCw, Scissors, SendToBack, X } from 'lucide-react'
 import {
   Link,
   useParams,
@@ -92,14 +94,26 @@ import {
 import { SortableBlock, SortablePageRow, SortableFolderGroup } from './EditorBlocks'
 import { EditorToolbar } from './EditorToolbar'
 import { CanvasElementContent } from './CanvasElementContent'
+import { HabitWidgetLibrary, type HabitWidgetType } from './HabitWidgets'
 import { CanvasElementFrame } from './CanvasElementFrame'
 import { TemplateGallery } from './TemplateGallery'
+import { SymbolsPanel, type SymbolInsertMode } from './SymbolsPanel'
+import { AgendaTextControls } from './AgendaTextControls'
+import { DEFAULT_WRITING_STYLE, agendaStyleChanges, readAgendaTextStyle, type AgendaTextStyle } from './agendaTypography'
+import { createInlineCheckboxHtml, createInlineListHtml, escapeRichText } from './richTextDocument'
+import { TornPapersPanel } from './TornPapersPanel'
+import { ScrapbookPanel } from './ScrapbookPanel'
+import { SCRAPBOOK_MATERIALS, scrapbookData, type ScrapbookMaterial, type ScrapbookPalette } from './scrapbookCatalog'
+import { WashiPanel, type WashiInsertOptions } from './WashiPanel'
+import { washiData, type WashiDesign } from './washiCatalog'
+import { TORN_PAPER_COLLECTIONS, TORN_PAPER_FORMATS, tornPaperData, type TornPaperFormat, type TornPaperCollection } from './tornPaperCatalog'
+import { SYMBOL_FONT_FAMILY, type SymbolDefinition } from './symbolCatalog'
 import { SECTION_TEMPLATES, getTemplateDefaultSettings, type BuiltInTemplate } from './templateCatalog'
 import { legacyTemplateFields } from './templateEditingModel'
 import { useTransientPanels } from './useTransientPanels'
 import { useEditorHistory } from './useEditorHistory'
 import { reorderLayers, type LayerAction } from './canvasGeometry'
-import { PEN_COLORS, HIGHLIGHTER_PRESETS, SHAPE_OPTIONS, EXTRA_SHAPE_OPTIONS, ARROW_OPTIONS, EXTRA_ARROW_OPTIONS, POSTIT_OPTIONS, WASHI_OPTIONS, STAMP_OPTIONS } from './editorCatalog'
+import { HIGHLIGHTER_PRESETS, SHAPE_OPTIONS, EXTRA_SHAPE_OPTIONS, ARROW_OPTIONS, EXTRA_ARROW_OPTIONS, POSTIT_OPTIONS, STAMP_OPTIONS } from './editorCatalog'
 import './AgendaPage.css'
 import './PlannerWidgets.css'
 import './TemplateCards.css'
@@ -112,6 +126,8 @@ type PageEditorProps = {
   scale: number
   focused: boolean
   agendaTheme?: 'light' | 'dark'
+  symbolFavorites: { ids: readonly string[]; ready: boolean; saving: boolean; error: string }
+  onToggleSymbolFavorite: (id: string) => void
   weeklyStart?: string
   onWeeklyWeekChange?: (weekStart: string) => Promise<void>
   previewMode: boolean
@@ -123,7 +139,7 @@ type PageEditorProps = {
   onPreferredMode?: (mode: 'single' | 'spread') => void
 }
 
-function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', weeklyStart, onWeeklyWeekChange, previewMode, onExitPreview, onTogglePreview, onFocus, onPageChange, onNavigate, onPreferredMode }: PageEditorProps) {
+function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', symbolFavorites, onToggleSymbolFavorite, weeklyStart, onWeeklyWeekChange, previewMode, onExitPreview, onTogglePreview, onFocus, onPageChange, onNavigate, onPreferredMode }: PageEditorProps) {
   const { id } = useParams()
   const agendaId = Number(id)
   const [searchParams] =
@@ -146,6 +162,10 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
   const [activePageId, setActivePageId] =
     useState<number | null>(null)
 
+  const [textTargetId, setTextTargetId] = useState<number | null>(null)
+  const [writingStyle, setWritingStyle] = useState<AgendaTextStyle>(DEFAULT_WRITING_STYLE)
+  const [inlineInsertionTool, setInlineInsertionTool] = useState<'checkbox' | 'list' | null>(null)
+
   const [newTaskText, setNewTaskText] =
     useState('')
   const [newTaskDate, setNewTaskDate] =
@@ -159,6 +179,7 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
     useState(false)
   const [blockLoadError, setBlockLoadError] =
     useState('')
+  const [blockSaveError, setBlockSaveError] = useState<{ pageId: number | null; message: string } | null>(null)
 
   const [mediaItems, setMediaItems] =
     useState<PlannerMedia[]>([])
@@ -261,7 +282,8 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
   const [activeTool, setActiveTool] =
     useState<EditorTool>(null)
   const [sectionLibraryOpen, setSectionLibraryOpen] = useState(false)
-  useTransientPanels(activeTool, isNavigationOpen, setActiveTool, setIsNavigationOpen)
+  const [drawingPinned, setDrawingPinned] = useState(false)
+  useTransientPanels(activeTool, isNavigationOpen, setActiveTool, setIsNavigationOpen, drawingPinned && activeTool === 'pen')
   useEffect(() => {
     if (activePageId !== null) onPageChange?.(activePageId, pages)
   }, [activePageId, pages, onPageChange])
@@ -288,12 +310,26 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
     useState(3)
   const [drawingOpacity, setDrawingOpacity] =
     useState(1)
+  const [stabilization, setStabilization] = useState<Stabilization>(0)
+  const [holdShapes, setHoldShapes] = useState(false)
+  const inkSession = useRef<{ pointerId: number; draft: DrawingDraft; raw: DrawingPoint[]; freehand: DrawingPoint[]; level: Stabilization; hold: boolean } | null>(null)
+  const shapeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  function clearShapeTimer() {
+    if (shapeTimer.current !== null) clearTimeout(shapeTimer.current)
+    shapeTimer.current = null
+  }
+  useEffect(() => {
+    inkSession.current = null
+    clearShapeTimer()
+    return () => { inkSession.current = null; clearShapeTimer() }
+  }, [activePageId, drawingMode, previewMode])
+
   const [drawingSaving, setDrawingSaving] =
     useState(false)
   const [drawingError, setDrawingError] =
     useState('')
 
-  const { editingTextElementId, setEditingTextElementId, pageCanvasElements, setPageCanvasElements, selectedCanvasElementId, setSelectedCanvasElementId, canvasSaveStatus, failedElementWrites, createInlineText, createStructuredElement, createPageCanvasElement, patchPageCanvasElement, handleCanvasElementPointerDown, handleCanvasElementPointerMove, finishCanvasElementDrag, handleCanvasElementResizeStart, handleCanvasElementResizeMove, finishCanvasElementResize, duplicatePageCanvasElement, deletePageCanvasElement, rotatePageCanvasElement, reorderPageCanvasElements } = useCanvasElements({
+  const { editingTextElementId, setEditingTextElementId, pageCanvasElements, setPageCanvasElements, selectedCanvasElementId, setSelectedCanvasElementId, canvasSaveStatus, failedElementWrites, createInlineText, createStructuredElement, createPageCanvasElement, patchPageCanvasElement, patchCanvasTextStyle, handleCanvasElementPointerDown, handleCanvasElementPointerMove, finishCanvasElementDrag, handleCanvasElementResizeStart, handleCanvasElementResizeMove, finishCanvasElementResize, duplicatePageCanvasElement, deletePageCanvasElement, rotatePageCanvasElement, reorderPageCanvasElements } = useCanvasElements({
     activePageId, scale, stampColor,
     history,
     onInsert: () => { setDrawingMode(null); setDrawingDraft(null) },
@@ -356,19 +392,27 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
     }
   }, [focused, history, onExitPreview, previewMode, setSelectedCanvasElementId, setEditingTextElementId])
 
-  function handleCanvasTextInput(element: CanvasElementFromApi, text: string) {
-    const input = document.querySelector<HTMLTextAreaElement>(`[data-element-id="${element.id}"] .canvas-inline-text`)
+  function handleCanvasTextInput(element: CanvasElementFromApi, text: string, richHtml?: string) {
+    if (element.element_type === 'text' && !element.data.templateField) setTextTargetId(element.id)
+    const input = document.querySelector<HTMLElement>(`[data-element-id="${element.id}"] .canvas-inline-text`)
     const height = input ? Math.min(Math.max(element.height, input.scrollHeight), (input.closest('.planner-sheet')?.clientHeight ?? 1253) - element.y) : element.height
-    void patchPageCanvasElement(element.id, { data: { ...element.data, text }, height })
+    void patchPageCanvasElement(element.id, current => ({
+      data: { ...current.data, text, ...(richHtml !== undefined ? { richHtml } : {}) },
+      height: Math.max(current.height, height),
+    }))
   }
 
-  function handleCanvasTextBlur(element: CanvasElementFromApi, text: string) {
+  function handleCanvasTextBlur(element: CanvasElementFromApi, text: string, richHtml?: string) {
     setEditingTextElementId(null)
-    if (element.element_type === 'text' && !element.data.templateField && !text.trim()) {
+    if (element.element_type === 'text' && !element.data.templateField && text.length === 0 && !richHtml) {
       void deletePageCanvasElement(element.id)
       return
     }
-    if (text !== element.data.text) void patchPageCanvasElement(element.id, { data: { ...element.data, text } })
+    if (text !== element.data.text || richHtml !== undefined && richHtml !== element.data.richHtml) {
+      void patchPageCanvasElement(element.id, current => ({
+        data: { ...current.data, text, ...(richHtml !== undefined ? { richHtml } : {}) },
+      }))
+    }
   }
   const [isRulerVisible, setIsRulerVisible] =
     useState(false)
@@ -1133,10 +1177,18 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
         setBlockSaveStatus(
           'saved',
         )
+        setBlockSaveError(null)
       }
     } catch (error) {
       console.error(error)
+      // A failed PATCH must remain available for blur or the next edit to retry.
+      // Keep any newer local changes in preference to this older snapshot.
+      pendingBlockUpdatesRef.current[blockId] = {
+        ...updates,
+        ...pendingBlockUpdatesRef.current[blockId],
+      }
       setBlockSaveStatus('error')
+      setBlockSaveError({ pageId: activePageId, message: error instanceof Error ? error.message : 'Não foi possível salvar o bloco.' })
     }
   }
 
@@ -4744,11 +4796,8 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
       setDrawingDraft(null)
     }
 
-    if (tool === 'pen') {
+    if (tool === 'pen' && drawingMode === null) {
       setDrawingMode('fineliner')
-      setDrawingColor('#3f3934')
-      setDrawingWidth(3)
-      setDrawingOpacity(1)
     }
 
     if (tool === 'highlighter') {
@@ -4760,11 +4809,29 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
       setDrawingOpacity(0.42)
     }
 
-    if (tool === 'elements') {
+    if (tool === 'elements' || tool === 'symbols' || tool === 'washi' || tool === 'habits') {
       setDrawingMode(null)
       setDrawingDraft(null)
-      setElementLibraryCategory(null)
+      setElementLibraryCategory(tool === 'elements' ? null : tool === 'habits' ? null : tool)
     }
+  }
+
+  function activateSelectionTool() {
+    setActiveTool(null)
+    setIsNavigationOpen(false)
+    setElementLibraryCategory(null)
+    setDrawingMode(null)
+    setDrawingDraft(null)
+  }
+
+  function activateEraserTool() {
+    setActiveTool('pen')
+    setIsNavigationOpen(false)
+    setElementLibraryCategory(null)
+    setDrawingDraft(null)
+    setDrawingMode('eraser')
+    setDrawingWidth(24)
+    setDrawingOpacity(1)
   }
 
   function toggleFolder(
@@ -4794,7 +4861,7 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
     setDrawingWidth(width)
     setDrawingOpacity(opacity)
     setDrawingError('')
-    setActiveTool(null)
+    if (!drawingPinned) setActiveTool(null)
   }
 
   function showFloatingRuler() {
@@ -5076,6 +5143,8 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
     if (
       drawingMode === null
       || event.button !== 0
+      || !event.isPrimary
+      || inkSession.current !== null
     ) {
       return
     }
@@ -5095,71 +5164,43 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
       return
     }
 
-    setDrawingDraft({
-      tool: drawingMode,
-      color: drawingColor,
-      width: drawingWidth,
-      opacity: drawingOpacity,
-      points: [point, point],
-    })
+    const draft: DrawingDraft = {
+      tool: drawingMode, color: drawingColor, width: drawingWidth,
+      opacity: drawingOpacity, points: [point, point],
+    }
+    clearShapeTimer()
+    inkSession.current = { pointerId: event.pointerId, draft, raw: [point], freehand: draft.points, level: stabilization, hold: holdShapes }
+    setDrawingDraft(draft)
   }
 
-  function handleDrawingPointerMove(
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) {
-    if (drawingMode === null) {
-      return
-    }
-
-    if (
-      drawingMode !== 'eraser'
-      && drawingDraft === null
-    ) {
-      return
-    }
-
+  function handleDrawingPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
     event.preventDefault()
-
-    const point =
-      getDrawingPoint(event)
-
+    const point = getDrawingPoint(event)
     if (drawingMode === 'eraser') {
       void eraseDrawingAtPoint(point)
       return
     }
-
-    setDrawingDraft(
-      (current) => {
-        if (current === null) {
-          return null
+    const session = inkSession.current
+    if (!session || session.pointerId !== event.pointerId) return
+    const previousRaw = session.raw[session.raw.length - 1]
+    if (Math.hypot(point.x - previousRaw.x, point.y - previousRaw.y) < 2) return
+    clearShapeTimer()
+    session.raw.push(point)
+    // Resume the original stroke if the user moves after a shape preview.
+    session.freehand.push(stabilizePoint(session.freehand[session.freehand.length - 1], point, session.level))
+    session.draft = { ...session.draft, points: session.freehand }
+    setDrawingDraft(session.draft)
+    if (session.hold) {
+      shapeTimer.current = setTimeout(() => {
+        if (inkSession.current !== session) return
+        const adjusted = recognizeHeldShape(session.raw)
+        if (adjusted) {
+          session.draft = { ...session.draft, points: adjusted }
+          setDrawingDraft(session.draft)
         }
-
-        const previous =
-          current.points[
-            current.points.length - 1
-          ]
-
-        if (previous) {
-          const distance =
-            Math.hypot(
-              point.x - previous.x,
-              point.y - previous.y,
-            )
-
-          if (distance < 2) {
-            return current
-          }
-        }
-
-        return {
-          ...current,
-          points: [
-            ...current.points,
-            point,
-          ],
-        }
-      },
-    )
+      }, SHAPE_HOLD_MS)
+    }
   }
 
   async function persistDrawingDraft(
@@ -5262,12 +5303,13 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
       return
     }
 
-    if (drawingDraft === null) {
-      return
-    }
-
-    const draft = drawingDraft
+    clearShapeTimer()
+    const session = inkSession.current
+    if (!session || session.pointerId !== event.pointerId) return
+    const draft = session.draft
+    inkSession.current = null
     setDrawingDraft(null)
+    if (event.type === 'pointercancel') return
 
     if (draft.points.length < 2) {
       return
@@ -5544,7 +5586,13 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
     const rect = event.currentTarget.getBoundingClientRect()
     const x = Math.max(0, Math.min(sheetWidth - 24, (event.clientX - rect.left) / scale))
     const y = Math.max(0, Math.min(sheetHeight - 36, (event.clientY - rect.top) / scale))
-    void createInlineText(Math.round(x), Math.round(y), Math.min(330, sheetWidth - x))
+    const initialHtml = inlineInsertionTool === 'checkbox'
+      ? createInlineCheckboxHtml()
+      : inlineInsertionTool === 'list'
+        ? createInlineListHtml()
+        : ''
+    setInlineInsertionTool(null)
+    void createInlineText(Math.round(x), Math.round(y), Math.min(330, sheetWidth - x), writingStyle, initialHtml)
   }
 
   function isTemplatePart(element: CanvasElementFromApi) {
@@ -5563,10 +5611,10 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
         const templateWidth = Math.min(sheetWidth, sheetHeight)
         const templateHeight = Math.max(sheetWidth, sheetHeight)
         const leftPage = await apiRequest<PageFromApi>(`/agendas/${agendaId}/pages`, {
-          method: 'POST', body: JSON.stringify({ title: `${template.name} · Plano`, paper_type: template.paperType, paper_settings: { orientation: 'portrait' } }),
+          method: 'POST', body: JSON.stringify({ title: `${template.name} · ${template.spreadTitles?.[0] ?? 'Plano'}`, paper_type: template.paperType, paper_settings: { orientation: 'portrait' } }),
         })
         const rightPage = await apiRequest<PageFromApi>(`/agendas/${agendaId}/pages`, {
-          method: 'POST', body: JSON.stringify({ title: `${template.name} · Reflexão`, paper_type: template.paperType, paper_settings: { orientation: 'portrait' } }),
+          method: 'POST', body: JSON.stringify({ title: `${template.name} · ${template.spreadTitles?.[1] ?? 'Reflexão'}`, paper_type: template.rightPaperType ?? template.paperType, paper_settings: { orientation: 'portrait' } }),
         })
         await createStructuredElement(`template:${template.id}`, { ...getTemplateDefaultSettings(template, String(activePage?.paperSettings.date ?? '')), templateId: template.id, spreadSide: 'left' }, templateWidth, templateHeight, leftPage.id, 0, 0, -20, true, false)
         await createStructuredElement(`template:${template.id}`, { ...getTemplateDefaultSettings(template, String(activePage?.paperSettings.date ?? '')), templateId: template.id, spreadSide: 'right' }, templateWidth, templateHeight, rightPage.id, 0, 0, -20, true, false)
@@ -5603,6 +5651,7 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
   }
 
   async function handleApplyBuiltInPage(template: BuiltInTemplate) {
+    if (template.createOnly) { await handleCreateBuiltInPage(template); return }
     if (activePageId === null) return
     try {
       setTemplatesError('')
@@ -5694,12 +5743,14 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
               >
                 <CanvasElementContent element={element.element_type.startsWith('template:') ? { ...element, data: legacyTemplateFields(element, pageCanvasElements) } : element} editing={editingTextElementId === element.id} onTextBlur={handleCanvasTextBlur}
                   onTextInput={handleCanvasTextInput}
+                  onTextResize={(item, height) => { void patchPageCanvasElement(item.id, { height }, false) }}
                   onSelect={id => {
-                    if (activeTool === 'text') {
+                    if (activeTool === 'text' && element.element_type === 'postit') {
                       const postIt = pageCanvasElements.find(item => item.id === id)
-                      if (postIt) void createInlineText(postIt.x, postIt.y, postIt.width)
+                      if (postIt) void createInlineText(postIt.x, postIt.y, postIt.width, writingStyle)
                       return
                     }
+                    if (element.element_type === 'text' && !element.data.templateField) setTextTargetId(id)
                     setEditingTextElementId(id)
                     setSelectedCanvasElementId(null)
                     setSelectedMediaId(null)
@@ -5719,6 +5770,8 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
                         event.stopPropagation()
                       }
                     >
+                      {element.element_type === 'text' && !element.data.templateField && <button type="button" aria-label="Formatar texto" title="Formatar texto"
+                        onClick={() => { setTextTargetId(element.id); setActiveTool('text') }}>Aa</button>}
                       <button
                         type="button"
                         title="Duplicar"
@@ -6614,10 +6667,27 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
   }
 
   function renderTextPanel() {
+    const target = pageCanvasElements.find(item => item.id === textTargetId && item.page_id === activePageId && item.element_type === 'text' && !item.data.templateField)
+    const enableRichText = () => {
+      if (!target || target.locked || target.data.richTextVersion === 1) return
+      setEditingTextElementId(target.id)
+      void patchPageCanvasElement(target.id, current => ({
+        data: {
+          ...current.data,
+          richTextVersion: 1,
+          richHtml: escapeRichText(typeof current.data.text === 'string' ? current.data.text : ''),
+        },
+      }))
+    }
     return (
       <div className="tool-panel-stack">
+        <AgendaTextControls style={target ? readAgendaTextStyle(target.data) : writingStyle} hasTarget={Boolean(target)} locked={Boolean(target?.locked)} richText={target?.data.richTextVersion === 1}
+          onChange={patch => { if (target) patchCanvasTextStyle(target.id, patch); else setWritingStyle(current => ({ ...current, ...agendaStyleChanges(patch) })) }}
+          onNewText={() => { setTextTargetId(null); setEditingTextElementId(null) }}
+          onResume={() => { if (target) { setActiveTool(null); setEditingTextElementId(target.id); requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-element-id="${target.id}"] .canvas-inline-text`)?.focus()) } }}
+          onEnableRichText={enableRichText} />
         <p className="tool-panel-description">
-          Clique em qualquer ponto da folha, de um adesivo ou de um post-it para escrever ali. Você também pode adicionar os blocos abaixo.
+          Escolha Checkbox ou Lista e clique no ponto da folha em que quer começar. Para textos antigos, ative a edição rica explicitamente.
         </p>
 
         <div className="tool-action-grid">
@@ -6643,22 +6713,20 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
 
           <button
             type="button"
-            onClick={() =>
-              void handleCreateBlock('checkbox')
-            }
+            aria-pressed={inlineInsertionTool === 'checkbox'}
+            onClick={() => setInlineInsertionTool(current => current === 'checkbox' ? null : 'checkbox')}
           >
             <strong>☑</strong>
-            <span>Checkbox</span>
+            <span>Checkbox na folha</span>
           </button>
 
           <button
             type="button"
-            onClick={() =>
-              void handleCreateBlock('list')
-            }
+            aria-pressed={inlineInsertionTool === 'list'}
+            onClick={() => setInlineInsertionTool(current => current === 'list' ? null : 'list')}
           >
             <strong>•</strong>
-            <span>Lista</span>
+            <span>Lista na folha</span>
           </button>
         </div>
       </div>
@@ -6666,241 +6734,15 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
   }
 
   function renderPenPanel() {
-    const isEraser =
-      drawingMode === 'eraser'
-
-    const penOptions = [
-      {
-        tool: 'fineliner' as const,
-        label: 'Fineliner',
-        subtitle: 'Traço uniforme',
-        width: 3,
-        opacity: 1,
-      },
-      {
-        tool: 'fountain' as const,
-        label: 'Tinteiro',
-        subtitle: 'Pontas mais finas',
-        width: 5,
-        opacity: 0.96,
-      },
-      {
-        tool: 'brush' as const,
-        label: 'Brush Pen',
-        subtitle: 'Pressão variável',
-        width: 8,
-        opacity: 0.92,
-      },
-      {
-        tool: 'pencil' as const,
-        label: 'Lápis',
-        subtitle: 'Leve e macio',
-        width: 2,
-        opacity: 0.7,
-      },
-      {
-        tool: 'eraser' as const,
-        label: 'Borracha',
-        subtitle: 'Apaga traços',
-        width: 24,
-        opacity: 1,
-      },
-    ]
-
     return (
-      <div className="tool-panel-stack">
-        <div className="pen-type-grid">
-          {penOptions.map(
-            (option) => (
-              <button
-                key={option.tool}
-                type="button"
-                className={
-                  drawingMode === option.tool
-                    ? 'pen-type-card active'
-                    : 'pen-type-card'
-                }
-                onClick={() => {
-                  setDrawingMode(
-                    option.tool,
-                  )
-                  setDrawingWidth(
-                    option.width,
-                  )
-                  setDrawingOpacity(
-                    option.opacity,
-                  )
-                }}
-              >
-                <strong>
-                  {option.tool === 'eraser'
-                    ? '⌫'
-                    : option.tool === 'brush'
-                      ? 'ð“‘'
-                      : option.tool === 'fountain'
-                        ? '✒'
-                        : option.tool === 'pencil'
-                          ? '✎'
-                          : '╱'}
-                </strong>
-                <span>
-                  {option.label}
-                </span>
-                <small>
-                  {option.subtitle}
-                </small>
-              </button>
-            ),
-          )}
-        </div>
-
-        {isEraser
-          ? (
-            <>
-              <p className="tool-helper-note">
-                A borracha remove o traço inteiro que você tocar — funciona tanto em desenhos quanto em marca-texto.
-              </p>
-
-              <label className="tool-field">
-                <span>
-                  Tamanho da borracha · {drawingWidth}px
-                </span>
-                <input
-                  type="range"
-                  min={10}
-                  max={54}
-                  value={drawingWidth}
-                  onChange={(event) =>
-                    setDrawingWidth(
-                      Number(
-                        event.target.value,
-                      ),
-                    )
-                  }
-                />
-              </label>
-            </>
-          )
-          : (
-            <>
-              <div className="tool-section-label">
-                Cores
-              </div>
-
-              <div className="color-swatch-grid pen-swatches">
-                {PEN_COLORS.map(
-                  (color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      className={
-                        drawingColor === color
-                          ? 'color-swatch selected'
-                          : 'color-swatch'
-                      }
-                      style={{
-                        backgroundColor: color,
-                      }}
-                      aria-label={`Cor ${color}`}
-                      title={color}
-                      onClick={() =>
-                        setDrawingColor(color)
-                      }
-                    />
-                  ),
-                )}
-              </div>
-
-              <label className="tool-field tool-color-field">
-                <span>Cor personalizada</span>
-                <input
-                  type="color"
-                  value={drawingColor}
-                  onChange={(event) =>
-                    setDrawingColor(
-                      event.target.value,
-                    )
-                  }
-                />
-              </label>
-
-              <label className="tool-field">
-                <span>
-                  Espessura · {drawingWidth}px
-                </span>
-                <input
-                  type="range"
-                  min={1}
-                  max={24}
-                  value={drawingWidth}
-                  onChange={(event) =>
-                    setDrawingWidth(
-                      Number(
-                        event.target.value,
-                      ),
-                    )
-                  }
-                />
-              </label>
-
-              <label className="tool-field">
-                <span>
-                  Opacidade · {Math.round(
-                    drawingOpacity * 100,
-                  )}%
-                </span>
-                <input
-                  type="range"
-                  min={0.15}
-                  max={1}
-                  step={0.05}
-                  value={drawingOpacity}
-                  onChange={(event) =>
-                    setDrawingOpacity(
-                      Number(
-                        event.target.value,
-                      ),
-                    )
-                  }
-                />
-              </label>
-
-              {drawingMode === 'brush' && (
-                <p className="tool-helper-note">
-                  Brush Pen usa a pressão da caneta/tela quando o dispositivo fornece esse dado. Com mouse, usa uma pressão média.
-                </p>
-              )}
-
-              {drawingMode === 'fountain' && (
-                <p className="tool-helper-note">
-                  Tinteiro afina o começo e o fim do traço para uma escrita mais elegante.
-                </p>
-              )}
-            </>
-          )}
-
-        <button
-          className="tool-primary-button"
-          type="button"
-          onClick={() =>
-            chooseDrawingStyle(
-              drawingMode === 'pencil'
-                || drawingMode === 'brush'
-                || drawingMode === 'fountain'
-                || drawingMode === 'fineliner'
-                || drawingMode === 'eraser'
-                ? drawingMode
-                : 'fineliner',
-              drawingColor,
-              drawingWidth,
-              drawingOpacity,
-            )
-          }
-        >
-          {isEraser
-            ? 'Usar borracha na folha'
-            : 'Usar na folha'}
-        </button>
+      <DrawingPanel tool={drawingMode} color={drawingColor} width={drawingWidth} opacity={drawingOpacity}
+        stabilization={stabilization} holdShapes={holdShapes}
+        onTool={(tool, width, opacity) => { setDrawingMode(tool); setDrawingWidth(width); setDrawingOpacity(opacity) }}
+        onColor={setDrawingColor} onWidth={setDrawingWidth} onOpacity={setDrawingOpacity}
+        onStabilization={setStabilization} onHoldShapes={setHoldShapes}>
+        <button className="tool-primary-button" type="button" onClick={() => chooseDrawingStyle(
+          drawingMode ?? 'fineliner', drawingColor, drawingWidth, drawingOpacity,
+        )}>{drawingMode === 'eraser' ? 'Usar borracha na folha' : 'Usar na folha'}</button>
 
         <div className="tool-inline-actions">
           <button
@@ -6929,7 +6771,7 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
             {drawingError}
           </p>
         )}
-      </div>
+      </DrawingPanel>
     )
   }
 
@@ -7284,7 +7126,7 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
       <div className="tool-panel-stack">
         <TemplateGallery busy={templateBusyId === -1} onApply={template => { void handleApplyBuiltInPage(template) }} onCreate={template => { void handleCreateBuiltInPage(template) }} />
         <div className="tool-panel-intro"><strong>Seções para compor</strong><p>Peças interativas que vivem dentro da folha.</p></div>
-        <div className="template-section-options">{SECTION_TEMPLATES.map((section, index) => <button type="button" data-section-template={section.id} key={section.id} onClick={() => void createStructuredElement(section.elementType, section.id === 'task-receipt' ? { taskIds: pages.flatMap(page => page.tasks).map(task => task.id) } : {}, Math.min(section.width, sheetWidth - 64), section.height, activePageId, 30 + index * 12, 100 + index * 12)}><Pencil size={16} /> {section.name} <span>{section.description}</span></button>)}</div>
+        <div className="template-section-options">{SECTION_TEMPLATES.filter(section => section.id !== 'habit-tracker').map((section, index) => <button type="button" data-section-template={section.id} key={section.id} onClick={() => void createStructuredElement(section.elementType, section.id === 'task-receipt' ? { taskIds: pages.flatMap(page => page.tasks).map(task => task.id) } : {}, Math.min(section.width, sheetWidth - 64), section.height, activePageId, 30 + index * 12, 100 + index * 12)}><Pencil size={16} /> {section.name} <span>{section.description}</span></button>)}</div>
         <button
           className="tool-primary-button"
           type="button"
@@ -7607,6 +7449,32 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
     )
   }
 
+  function renderHabitsPanel() {
+    return <HabitWidgetLibrary onInsert={(type: HabitWidgetType, width, height) => {
+      const offset = pageCanvasElements.length % 5
+      void createStructuredElement(type, {}, Math.min(width, sheetWidth - 64), height, activePageId, 42 + offset * 14, 96 + offset * 14, 4)
+    }} />
+  }
+
+  function renderSymbolsPanel(onBack: () => void) {
+    return <SymbolsPanel
+      onInsert={insertPaperieSymbol}
+      favoriteIds={symbolFavorites.ids}
+      favoritesReady={symbolFavorites.ready}
+      favoritesSaving={symbolFavorites.saving}
+      favoritesError={symbolFavorites.error}
+      onToggleFavorite={onToggleSymbolFavorite}
+      onBack={onBack}
+    />
+  }
+
+  function renderWashiPanel(onBack: () => void) {
+    return <WashiPanel onInsert={insertPaperieWashi}
+      onLegacyInsert={id => createPageCanvasElement('washi', id)}
+      onBack={onBack}
+    />
+  }
+
   function renderToolPanelContent() {
     if (activeTool === 'text') {
       return renderTextPanel()
@@ -7628,6 +7496,15 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
     }
     if (activeTool === 'templates') {
       return renderTemplatesPanel()
+    }
+    if (activeTool === 'habits') {
+      return renderHabitsPanel()
+    }
+    if (activeTool === 'symbols') {
+      return renderSymbolsPanel(() => { setElementLibraryCategory(null); setActiveTool('elements') })
+    }
+    if (activeTool === 'washi') {
+      return renderWashiPanel(() => { setElementLibraryCategory(null); setActiveTool('elements') })
     }
     if (activeTool === 'tasks') {
       return renderTasksPanel()
@@ -7772,51 +7649,7 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
       }
 
       if (elementLibraryCategory === 'washi') {
-        return (
-          <div className="tool-panel-stack">
-            <button
-              type="button"
-              className="element-library-back"
-              onClick={() =>
-                setElementLibraryCategory(null)
-              }
-            >
-              <ArrowLeft size={16} /> Elementos
-            </button>
-
-            <div className="tool-panel-intro">
-              <strong>Washi tapes</strong>
-              <p>
-                {WASHI_OPTIONS.length} fitas decorativas com padrões diferentes, sempre usando cores sólidas.
-              </p>
-            </div>
-
-            <div className="element-library-grid color-element-grid">
-              {WASHI_OPTIONS.map(
-                ([id, color, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() =>
-                      void createPageCanvasElement(
-                        'washi',
-                        id,
-                      )
-                    }
-                  >
-                    <span
-                      className={`element-color-preview washi-preview washi-${id}`}
-                      style={{
-                        backgroundColor: color,
-                      }}
-                    />
-                    <span>{label}</span>
-                  </button>
-                ),
-              )}
-            </div>
-          </div>
-        )
+        return renderWashiPanel(() => setElementLibraryCategory(null))
       }
 
       if (elementLibraryCategory === 'stamps') {
@@ -7908,6 +7741,18 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
         )
       }
 
+      if (elementLibraryCategory === 'symbols') {
+        return renderSymbolsPanel(() => setElementLibraryCategory(null))
+      }
+
+      if (elementLibraryCategory === 'torn-papers') {
+        return <TornPapersPanel onInsert={insertTornPaper} onBack={() => setElementLibraryCategory(null)} />
+      }
+
+      if (elementLibraryCategory === 'scrapbook') {
+        return <ScrapbookPanel onInsert={insertScrapbook} onBack={() => setElementLibraryCategory(null)} />
+      }
+
       return (
         <div className="tool-panel-stack">
           <p className="tool-panel-description">
@@ -7956,19 +7801,6 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
 
             <button
               type="button"
-              onClick={() =>
-                setElementLibraryCategory(
-                  'washi',
-                )
-              }
-            >
-              <strong>▱</strong>
-              <span>Washi</span>
-              <small>{WASHI_OPTIONS.length} fitas</small>
-            </button>
-
-            <button
-              type="button"
               className={
                 isRulerVisible
                   ? 'is-active'
@@ -7997,6 +7829,17 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
               <span>Carimbos</span>
               <small>{STAMP_OPTIONS.length} carimbos</small>
             </button>
+
+            <button type="button" className="torn-papers-entry" onClick={() => setElementLibraryCategory('torn-papers')}>
+              <strong aria-hidden="true">▧</strong>
+              <span>Papéis Rasgados</span>
+              <small>{TORN_PAPER_FORMATS.length} recortes · {TORN_PAPER_COLLECTIONS.length} coleções</small>
+            </button>
+            <button type="button" className="scrapbook-entry" onClick={() => setElementLibraryCategory('scrapbook')}>
+              <strong aria-hidden="true">▱</strong>
+              <span>Recortes &amp; Colagens</span>
+              <small>{SCRAPBOOK_MATERIALS.length} materiais de scrapbook</small>
+            </button>
           </div>
 
           <p className="tool-helper-note">
@@ -8007,6 +7850,78 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
     }
 
     return null
+  }
+
+  async function insertPaperieWashi(design: WashiDesign, options: WashiInsertOptions) {
+    setDrawingMode(null)
+    setDrawingDraft(null)
+    const created = await createStructuredElement(
+      'washi', washiData(design, options.edge, options.opacity, options.paper), 300, options.height,
+      activePageId, 110, 120, Math.max(0, ...pageCanvasElements.map(element => element.z_index)) + 1,
+      false, true, true,
+    )
+    return Boolean(created)
+  }
+
+  async function insertTornPaper(format: TornPaperFormat, collection: TornPaperCollection) {
+    setDrawingMode(null)
+    setDrawingDraft(null)
+    const created = await createStructuredElement(
+      'shape', tornPaperData(format, collection), format.width, format.height,
+      activePageId, 110, 120, Math.max(0, ...pageCanvasElements.map(element => element.z_index)) + 1,
+      false, true, true,
+    )
+    return Boolean(created)
+  }
+
+  async function insertScrapbook(material: ScrapbookMaterial, palette: ScrapbookPalette) {
+    setDrawingMode(null)
+    setDrawingDraft(null)
+    const created = await createStructuredElement(
+      'shape', scrapbookData(material, palette), material.width, material.height,
+      activePageId, 110, 120, Math.max(0, ...pageCanvasElements.map(element => element.z_index)) + 1,
+      false, true, true,
+    )
+    return Boolean(created)
+  }
+
+  async function insertPaperieSymbol(symbol: SymbolDefinition, mode: SymbolInsertMode) {
+    // Measure the whole sequence in its fallback font stack; never slice Unicode
+    // to fit a frame. Only newly inserted elements receive these dimensions.
+    const context = document.createElement('canvas').getContext('2d')
+    if (context) context.font = `28px ${SYMBOL_FONT_FAMILY}`
+    const textWidth = context?.measureText(symbol.value).width ?? 180
+    const maxWidth = Math.max(132, sheetWidth - 64)
+    const width = Math.min(maxWidth, Math.max(mode === 'text' ? 180 : 100, textWidth + 36))
+    const fontSize = Math.min(28, 28 * (width - 24) / Math.max(1, textWidth))
+    const data = mode === 'text'
+      ? {
+          text: symbol.value,
+          fontSize,
+          color: '#403a35',
+          fontFamily: SYMBOL_FONT_FAMILY,
+          textAlign: 'center',
+          lineHeight: 1.4,
+        }
+      : {
+          symbol: symbol.value,
+          variant: symbol.id,
+          color: stampColor,
+        }
+    const created = await createStructuredElement(
+      mode === 'text' ? 'text' : 'stamp',
+      data,
+      width,
+      mode === 'text' ? 88 : 80,
+      activePageId,
+      110,
+      120,
+      Math.max(0, ...pageCanvasElements.map(element => element.z_index)) + 1,
+      false,
+      true,
+      true,
+    )
+    return Boolean(created)
   }
 
   function renderPageButton(
@@ -8101,7 +8016,7 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
     activeTool === 'text'
       ? 'Texto'
       : activeTool === 'pen'
-        ? 'Canetas'
+        ? 'Desenhar'
         : activeTool === 'highlighter'
           ? 'Marca-texto'
           : activeTool === 'paper'
@@ -8112,13 +8027,19 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
                 ? 'Fotos'
                 : activeTool === 'elements'
                   ? 'Elementos'
-                  : activeTool === 'templates'
-                    ? 'Templates'
-                    : activeTool === 'tasks'
-                      ? 'Tarefas'
-                      : activeTool === 'more'
-                        ? 'Mais opções'
-                        : ''
+                  : activeTool === 'symbols'
+                    ? 'Símbolos & Charminhos'
+                    : activeTool === 'washi'
+                      ? 'Washi tapes'
+                      : activeTool === 'habits'
+                        ? 'Hábitos'
+                        : activeTool === 'templates'
+                          ? 'Templates'
+                          : activeTool === 'tasks'
+                            ? 'Tarefas'
+                            : activeTool === 'more'
+                              ? 'Mais opções'
+                              : ''
 
   const saveLabel =
     canvasSaveStatus === 'error'
@@ -8502,15 +8423,6 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
                   </span>}
                 </div>
 
-                {!previewMode && <div className="editor-history-controls" aria-label="Histórico de edição">
-                  <button type="button" title="Desfazer" aria-label="Desfazer" disabled={!history.canUndo} onClick={() => void history.undo()}>
-                    <Undo2 size={16} aria-hidden="true" />
-                  </button>
-                  <button type="button" title="Refazer" aria-label="Refazer" disabled={!history.canRedo} onClick={() => void history.redo()}>
-                    <Redo2 size={16} aria-hidden="true" />
-                  </button>
-                </div>}
-
                 {!previewMode && drawingMode !== null && (
                   <div className="active-drawing-pill">
                     <span>
@@ -8545,7 +8457,7 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
               {!previewMode && <div className="template-section-menu">
                 <button type="button" className="template-add-section" aria-expanded={sectionLibraryOpen} onClick={() => setSectionLibraryOpen(current => !current)}>Adicionar seção</button>
                 {sectionLibraryOpen && <div className="template-section-picker" role="group" aria-label="Biblioteca de seções">
-                  {SECTION_TEMPLATES.filter(section => !['study-planner', 'task-receipt'].includes(section.id)).map(section => <button type="button" data-section-template={section.id} key={section.id} onClick={() => {
+                  {SECTION_TEMPLATES.filter(section => !['study-planner', 'task-receipt', 'habit-tracker'].includes(section.id)).map(section => <button type="button" data-section-template={section.id} key={section.id} onClick={() => {
                     void createStructuredElement(section.elementType, {}, Math.min(section.width, sheetWidth - 64), section.height, activePageId, 60, 120, 4)
                     setSectionLibraryOpen(false)
                   }}>{section.name}</button>)}
@@ -8668,6 +8580,7 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
                 </article>
               </div>
 
+              {blockSaveError?.pageId === activePageId && <p className="workspace-floating-error block-action-error" role="alert">{blockSaveError.message} As alterações continuam pendentes; edite o campo ou saia dele para tentar novamente.</p>}
               {(drawingError || (historyError?.pageId === activePageId ? historyError.message : '') || mediaError) && (
                 <p className="workspace-floating-error">
                   {(historyError?.pageId === activePageId ? historyError.message : '') || mediaError || drawingError}
@@ -8688,7 +8601,9 @@ function PageEditor({ initialPageId, scale, focused, agendaTheme = 'light', week
       </section>
 
       {!previewMode && <EditorToolbar activeTool={activeTool} title={activeToolTitle} onTogglePreview={onTogglePreview}
-        onToggle={toggleTool} onClose={() => setActiveTool(null)}>
+        onToggle={toggleTool} onClose={() => setActiveTool(null)} drawingPinned={drawingPinned} onToggleDrawingPin={() => setDrawingPinned(value => !value)}
+        drawingMode={drawingMode} selectionActive={activeTool === null && drawingMode === null} onSelect={activateSelectionTool} onEraser={activateEraserTool}
+        canUndo={history.canUndo} canRedo={history.canRedo} onUndo={() => { void history.undo() }} onRedo={() => { void history.redo() }}>
         {activeTool !== null && renderToolPanelContent()}
       </EditorToolbar>}
     </main>
